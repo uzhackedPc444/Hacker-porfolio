@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>~$ hacker portfolio</title>
+	<meta name="description" content="Hacker uslubidagi shaxsiy portfel">
+	<link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+	<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+
+	<canvas id="matrix"></canvas>
+	<header class="topbar">
+		<nav class="nav">
+			<a href="#home" class="logo">root@Maqsadbek:~$</a>
+			<ul>
+				<li><a href="#about">About</a></li>
+				<li><a href="#skills">Skills</a></li>
+				<li><a href="#projects">Projects</a></li>
+				<li><a href="#contact">Contact</a></li>
+			</ul>
+			<div class="toggles">
+				<label class="switch" title="Matrix Rain">
+					<input id="toggle-matrix" type="checkbox" checked>
+					<span></span>
+				</label>
+			</div>
+		</nav>
+	</header>
+
+	<main>
+		<section id="home" class="hero">
+			<h1><span class="prompt">root@Maqsadbek:~$</span> <span id="type"></span><span class="cursor">█</span></h1>
+			<p class="sub">Ethical future hacker • full‑stack dev • Modder</p>
+			<div class="hero-actions">
+				<a href="#projects" class="btn primary">view_projects.sh</a>
+				<a href="#contact" class="btn">contact_me.sh</a>
+			</div>
+		</section>
+
+		<section id="about" class="panel">
+			<h2>about()</h2>
+			<p>
+				Salom! Men xavfsizlik va web texnologiyalariga qiziqqan dasturchiman. Koding, tahlil va ekspluatatsiya
+				jarayonlarini yoqtiraman. Linux, CLI va avtomatlashtirish mening qurollarim. Ba'zan o'yinlarni modderlashni yoqtiraman.
+			</p>
+		</section>
+
+		<section id="skills" class="panel">
+			<h2>skills()</h2>
+			<ul class="grid tags">
+				<li class="skill linux">Linux</li>
+				<li class="skill bash">Bash/Zsh</li>
+				<li class="skill python">Python</li>
+				<li class="skill javascript">JavaScript/TypeScript</li>
+				<li class="skill node">Node.js</li>
+				<li class="skill react">React</li>
+				<li class="skill nextjs">Next.js</li>
+				<li class="skill express">Express</li>
+				<li class="skill postgresql">PostgreSQL</li>
+				<li class="skill docker">Docker</li>
+				<li class="skill nmap">Nmap</li>
+				<li class="skill burp">Burp Suite</li>
+				<li class="skill owasp">OWASP Top 10</li>
+			</ul>
+		</section>
+
+		<section id="projects" class="panel">
+			<h2>projects()</h2>
+			<div class="grid cards">
+				<article class="card">
+					h3>recon-automator</h3>
+					<p>Bash + Python bilan subdomain enum va port skan avtomatlashtirish.</p>
+					<a class="link" href="#">repo →</a>
+				</article>
+				<article class="card">
+					<h3>ctf-toolkit</h3>
+					<p>CTF uchun kripto, stego va web utilitalar to'plami.</p>
+					<a class="link" href="#">repo →</a>
+				</article>
+				<article class="card">
+					<h3>darkfolio</h3>
+					<p>Static portfolio generator — hacker tematikasi.</p>
+					<a class="link" href="#">demo →</a>
+				</article>
+			</div>
+		</section>
+
+		<section id="contact" class="panel">
+			<h2>contact()</h2>
+			<div class="contact-rows">
+				<div class="row email">
+					<span class="key">email</span>
+					<span class="val"><a href="mailto:you@example.com">ekiuzb999@gmail.com</a></span>
+					<button class="copy" data-copy="you@example.com" title="copy">copy</button>
+				</div>
+				<div class="row github">
+					<span class="key">github</span>
+					<span class="val"><a href="https://github.com/uzHackedPc444" target="_blank" rel="noreferrer">github.com/uzHackedPc444</a></span>
+					<button class="copy" data-copy="https://github.com/uzHackedPc444" title="copy">copy</button>
+				</div>
+				<div class="row telegram">
+					<span class="key">telegram</span>
+					<span class="val"><a href="https://t.me/IM_ALONE37" target="_blank" rel="noreferrer"> @IM_ALONE37</a></span>
+					<button class="copy" data-copy="https://t.me/IM_ALONE37" title="copy">Copy</button>
+				</div>
+			</div>
+		</section>
+	</main>
+
+	<footer class="footer">
+		<p>© <span id="year"></span> you. <span class="dim">Built with ⌨︎ and ☕</span></p>
+	</footer>
+
+	<script src="/script.js"></script>
+</body>
+</html>
