@@ -73,7 +73,7 @@
 			<h2>projects()</h2>
 			<div class="grid cards">
 				<article class="card">
-					h3>recon-automator</h3>
+					<h3>recon-automator</h3>
 					<p>Bash + Python bilan subdomain enum va port skan avtomatlashtirish.</p>
 					<a class="link" href="#">repo →</a>
 				</article>
@@ -95,8 +95,8 @@
 			<div class="contact-rows">
 				<div class="row email">
 					<span class="key">email</span>
-					<span class="val"><a href="mailto:you@example.com">ekiuzb999@gmail.com</a></span>
-					<button class="copy" data-copy="you@example.com" title="copy">copy</button>
+					<span class="val"><a href="mailto:ekiuzb999@gmail.com">ekiuzb999@gmail.com</a></span>
+					<button class="copy" data-copy="ekiuzb999@gmail.com" title="copy">copy</button>
 				</div>
 				<div class="row github">
 					<span class="key">github</span>
@@ -106,11 +106,23 @@
 				<div class="row telegram">
 					<span class="key">telegram</span>
 					<span class="val"><a href="https://t.me/IM_ALONE37" target="_blank" rel="noreferrer"> @IM_ALONE37</a></span>
-					<button class="copy" data-copy="https://t.me/IM_ALONE37" title="copy">Copy</button>
+					<button class="copy" data-copy="https://t.me/IM_ALONE37" title="copy">copy</button>
 				</div>
 			</div>
 		</section>
 	</main>
+
+	<!-- Command palette / mini-terminal -->
+	<div id="cmd" aria-hidden="true">
+		<div class="cmd-panel" role="dialog" aria-modal="true" aria-labelledby="cmd-label">
+			<div class="cmd-header">
+				<span class="prompt">root@Maqsadbek:~$</span>
+				<span id="cmd-label" class="dim">command palette — press Esc to close</span>
+			</div>
+			<input id="cmd-input" type="text" spellcheck="false" autocomplete="off" placeholder="help | about | skills | projects | contact | matrix on/off" />
+			<ul id="cmd-suggestions" aria-live="polite"></ul>
+		</div>
+	</div>
 
 	<footer class="footer">
 		<p>© <span id="year"></span> you. <span class="dim">Built with ⌨︎ and ☕</span></p>
