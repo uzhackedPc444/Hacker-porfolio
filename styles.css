@@ -90,6 +90,42 @@ body {
 	.nav { padding-left: 56px; }
 }
 
+/* Audio player (fixed top-right) */
+.audio-widget {
+	position: fixed;
+	top: 10px;
+	left: 12px; /* move to left corner */
+	z-index: 6; /* above topbar */
+	background: transparent;
+	border: none; /* remove outer border */
+	border-radius: 10px;
+	padding: 0;
+}
+.audio-widget audio {
+	width: 240px;
+	height: 32px;
+	outline: none;
+	border: none;
+	accent-color: var(--accent);
+}
+
+/* Dark hacker theme for native controls (WebKit/Blink) */
+.audio-widget audio::-webkit-media-controls-enclosure {
+	background: #0c120e;
+	border: 1px solid var(--border);
+	border-radius: 10px;
+	box-shadow: 0 6px 20px var(--shadow), 0 0 0 2px var(--shadow) inset;
+}
+.audio-widget audio::-webkit-media-controls-panel { background: transparent; }
+.audio-widget audio::-webkit-media-controls-current-time-display,
+.audio-widget audio::-webkit-media-controls-time-remaining-display { color: #b6ffd0; }
+.audio-widget audio::-webkit-media-controls-timeline { filter: hue-rotate(70deg) saturate(1.2); }
+.audio-widget audio::-webkit-media-controls-mute-button,
+.audio-widget audio::-webkit-media-controls-play-button { filter: hue-rotate(95deg) saturate(2) brightness(1.05); }
+
+/* Remove focus outline on supported browsers */
+.audio-widget audio:focus { outline: none; }
+
 /* Toggle switch */
 .switch { position: relative; display: inline-block; width: 42px; height: 22px; }
 .switch input { display: none; }
