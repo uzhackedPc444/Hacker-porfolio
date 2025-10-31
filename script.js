@@ -22,6 +22,31 @@
 	setTimeout(tick, 500);
 })();
 
+// Audio player track selector
+(function() {
+	function setupAudioSelector() {
+		const select = document.getElementById('audio-select');
+		const audio = document.getElementById('site-audio');
+		if (!select || !audio) return;
+
+		select.addEventListener('change', async () => {
+			audio.src = select.value;
+			audio.load();
+			try {
+				await audio.play();
+			} catch (_) {
+				// Autoplay may be blocked; user can press play
+			}
+		});
+	}
+
+	if (document.readyState === 'loading') {
+		document.addEventListener('DOMContentLoaded', setupAudioSelector);
+	} else {
+		setupAudioSelector();
+	}
+})();
+
 // Smooth scroll for nav links
 (function() {
 	document.querySelectorAll('a[href^="#"]').forEach(a => {

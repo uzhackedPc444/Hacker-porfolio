@@ -109,6 +109,18 @@ body {
 	accent-color: var(--accent);
 }
 
+.audio-widget select {
+	margin-right: 8px;
+	background: #0c120e;
+	color: var(--text);
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	padding: 6px 10px;
+	font-family: inherit;
+	box-shadow: 0 0 0 2px var(--shadow) inset;
+}
+.audio-widget select:focus { outline: none; border-color: var(--accent); }
+
 /* Dark hacker theme for native controls (WebKit/Blink) */
 .audio-widget audio::-webkit-media-controls-enclosure {
 	background: #0c120e;
