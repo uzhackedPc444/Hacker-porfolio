@@ -1,0 +1,1670 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CYBERDECK OS - Windows 11 Hacker Simulation</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        /*
+        =======================================================
+        1. GLOBAL STYLES & THEME
+        =======================================================
+        */
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+
+        :root {
+            --color-neon-cyan: #00ffff;
+            --color-neon-magenta: #ff00ff;
+            --color-neon-green: #00ff7f;
+            --color-dark-bg: #0d1117;
+            --color-glass-dark: rgba(25, 30, 40, 0.85);
+            --color-glass-light: rgba(40, 45, 60, 0.7);
+            --neon-glow-cyan: 0 0 5px var(--color-neon-cyan), 0 0 10px var(--color-neon-cyan);
+            --neon-glow-magenta: 0 0 5px var(--color-neon-magenta), 0 0 10px var(--color-neon-magenta);
+            --neon-glow-green: 0 0 5px var(--color-neon-green), 0 0 10px var(--color-neon-green);
+        }
+
+        /* Neon Cursor (Optional) */
+        body {
+            cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 30 30"><path fill="%2300FFFF" d="M12.984 4.016l-8.984 21.984 5.984-2.484 2.5 7.484 2-0.625-2.5-7.484 7.5-3.031z"/></svg>'), auto;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            overflow: hidden;
+            background-color: var(--color-dark-bg);
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--color-neon-cyan);
+            user-select: none;
+            position: relative;
+            /* Smooth fade-in on startup */
+            animation: fadeIn 1s ease-out forwards;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        /* Animated Grid/Circuit Background */
+        #desktop-bg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            background: 
+                linear-gradient(rgba(0, 255, 255, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 255, 255, 0.05) 1px, transparent 1px);
+            background-size: 50px 50px;
+            animation: moveGrid 30s linear infinite;
+        }
+
+        @keyframes moveGrid {
+            0% { background-position: 0 0; }
+            100% { background-position: -500px -500px; }
+        }
+
+        /*
+        =======================================================
+        2. DESKTOP & TASKBAR
+        =======================================================
+        */
+        #desktop {
+            padding: 10px;
+            height: calc(100% - 50px); /* Account for taskbar height */
+            position: relative;
+        }
+
+        /* Desktop Icon Styles */
+        .desktop-icon {
+            width: 80px;
+            height: 80px;
+            margin: 10px;
+            text-align: center;
+            padding: 5px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            position: absolute; /* Allows for easy placement */
+        }
+
+        .desktop-icon:nth-child(1) { top: 10px; left: 10px; }
+        .desktop-icon:nth-child(2) { top: 100px; left: 10px; }
+        .desktop-icon:nth-child(3) { top: 190px; left: 10px; }
+        .desktop-icon:nth-child(4) { top: 280px; left: 10px; }
+
+        .desktop-icon:hover {
+            background-color: var(--color-glass-light);
+            border-radius: 5px;
+            box-shadow: var(--neon-glow-cyan);
+            transform: scale(1.05);
+        }
+
+        .desktop-icon-img {
+            font-size: 36px;
+            display: block;
+            margin: 0 auto 5px;
+            text-shadow: var(--neon-glow-cyan);
+        }
+
+        .desktop-icon-label {
+            font-size: 12px;
+            text-shadow: 1px 1px 2px #000;
+            color: var(--color-neon-green);
+        }
+
+        /* Taskbar Styles (Blurred Glass) */
+        #taskbar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 50px;
+            background-color: var(--color-glass-dark);
+            backdrop-filter: blur(10px);
+            border-top: 1px solid rgba(0, 255, 255, 0.2);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 0 10px;
+            box-shadow: 0 -2px 10px rgba(0, 255, 255, 0.3);
+            z-index: 1000;
+        }
+
+        #taskbar-icons {
+            display: flex;
+            gap: 10px;
+            flex-grow: 1;
+            justify-content: center;
+        }
+
+        .taskbar-icon {
+            width: 40px;
+            height: 40px;
+            font-size: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s, box-shadow 0.3s;
+            color: var(--color-neon-cyan);
+            text-shadow: var(--neon-glow-cyan);
+        }
+
+        .taskbar-icon:hover {
+            background-color: rgba(0, 255, 255, 0.1);
+            box-shadow: var(--neon-glow-cyan);
+        }
+
+        .taskbar-icon.open {
+            border-bottom: 3px solid var(--color-neon-magenta);
+            background-color: rgba(0, 255, 255, 0.2);
+            box-shadow: var(--neon-glow-magenta);
+        }
+
+        #taskbar-clock {
+            position: absolute;
+            right: 15px;
+            font-size: 14px;
+            color: var(--color-neon-green);
+            text-shadow: var(--neon-glow-green);
+        }
+
+        /*
+        =======================================================
+        3. WINDOWS (APP UI)
+        =======================================================
+        */
+        .window {
+            position: absolute;
+            min-width: 300px;
+            min-height: 200px;
+            background-color: var(--color-glass-dark);
+            border: 2px solid var(--color-neon-cyan);
+            box-shadow: var(--neon-glow-cyan);
+            border-radius: 10px;
+            overflow: hidden;
+            resize: both;
+            z-index: 100;
+            opacity: 0;
+            transform: scale(0.8);
+            transition: opacity 0.3s, transform 0.3s, box-shadow 0.3s;
+            backdrop-filter: blur(8px);
+        }
+
+        .window.active {
+            box-shadow: 0 0 15px 5px var(--color-neon-magenta); /* Bright glow for active window */
+            border-color: var(--color-neon-magenta);
+        }
+
+        .window.show {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .window-header {
+            padding: 8px 12px;
+            background-color: rgba(0, 255, 255, 0.1);
+            cursor: grab;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--color-neon-cyan);
+            color: var(--color-neon-green);
+            text-shadow: var(--neon-glow-green);
+        }
+
+        .window-header:active {
+            cursor: grabbing;
+        }
+
+        .window-controls {
+            display: flex;
+            gap: 5px;
+        }
+
+        .window-control-btn {
+            background: none;
+            border: none;
+            font-size: 16px;
+            color: var(--color-neon-cyan);
+            cursor: pointer;
+            padding: 2px 5px;
+            transition: color 0.2s, background-color 0.2s;
+        }
+
+        .window-control-btn:hover {
+            color: var(--color-neon-magenta);
+            background-color: rgba(255, 0, 255, 0.2);
+            box-shadow: 0 0 5px var(--color-neon-magenta);
+        }
+
+        .window-body {
+            padding: 10px;
+            height: calc(100% - 37px); /* Account for header height */
+            overflow: auto;
+            color: var(--color-neon-cyan);
+        }
+
+        /*
+        =======================================================
+        4. FILE EXPLORER STYLES
+        =======================================================
+        */
+        #explorer-body {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .explorer-toolbar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+            padding-bottom: 5px;
+            border-bottom: 1px dashed rgba(0, 255, 255, 0.3);
+        }
+
+        .explorer-btn {
+            background-color: rgba(0, 255, 127, 0.1);
+            color: var(--color-neon-green);
+            border: 1px solid var(--color-neon-green);
+            padding: 5px 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-shadow: var(--neon-glow-green);
+        }
+
+        .explorer-btn:hover {
+            background-color: rgba(0, 255, 127, 0.3);
+            box-shadow: var(--neon-glow-green);
+        }
+
+        #explorer-content {
+            flex-grow: 1;
+            overflow-y: auto;
+        }
+
+        .file-item, .folder-item {
+            display: flex;
+            align-items: center;
+            padding: 5px;
+            border-radius: 3px;
+            transition: background-color 0.2s, box-shadow 0.2s;
+            cursor: pointer;
+        }
+
+        .file-item:hover, .folder-item:hover {
+            background-color: rgba(0, 255, 255, 0.1);
+            box-shadow: var(--neon-glow-cyan);
+        }
+
+        .file-item i, .folder-item i {
+            margin-right: 10px;
+            font-size: 18px;
+            color: var(--color-neon-magenta);
+        }
+        
+        .file-item.txt i {
+            color: var(--color-neon-cyan);
+        }
+
+        /* File Editor Modal (Mini Window) */
+        #file-editor {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.9);
+            width: 400px;
+            height: 300px;
+            background-color: var(--color-glass-dark);
+            border: 2px solid var(--color-neon-magenta);
+            box-shadow: var(--neon-glow-magenta);
+            border-radius: 8px;
+            padding: 10px;
+            z-index: 200;
+            display: none;
+            flex-direction: column;
+            transition: transform 0.3s, opacity 0.3s;
+        }
+
+        #file-editor.show {
+            display: flex;
+            transform: translate(-50%, -50%) scale(1);
+        }
+
+        #file-editor textarea {
+            flex-grow: 1;
+            background-color: rgba(0, 0, 0, 0.5);
+            border: 1px solid var(--color-neon-cyan);
+            color: var(--color-neon-green);
+            padding: 10px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            resize: none;
+            margin-bottom: 10px;
+        }
+
+        #file-editor button {
+            align-self: flex-end;
+        }
+
+        /*
+        =======================================================
+        5. TERMINAL STYLES
+        =======================================================
+        */
+        #terminal-body {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 0;
+        }
+
+        #terminal-output {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 5px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-size: 14px;
+            color: var(--color-neon-green);
+            text-shadow: 0 0 2px var(--color-neon-green);
+        }
+
+        .terminal-line {
+            line-height: 1.4;
+        }
+        
+        .terminal-line.input-prefix {
+            color: var(--color-neon-cyan);
+        }
+        
+        .terminal-line.error {
+            color: var(--color-neon-magenta);
+        }
+
+        .terminal-line.folder-name {
+            color: var(--color-neon-magenta);
+        }
+
+        #terminal-input-container {
+            display: flex;
+            padding: 5px;
+            border-top: 1px solid var(--color-neon-cyan);
+        }
+
+        #terminal-input {
+            flex-grow: 1;
+            background: none;
+            border: none;
+            outline: none;
+            color: var(--color-neon-green);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+        }
+
+        /*
+        =======================================================
+        6. CALCULATOR STYLES
+        =======================================================
+        */
+        #calc-body {
+            display: grid;
+            grid-template-rows: 1fr 4fr;
+            gap: 10px;
+            height: 100%;
+        }
+
+        #calc-display {
+            background-color: rgba(0, 0, 0, 0.5);
+            border: 1px solid var(--color-neon-cyan);
+            text-align: right;
+            padding: 10px;
+            font-size: 30px;
+            overflow: hidden;
+            white-space: nowrap;
+            color: var(--color-neon-green);
+            text-shadow: var(--neon-glow-green);
+        }
+
+        #calc-buttons {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 5px;
+        }
+
+        .calc-btn {
+            background-color: rgba(0, 255, 255, 0.1);
+            border: 1px solid var(--color-neon-cyan);
+            color: var(--color-neon-cyan);
+            font-size: 20px;
+            padding: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-shadow: var(--neon-glow-cyan);
+        }
+
+        .calc-btn:hover {
+            background-color: rgba(0, 255, 255, 0.3);
+            box-shadow: var(--neon-glow-cyan);
+            transform: scale(1.05);
+        }
+
+        .calc-btn.op {
+            background-color: rgba(255, 0, 255, 0.1);
+            border-color: var(--color-neon-magenta);
+            color: var(--color-neon-magenta);
+            text-shadow: var(--neon-glow-magenta);
+        }
+
+        .calc-btn.eq {
+            background-color: var(--color-neon-green);
+            color: var(--color-dark-bg);
+            border-color: var(--color-neon-green);
+            grid-column: span 2;
+            text-shadow: none;
+        }
+
+        /*
+        =======================================================
+        7. PAINT APP STYLES
+        =======================================================
+        */
+        #paint-body {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        #paint-controls {
+            display: flex;
+            gap: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px dashed var(--color-neon-cyan);
+            margin-bottom: 10px;
+        }
+
+        #paint-controls input[type="color"] {
+            border: none;
+            width: 40px;
+            height: 25px;
+            padding: 0;
+            cursor: pointer;
+        }
+
+        #paint-controls label {
+            display: flex;
+            align-items: center;
+        }
+
+        #paint-canvas {
+            background-color: rgba(0, 0, 0, 0.8);
+            border: 1px solid var(--color-neon-green);
+            cursor: crosshair;
+            flex-grow: 1;
+            box-shadow: 0 0 5px var(--color-neon-green);
+        }
+
+        /*
+        =======================================================
+        8. CONTEXT MENU STYLES (O'ng tugma menyusi)
+        =======================================================
+        */
+        #context-menu {
+            position: fixed;
+            z-index: 500; /* Boshqa hamma narsadan yuqori */
+            background-color: var(--color-glass-dark);
+            backdrop-filter: blur(15px);
+            border: 1px solid var(--color-neon-magenta);
+            border-radius: 5px;
+            box-shadow: var(--neon-glow-magenta);
+            padding: 5px 0;
+            display: none; /* Dastlab yashirilgan */
+            min-width: 250px;
+        }
+
+        .context-item {
+            padding: 8px 15px;
+            cursor: pointer;
+            color: var(--color-neon-cyan);
+            font-size: 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background-color 0.2s;
+        }
+
+        .context-item:hover {
+            background-color: rgba(255, 0, 255, 0.2);
+            box-shadow: 0 0 3px var(--color-neon-magenta) inset;
+        }
+
+        .context-separator {
+            height: 1px;
+            background-color: rgba(255, 0, 255, 0.3);
+            margin: 5px 0;
+        }
+
+        .context-icon {
+            margin-right: 10px;
+            color: var(--color-neon-green);
+        }
+
+        .context-shortcut {
+            font-size: 10px;
+            opacity: 0.6;
+            margin-left: 15px;
+        }
+
+        /*
+        =======================================================
+        9. EXTRA UI / FEATURES (BOOT SCREEN)
+        =======================================================
+        */
+        #boot-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--color-dark-bg);
+            z-index: 1001;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            transition: opacity 1s ease-out;
+        }
+
+        #boot-logo {
+            font-size: 48px;
+            margin-bottom: 20px;
+            color: var(--color-neon-magenta);
+            text-shadow: var(--neon-glow-magenta);
+            overflow: hidden;
+            white-space: nowrap;
+            border-right: 0.1em solid var(--color-neon-magenta);
+            animation: typing 1.5s steps(18, end), blink-caret 0.75s step-end infinite;
+        }
+        
+        #boot-message {
+            color: var(--color-neon-green);
+            text-shadow: var(--neon-glow-green);
+            margin-top: 10px;
+        }
+
+        @keyframes typing {
+            from { width: 0 }
+            to { width: 450px } /* Adjust width based on text length */
+        }
+
+        @keyframes blink-caret {
+            from, to { border-color: transparent }
+            50% { border-color: var(--color-neon-magenta) }
+        }
+
+        #loading-bar {
+            width: 300px;
+            height: 10px;
+            border: 1px solid var(--color-neon-cyan);
+            margin-top: 30px;
+            overflow: hidden;
+        }
+
+        #loading-progress {
+            height: 100%;
+            width: 0;
+            background-color: var(--color-neon-cyan);
+            box-shadow: var(--neon-glow-cyan);
+            transition: width 0.1s linear;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="boot-screen">
+        <div id="boot-logo">CYBERDECK OS v3.1</div>
+        <div id="loading-bar"><div id="loading-progress"></div></div>
+        <div id="boot-message">INITIALIZING CORE...</div>
+    </div>
+
+    <div id="desktop-bg"></div>
+    <div id="desktop">
+        <div class="desktop-icon" data-app="explorer">
+            <i class="fas fa-folder-tree desktop-icon-img"></i>
+            <div class="desktop-icon-label">File Explorer</div>
+        </div>
+        <div class="desktop-icon" data-app="terminal">
+            <i class="fas fa-terminal desktop-icon-img"></i>
+            <div class="desktop-icon-label">Terminal</div>
+        </div>
+        <div class="desktop-icon" data-app="paint">
+            <i class="fas fa-paint-brush desktop-icon-img"></i>
+            <div class="desktop-icon-label">Paint</div>
+        </div>
+        <div class="desktop-icon" data-app="calculator">
+            <i class="fas fa-calculator desktop-icon-img"></i>
+            <div class="desktop-icon-label">Calculator</div>
+        </div>
+    </div>
+
+    <div id="taskbar">
+        <div id="taskbar-icons">
+            </div>
+        <div id="taskbar-clock">00:00:00</div>
+    </div>
+
+    <div id="window-explorer" class="window" style="width: 500px; height: 400px; top: 100px; left: 100px;" data-app-id="explorer">
+        <div class="window-header">
+            <span class="window-title">File Explorer</span>
+            <div class="window-controls">
+                <button class="window-control-btn minimize-btn" onclick="minimizeWindow('explorer')">_</button>
+                <button class="window-control-btn close-btn" onclick="closeWindow('explorer')">X</button>
+            </div>
+        </div>
+        <div class="window-body" id="explorer-body">
+            <div class="explorer-toolbar">
+                <button class="explorer-btn" onclick="createFileItem('folder')"><i class="fas fa-folder-plus"></i> New Folder</button>
+                <button class="explorer-btn" onclick="createFileItem('file')"><i class="fas fa-file-circle-plus"></i> New File.txt</button>
+            </div>
+            <div id="explorer-content">
+                </div>
+        </div>
+    </div>
+
+    <div id="file-editor">
+        <div class="window-header">
+            <span id="file-editor-title">Editing:</span>
+        </div>
+        <textarea id="file-editor-textarea" placeholder="Enter text here..."></textarea>
+        <button class="explorer-btn" onclick="saveFileEditor()">Save & Close</button>
+    </div>
+
+    <div id="window-terminal" class="window" style="width: 600px; height: 450px; top: 150px; left: 600px;" data-app-id="terminal">
+        <div class="window-header">
+            <span class="window-title">Terminal - CYBERDECK_CLI</span>
+            <div class="window-controls">
+                <button class="window-control-btn minimize-btn" onclick="minimizeWindow('terminal')">_</button>
+                <button class="window-control-btn close-btn" onclick="closeWindow('terminal')">X</button>
+            </div>
+        </div>
+        <div class="window-body" id="terminal-body">
+            <div id="terminal-output"></div>
+            <div id="terminal-input-container">
+                <span class="terminal-line input-prefix" id="terminal-path-prefix">C:\></span>
+                <input type="text" id="terminal-input" autofocus>
+            </div>
+        </div>
+    </div>
+
+    <div id="window-calculator" class="window" style="width: 300px; height: 400px; top: 200px; left: 300px;" data-app-id="calculator">
+        <div class="window-header">
+            <span class="window-title">Calculator</span>
+            <div class="window-controls">
+                <button class="window-control-btn minimize-btn" onclick="minimizeWindow('calculator')">_</button>
+                <button class="window-control-btn close-btn" onclick="closeWindow('calculator')">X</button>
+            </div>
+        </div>
+        <div class="window-body" id="calc-body">
+            <div id="calc-display">0</div>
+            <div id="calc-buttons">
+                <button class="calc-btn op" data-val="C">C</button>
+                <button class="calc-btn op" data-val="%">%</button>
+                <button class="calc-btn op" data-val="/">÷</button>
+                <button class="calc-btn op" data-val="*">×</button>
+
+                <button class="calc-btn" data-val="7">7</button>
+                <button class="calc-btn" data-val="8">8</button>
+                <button class="calc-btn" data-val="9">9</button>
+                <button class="calc-btn op" data-val="-">−</button>
+
+                <button class="calc-btn" data-val="4">4</button>
+                <button class="calc-btn" data-val="5">5</button>
+                <button class="calc-btn" data-val="6">6</button>
+                <button class="calc-btn op" data-val="+">+</button>
+
+                <button class="calc-btn" data-val="1">1</button>
+                <button class="calc-btn" data-val="2">2</button>
+                <button class="calc-btn" data-val="3">3</button>
+                <button class="calc-btn" data-val=".">.</button>
+
+                <button class="calc-btn" data-val="0">0</button>
+                <button class="calc-btn eq" data-val="=">=</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="window-paint" class="window" style="width: 700px; height: 500px; top: 50px; left: 400px;" data-app-id="paint">
+        <div class="window-header">
+            <span class="window-title">Paint - Neon Scribbler</span>
+            <div class="window-controls">
+                <button class="window-control-btn minimize-btn" onclick="minimizeWindow('paint')">_</button>
+                <button class="window-control-btn close-btn" onclick="closeWindow('paint')">X</button>
+            </div>
+        </div>
+        <div class="window-body" id="paint-body">
+            <div id="paint-controls">
+                <button class="explorer-btn" onclick="clearCanvas()">Clear Canvas</button>
+                <label for="color-picker">Color:</label><input type="color" id="color-picker" value="#00ff7f">
+                <label for="brush-size">Size:</label><input type="range" id="brush-size" min="1" max="50" value="5">
+                <span id="brush-size-display">5</span>
+            </div>
+            <canvas id="paint-canvas"></canvas>
+        </div>
+    </div>
+
+    <div id="context-menu">
+        <div class="context-item" data-action="cut"><span class="context-icon">✂️</span> Вырезать</div>
+        <div class="context-item" data-action="copy"><span class="context-icon">📄</span> Копировать</div>
+        <div class="context-separator"></div>
+        <div class="context-item" data-action="rename"><span class="context-icon">📂</span> Переименовать</div>
+        <div class="context-item" data-action="delete"><span class="context-icon">🗑️</span> Удалить</div>
+        <div class="context-separator"></div>
+        <div class="context-item" data-action="open">Открыть</div>
+        <div class="context-item" data-action="new-tab">Открыть в новой вкладке</div>
+        <div class="context-item" data-action="new-window">Открыть в новом окне</div>
+        <div class="context-separator"></div>
+        <div class="context-item" data-action="terminal">Открыть в Терминале</div>
+        <div class="context-item" data-action="properties">Свойства <span class="context-shortcut">Alt + Enter</span></div>
+        <div class="context-separator"></div>
+        <div class="context-item" data-action="show-more">Показать дополнительные параметры</div>
+    </div>
+
+    <script>
+        /*
+        =======================================================
+        JAVASCRIPT CORE LOGIC
+        =======================================================
+        */
+
+        let zIndexCounter = 100;
+        let activeWindowId = null;
+        let lastPositions = {};
+        const openApps = new Set();
+        const apps = document.querySelectorAll('.window');
+        const desktopIcons = document.querySelectorAll('.desktop-icon');
+
+        // Kontekst menyu elementlari
+        const contextMenu = document.getElementById('context-menu');
+        let selectedFileElement = null; // Kontekst menyu ochilgan element
+
+        // Global o'ng tugma bosishni ushlash (menyuni yopish uchun)
+        document.addEventListener('click', (e) => {
+            // Agar bosilgan element kontekst menyu yoki uning ichida bo'lmasa, menyuni yop
+            if (!contextMenu.contains(e.target)) {
+                contextMenu.style.display = 'none';
+                // Faol tanlovni tozalash
+                document.querySelectorAll('.file-item, .folder-item').forEach(i => i.style.backgroundColor = 'transparent');
+                selectedFileElement = null;
+            }
+        });
+        // Menyu elementlarida o'ng tugmani bosish menyuni yopmasligi uchun
+        contextMenu.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+        });
+
+
+        // --- 1. BOOT SEQUENCE ---
+        document.addEventListener('DOMContentLoaded', bootSequence);
+
+        function bootSequence() {
+            const loadingBar = document.getElementById('loading-progress');
+            const bootScreen = document.getElementById('boot-screen');
+            let progress = 0;
+
+            const interval = setInterval(() => {
+                progress += Math.floor(Math.random() * 5) + 1; // Random progress increase
+                if (progress > 100) progress = 100;
+                loadingBar.style.width = progress + '%';
+
+                if (progress >= 100) {
+                    clearInterval(interval);
+                    setTimeout(() => {
+                        bootScreen.style.opacity = 0;
+                        setTimeout(() => bootScreen.remove(), 1000); // Remove after fade
+                        initializeDesktop();
+                    }, 500);
+                }
+            }, 50);
+        }
+
+        function initializeDesktop() {
+            // Setup initial clock
+            updateClock();
+            setInterval(updateClock, 1000);
+
+            // Add event listeners for desktop icons
+            desktopIcons.forEach(icon => {
+                icon.addEventListener('click', () => openWindow(icon.dataset.app));
+            });
+
+            // Initialize app data (e.g., File Explorer content)
+            initializeAppData();
+
+            // Initialize App functionality
+            initCalculator();
+            initPaint();
+            initTerminal();
+        }
+
+        // --- 2. CLOCK AND TASKBAR ---
+        function updateClock() {
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            document.getElementById('taskbar-clock').textContent = timeStr;
+        }
+
+        function updateTaskbar(appId, isOpen) {
+            const taskbarIcons = document.getElementById('taskbar-icons');
+            let icon = document.querySelector(`.taskbar-icon[data-app-id="${appId}"]`);
+
+            if (isOpen && !icon) {
+                // Create icon
+                const desktopIcon = document.querySelector(`.desktop-icon[data-app="${appId}"]`);
+                const iconClass = desktopIcon.querySelector('i').className;
+                const newIcon = document.createElement('div');
+                newIcon.className = 'taskbar-icon open';
+                newIcon.dataset.appId = appId;
+                newIcon.innerHTML = `<i class="${iconClass}"></i>`;
+                newIcon.addEventListener('click', () => {
+                    const windowElement = document.getElementById(`window-${appId}`);
+                    if (windowElement.classList.contains('show')) {
+                        // Minimize if already open and active
+                        minimizeWindow(appId);
+                    } else {
+                        // Restore/Focus
+                        openWindow(appId);
+                    }
+                });
+                taskbarIcons.appendChild(newIcon);
+                openApps.add(appId);
+            } else if (!isOpen && icon) {
+                // Remove icon
+                icon.remove();
+                openApps.delete(appId);
+            } else if (icon) {
+                // Update state (focus/unfocus)
+                icon.classList.toggle('open', isOpen);
+            }
+        }
+
+        // --- 3. WINDOW MANAGEMENT (Open, Close, Drag, Focus) ---
+
+        function openWindow(appId) {
+            const windowElement = document.getElementById(`window-${appId}`);
+            if (!windowElement) return;
+
+            // Restore position if available
+            if (lastPositions[appId]) {
+                windowElement.style.top = lastPositions[appId].top;
+                windowElement.style.left = lastPositions[appId].left;
+            }
+
+            windowElement.classList.add('show');
+            updateTaskbar(appId, true);
+            focusWindow(appId);
+        }
+
+        function closeWindow(appId) {
+            const windowElement = document.getElementById(`window-${appId}`);
+            if (!windowElement) return;
+
+            // Smooth close animation
+            windowElement.classList.remove('show');
+
+            // Save last position before closing
+            lastPositions[appId] = {
+                top: windowElement.style.top,
+                left: windowElement.style.left
+            };
+
+            setTimeout(() => {
+                updateTaskbar(appId, false);
+                if (activeWindowId === appId) activeWindowId = null;
+                // De-activate app specific logic (e.g., Paint)
+                if (appId === 'paint') isDrawing = false;
+            }, 300); // Match CSS transition duration
+        }
+
+        function minimizeWindow(appId) {
+            const windowElement = document.getElementById(`window-${appId}`);
+            if (!windowElement) return;
+            
+            // Save last position before minimizing
+            lastPositions[appId] = {
+                top: windowElement.style.top,
+                left: windowElement.style.left
+            };
+
+            windowElement.classList.remove('show');
+            
+            // If the minimized window was active, clear active state
+            if (activeWindowId === appId) {
+                windowElement.classList.remove('active');
+                activeWindowId = null;
+            }
+        }
+
+        function focusWindow(appId) {
+            const windowElement = document.getElementById(`window-${appId}`);
+            if (!windowElement || activeWindowId === appId) return;
+
+            // Remove active state from previous active window
+            if (activeWindowId) {
+                const prevActive = document.getElementById(`window-${activeWindowId}`);
+                if (prevActive) prevActive.classList.remove('active');
+            }
+
+            // Set new active window
+            activeWindowId = appId;
+            windowElement.classList.add('active');
+            windowElement.style.zIndex = ++zIndexCounter;
+
+            // Update taskbar icon to active state
+            document.querySelectorAll('.taskbar-icon').forEach(icon => {
+                icon.classList.remove('open');
+            });
+            const taskbarIcon = document.querySelector(`.taskbar-icon[data-app-id="${appId}"]`);
+            if (taskbarIcon) taskbarIcon.classList.add('open');
+        }
+
+
+        // Handle window dragging
+        apps.forEach(windowElement => {
+            const header = windowElement.querySelector('.window-header');
+            const appId = windowElement.dataset.appId;
+            let isDragging = false;
+            let currentX, currentY, initialX, initialY, xOffset = 0, yOffset = 0;
+
+            header.addEventListener('mousedown', dragStart);
+            windowElement.addEventListener('mousedown', () => focusWindow(appId)); // Focus on click anywhere on window
+
+            function dragStart(e) {
+                // Only allow dragging with left mouse button
+                if (e.button !== 0) return;
+                
+                initialX = e.clientX - xOffset;
+                initialY = e.clientY - yOffset;
+                isDragging = true;
+                header.style.cursor = 'grabbing';
+                document.addEventListener('mousemove', drag);
+                document.addEventListener('mouseup', dragEnd);
+                e.preventDefault(); // Prevent text selection
+            }
+
+            function drag(e) {
+                if (!isDragging) return;
+                
+                currentX = e.clientX - initialX;
+                currentY = e.clientY - initialY;
+                
+                xOffset = currentX;
+                yOffset = currentY;
+
+                windowElement.style.transform = `translate3d(${currentX}px, ${currentY}px, 0)`;
+                // Update position in lastPositions for restoration if dragged
+                lastPositions[appId] = {
+                    top: `${windowElement.offsetTop + currentY}px`,
+                    left: `${windowElement.offsetLeft + currentX}px`
+                };
+            }
+
+            function dragEnd(e) {
+                if (!isDragging) return;
+                
+                initialX = currentX;
+                initialY = currentY;
+                isDragging = false;
+                header.style.cursor = 'grab';
+                document.removeEventListener('mousemove', drag);
+                document.removeEventListener('mouseup', dragEnd);
+
+                // Apply final position as 'top' and 'left' instead of transform
+                windowElement.style.top = `${windowElement.offsetTop + yOffset}px`;
+                windowElement.style.left = `${windowElement.offsetLeft + xOffset}px`;
+                windowElement.style.transform = 'none';
+                xOffset = 0;
+                yOffset = 0;
+            }
+        });
+
+        // --- 4. FILE EXPLORER LOGIC & LOCALSTORAGE ---
+
+        const FS_KEY = 'cyberdeck_file_system';
+        const DEFAULT_FS = {
+            'Documents': { type: 'folder', children: {} },
+            'System_Logs': { type: 'folder', children: {} },
+            'README.txt': { type: 'file', content: 'Welcome to CYBERDECK OS. Use the terminal for advanced operations.' },
+            'credentials.txt': { type: 'file', content: 'Username: hacker\nPassword: 1337' }
+        };
+        
+        let fileSystem = {};
+        let currentPath = []; // Tracks the current folder hierarchy
+
+        function loadFileSystem() {
+            try {
+                const savedFs = localStorage.getItem(FS_KEY);
+                fileSystem = savedFs ? JSON.parse(savedFs) : DEFAULT_FS;
+            } catch (e) {
+                console.error("Error loading file system from localStorage:", e);
+                fileSystem = DEFAULT_FS;
+            }
+        }
+
+        function saveFileSystem() {
+            try {
+                localStorage.setItem(FS_KEY, JSON.stringify(fileSystem));
+            } catch (e) {
+                console.error("Error saving file system to localStorage:", e);
+            }
+        }
+
+        function initializeAppData() {
+            loadFileSystem();
+            renderExplorerContent();
+        }
+
+        function getCurrentFolder() {
+            let current = fileSystem;
+            for (const key of currentPath) {
+                if (!current[key] || current[key].type !== 'folder') {
+                    // Path error, reset to root
+                    currentPath = [];
+                    return fileSystem;
+                }
+                current = current[key].children;
+            }
+            return current;
+        }
+
+        function renderExplorerContent() {
+            const contentDiv = document.getElementById('explorer-content');
+            contentDiv.innerHTML = '';
+            const currentFolder = getCurrentFolder();
+            
+            // Update terminal path prefix
+            const pathPrefix = 'C:\\' + currentPath.join('\\') + '>';
+            document.getElementById('terminal-path-prefix').textContent = pathPrefix;
+
+            // Add '..' to go up a directory
+            if (currentPath.length > 0) {
+                const upEl = document.createElement('div');
+                upEl.className = 'folder-item';
+                upEl.innerHTML = `<i class="fas fa-folder-open"></i> .. (Go Up)`;
+                upEl.dataset.itemName = '..'; // Kontekst menyu uchun nom saqlash
+                upEl.ondblclick = () => navigateFolder('..');
+                contentDiv.appendChild(upEl);
+            }
+
+            // Render current folder contents
+            for (const name in currentFolder) {
+                const item = currentFolder[name];
+                const el = document.createElement('div');
+                el.dataset.itemName = name; // Element nomini saqlash
+
+                if (item.type === 'folder') {
+                    el.className = 'folder-item';
+                    el.innerHTML = `<i class="fas fa-folder"></i> ${name}`;
+                    el.ondblclick = () => navigateFolder(name);
+                } else { // file
+                    el.className = 'file-item txt';
+                    el.innerHTML = `<i class="fas fa-file-alt"></i> ${name}`;
+                    el.ondblclick = () => openFileEditor(name, item);
+                    el.dataset.filename = name;
+                }
+
+                // *** O'NG TUGMA (CONTEXT MENU) ESHITUVCHISI ***
+                el.addEventListener('contextmenu', (e) => {
+                    e.preventDefault(); 
+                    
+                    selectedFileElement = el; 
+                    contextMenu.style.top = `${e.clientY}px`;
+                    contextMenu.style.left = `${e.clientX}px`;
+                    contextMenu.style.display = 'block';
+
+                    document.querySelectorAll('.file-item, .folder-item').forEach(i => i.style.backgroundColor = 'transparent');
+                    el.style.backgroundColor = 'rgba(0, 255, 255, 0.2)';
+
+                    e.stopPropagation(); 
+                });
+                // *******************************************************
+
+                contentDiv.appendChild(el);
+            }
+        }
+
+        function navigateFolder(name) {
+            if (name === '..') {
+                currentPath.pop();
+            } else {
+                const current = getCurrentFolder();
+                if (current[name] && current[name].type === 'folder') {
+                    currentPath.push(name);
+                } else {
+                    return false; // Manzil topilmadi
+                }
+            }
+            renderExplorerContent();
+            return true; // Muvaffaqiyatli o'tdi
+        }
+
+        function createFileItem(type, name) {
+            const currentFolder = getCurrentFolder();
+            let finalName = name;
+
+            if (!name) { // UI dan kelgan bo'lsa
+                let baseName = type === 'folder' ? 'New Folder' : 'New File.txt';
+                let counter = 1;
+                finalName = baseName;
+                while (currentFolder[finalName]) {
+                    if (type === 'folder') {
+                        finalName = `New Folder (${counter})`;
+                    } else {
+                        finalName = `New File (${counter}).txt`;
+                    }
+                    counter++;
+                }
+            } else if (currentFolder[name]) {
+                return { success: false, message: `Error: '${name}' already exists.` };
+            }
+
+            if (type === 'folder') {
+                currentFolder[finalName] = { type: 'folder', children: {} };
+            } else {
+                if (!finalName.endsWith('.txt')) {
+                    finalName += '.txt'; // Agar terminal .txt qo'shmasa, qo'shish
+                }
+                currentFolder[finalName] = { type: 'file', content: '' };
+            }
+
+            saveFileSystem();
+            renderExplorerContent();
+            return { success: true, name: finalName }; 
+        }
+
+        let currentlyEditingFile = null;
+        let currentlyEditingFileName = null;
+
+        function openFileEditor(name, fileItem) {
+            const editor = document.getElementById('file-editor');
+            document.getElementById('file-editor-title').textContent = `Editing: ${name}`;
+            document.getElementById('file-editor-textarea').value = fileItem.content;
+            currentlyEditingFile = fileItem;
+            currentlyEditingFileName = name;
+            editor.classList.add('show');
+        }
+
+        function saveFileEditor() {
+            if (currentlyEditingFile) {
+                currentlyEditingFile.content = document.getElementById('file-editor-textarea').value;
+                document.getElementById('file-editor').classList.remove('show');
+                currentlyEditingFile = null;
+                currentlyEditingFileName = null;
+                saveFileSystem(); // O'zgarishlarni saqlash
+            }
+        }
+
+        // Kontekst menyu harakatlarini boshqarish
+        contextMenu.addEventListener('click', handleContextMenuAction);
+
+        function handleContextMenuAction(e) {
+            const actionItem = e.target.closest('.context-item');
+            if (!actionItem || !selectedFileElement) return;
+
+            const action = actionItem.dataset.action;
+            const itemName = selectedFileElement.dataset.itemName || selectedFileElement.dataset.filename;
+            const itemType = selectedFileElement.classList.contains('folder-item') ? 'folder' : 'file';
+            
+            contextMenu.style.display = 'none';
+
+            // Har bir harakatni simulyatsiya qilish
+            switch (action) {
+                case 'rename':
+                    const newName = prompt(`Yangi nom kiriting: ${itemName}`, itemName);
+                    if (newName && newName !== itemName) {
+                        const currentFolder = getCurrentFolder();
+                        if (currentFolder[newName]) {
+                            typewriterOutput(`Error: Name '${newName}' already exists.`, 'error');
+                            break;
+                        }
+                        
+                        // Nomni o'zgartirish
+                        const itemData = currentFolder[itemName];
+                        delete currentFolder[itemName];
+                        currentFolder[newName] = itemData;
+
+                        saveFileSystem();
+                        renderExplorerContent();
+                        typewriterOutput(`Renamed: ${itemName} -> ${newName}`, 'magenta');
+                    }
+                    break;
+                case 'delete':
+                    if (confirm(`Rostdan ham ${itemName} ${itemType}ni o'chirmoqchimisiz?`)) {
+                        deleteFileItem(itemName);
+                        typewriterOutput(`Deleted: ${itemName}`, 'magenta');
+                    }
+                    break;
+                case 'terminal':
+                    openWindow('terminal');
+                    typewriterOutput(`[FILE_EXPLORER] Changing directory to: ${currentPath.join('/') || '\\'}`, 'cyan');
+                    typewriterOutput(`[FILE_EXPLORER] Selected item: ${itemName}`, 'cyan');
+                    break;
+                case 'open':
+                    if (itemType === 'folder') {
+                        navigateFolder(itemName);
+                    } else {
+                        const current = getCurrentFolder();
+                        openFileEditor(itemName, current[itemName]);
+                    }
+                    typewriterOutput(`Opened: ${itemName} (Simulated)`, 'green');
+                    break;
+                case 'cut':
+                case 'copy':
+                case 'properties':
+                case 'show-more':
+                case 'new-tab':
+                case 'new-window':
+                    typewriterOutput(`Action: "${actionItem.textContent.trim().split('<')[0]}" on ${itemName} (Simulated)`, 'green');
+                    break;
+                default:
+                    typewriterOutput(`Unknown action: ${action}`, 'error');
+            }
+            selectedFileElement = null; // Tanlovni tozalash
+            document.querySelectorAll('.file-item, .folder-item').forEach(i => i.style.backgroundColor = 'transparent');
+        }
+
+        // Fayl/papka o'chirish logikasi
+        function deleteFileItem(name) {
+            const currentFolder = getCurrentFolder();
+            if (currentFolder[name]) {
+                delete currentFolder[name];
+                saveFileSystem();
+                renderExplorerContent(); // Fayl explorerini yangilash
+            }
+        }
+
+        // --- 5. TERMINAL LOGIC (YANGILANGAN) ---
+
+        const terminalOutput = document.getElementById('terminal-output');
+        const terminalInput = document.getElementById('terminal-input');
+
+        function initTerminal() {
+            terminalInput.addEventListener('keydown', handleTerminalInput);
+            typewriterOutput('Initializing CYBERDECK OS v3.1 Terminal...', 'magenta');
+            setTimeout(() => typewriterOutput('Type \'help\' to see available commands.', 'cyan'), 1000);
+            renderExplorerContent(); // Path prefixni yangilash uchun chaqiramiz
+        }
+
+        function appendOutput(text, colorClass = '') {
+            const line = document.createElement('div');
+            line.className = `terminal-line ${colorClass}`;
+            line.textContent = text;
+            terminalOutput.appendChild(line);
+            terminalOutput.scrollTop = terminalOutput.scrollHeight;
+        }
+
+        function typewriterOutput(text, colorClass = '', speed = 20) {
+            const line = document.createElement('div');
+            line.className = `terminal-line ${colorClass}`;
+            terminalOutput.appendChild(line);
+            terminalOutput.scrollTop = terminalOutput.scrollHeight;
+
+            let i = 0;
+            const type = setInterval(() => {
+                if (i < text.length) {
+                    line.textContent += text.charAt(i);
+                    i++;
+                    terminalOutput.scrollTop = terminalOutput.scrollHeight;
+                } else {
+                    clearInterval(type);
+                }
+            }, speed);
+        }
+
+        function handleTerminalInput(e) {
+            if (e.key === 'Enter') {
+                const command = terminalInput.value.trim();
+                appendOutput(document.getElementById('terminal-path-prefix').textContent + ' ' + command, 'input-prefix');
+                terminalInput.value = '';
+                parseCommand(command);
+            }
+        }
+
+        function parseCommand(fullCommand) {
+            const parts = fullCommand.split(/\s+/).filter(p => p.length > 0);
+            const command = parts[0] ? parts[0].toLowerCase() : '';
+            const args = parts.slice(1);
+            const currentFolder = getCurrentFolder();
+
+            switch (command) {
+                case 'help':
+                    typewriterOutput('--- Available Commands ---', 'green');
+                    appendOutput('help                   : Show this list.');
+                    appendOutput('ls                     : List directory contents (File Explorer data).');
+                    appendOutput('cd <path/..>           : Change directory (Navigate in File Explorer).');
+                    appendOutput('mkdir <name>           : Create a new folder (Saved to localStorage).');
+                    appendOutput('touch <name>.txt       : Create a new text file (Saved to localStorage).');
+                    appendOutput('rm <name>              : Remove file or folder (Deletes from FS and UI).');
+                    appendOutput('cat <name>.txt         : Display contents of a text file.');
+                    appendOutput('open calc/paint        : Open the specified application.');
+                    appendOutput('clear                  : Clear terminal history.');
+                    appendOutput('exit                   : Close the terminal window.', 'green');
+                    break;
+
+                case 'ls':
+                    if (Object.keys(currentFolder).length === 0) {
+                        appendOutput('Directory is empty.');
+                        return;
+                    }
+                    typewriterOutput('Contents of ' + (currentPath.join('\\') || 'C:\\') + ':', 'cyan');
+                    for (const name in currentFolder) {
+                        const item = currentFolder[name];
+                        const icon = item.type === 'folder' ? 'D' : 'F';
+                        const color = item.type === 'folder' ? 'folder-name' : 'green';
+                        appendOutput(`${icon}  ${name}`, color);
+                    }
+                    break;
+
+                case 'cd':
+                    if (args.length !== 1) {
+                        appendOutput('Usage: cd <path/..>', 'error');
+                        return;
+                    }
+                    const success = navigateFolder(args[0]);
+                    if (!success) {
+                        appendOutput(`Error: Directory not found: ${args[0]}`, 'error');
+                    }
+                    break;
+
+                case 'mkdir':
+                    if (args.length !== 1) {
+                        appendOutput('Usage: mkdir <name>', 'error');
+                        return;
+                    }
+                    const mkResult = createFileItem('folder', args[0]);
+                    if (mkResult.success) {
+                        appendOutput(`Directory '${mkResult.name}' created.`, 'green');
+                    } else {
+                        appendOutput(mkResult.message, 'error');
+                    }
+                    break;
+
+                case 'touch':
+                    if (args.length !== 1) {
+                        appendOutput('Usage: touch <name>.txt', 'error');
+                        return;
+                    }
+                    const touchResult = createFileItem('file', args[0]);
+                    if (touchResult.success) {
+                        appendOutput(`File '${touchResult.name}' created.`, 'green');
+                    } else {
+                        appendOutput(touchResult.message, 'error');
+                    }
+                    break;
+
+                case 'rm':
+                    if (args.length !== 1) {
+                        appendOutput('Usage: rm <file_or_folder_name>', 'error');
+                        return;
+                    }
+                    const rmName = args[0];
+                    if (currentFolder[rmName]) {
+                        if (confirm(`Rostdan ham ${rmName} ni o'chirmoqchimisiz?`)) {
+                            deleteFileItem(rmName);
+                            appendOutput(`Removed: ${rmName}.`, 'magenta');
+                        }
+                    } else {
+                        appendOutput(`Error: File or directory not found: ${rmName}`, 'error');
+                    }
+                    break;
+
+                case 'cat':
+                    if (args.length !== 1) {
+                        appendOutput('Usage: cat <filename.txt>', 'error');
+                        return;
+                    }
+                    const catName = args[0];
+                    const file = currentFolder[catName];
+                    
+                    if (!file) {
+                        appendOutput(`Error: File not found: ${catName}`, 'error');
+                    } else if (file.type !== 'file') {
+                        appendOutput(`Error: ${catName} is a directory.`, 'error');
+                    } else {
+                        typewriterOutput(`--- Content of ${catName} ---`, 'cyan');
+                        const content = file.content || '(Empty file)';
+                        appendOutput(content, 'green');
+                    }
+                    break;
+                    
+                case 'open':
+                    if (args.length === 1) {
+                        const app = args[0].toLowerCase();
+                        if (['calc', 'paint'].includes(app)) {
+                            const appId = (app === 'calc' ? 'calculator' : 'paint');
+                            openWindow(appId);
+                            appendOutput(`Opening ${appId}...`, 'cyan');
+                        } else {
+                            appendOutput('Error: Invalid application name. Supported: calc, paint', 'error');
+                        }
+                    } else {
+                        appendOutput('Usage: open <app_name>', 'error');
+                    }
+                    break;
+                case 'clear':
+                    terminalOutput.innerHTML = '';
+                    typewriterOutput('Terminal cleared. Awaiting commands...', 'cyan');
+                    break;
+                case 'exit':
+                    closeWindow('terminal');
+                    break;
+
+                default:
+                    appendOutput(`Error: Command not found: ${command}. Type 'help'.`, 'error');
+            }
+            // Har qanday fayl tizimi o'zgarishidan keyin explorer yangilanadi
+            if (['mkdir', 'touch', 'rm', 'cd'].includes(command)) {
+                renderExplorerContent();
+            }
+        }
+
+        // --- 6. CALCULATOR LOGIC ---
+
+        function initCalculator() {
+            const display = document.getElementById('calc-display');
+            const buttons = document.getElementById('calc-buttons');
+            let currentInput = '0';
+            let operator = null;
+            let firstOperand = null;
+            let waitingForSecondOperand = false;
+
+            buttons.addEventListener('click', (e) => {
+                if (!e.target.matches('.calc-btn')) return;
+
+                const value = e.target.dataset.val;
+
+                if (value === 'C') {
+                    clearCalculator();
+                } else if (value === '=') {
+                    calculate();
+                } else if (value === '+' || value === '-' || value === '*' || value === '/' || value === '%') {
+                    handleOperator(value);
+                } else if (value === '.') {
+                    inputDecimal(value);
+                } else {
+                    inputDigit(value);
+                }
+
+                updateDisplay();
+            });
+
+            function updateDisplay() {
+                display.textContent = currentInput;
+            }
+
+            function inputDigit(digit) {
+                if (waitingForSecondOperand) {
+                    currentInput = digit;
+                    waitingForSecondOperand = false;
+                } else {
+                    currentInput = currentInput === '0' ? digit : currentInput + digit;
+                }
+            }
+
+            function inputDecimal(dot) {
+                if (waitingForSecondOperand) {
+                    currentInput = '0.';
+                    waitingForSecondOperand = false;
+                    return;
+                }
+                if (!currentInput.includes(dot)) {
+                    currentInput += dot;
+                }
+            }
+
+            function handleOperator(nextOperator) {
+                const inputValue = parseFloat(currentInput);
+
+                if (operator && waitingForSecondOperand) {
+                    operator = nextOperator;
+                    return;
+                }
+
+                if (firstOperand === null) {
+                    firstOperand = inputValue;
+                } else if (operator) {
+                    const result = performCalculation[operator](firstOperand, inputValue);
+                    currentInput = String(result);
+                    firstOperand = result;
+                }
+
+                waitingForSecondOperand = true;
+                operator = nextOperator;
+            }
+
+            const performCalculation = {
+                '/': (firstOperand, secondOperand) => firstOperand / secondOperand,
+                '*': (firstOperand, secondOperand) => firstOperand * secondOperand,
+                '+': (firstOperand, secondOperand) => firstOperand + secondOperand,
+                '-': (firstOperand, secondOperand) => firstOperand - secondOperand,
+                '%': (firstOperand, secondOperand) => firstOperand % secondOperand,
+            };
+
+            function calculate() {
+                if (operator === null || waitingForSecondOperand) return;
+
+                const secondOperand = parseFloat(currentInput);
+                let result = performCalculation[operator](firstOperand, secondOperand);
+
+                currentInput = String(result);
+                firstOperand = null;
+                operator = null;
+                waitingForSecondOperand = false;
+            }
+
+            function clearCalculator() {
+                currentInput = '0';
+                firstOperand = null;
+                operator = null;
+                waitingForSecondOperand = false;
+            }
+
+            updateDisplay();
+        }
+
+        // --- 7. PAINT APP LOGIC ---
+
+        function initPaint() {
+            const canvas = document.getElementById('paint-canvas');
+            const ctx = canvas.getContext('2d');
+            const colorPicker = document.getElementById('color-picker');
+            const brushSize = document.getElementById('brush-size');
+            const sizeDisplay = document.getElementById('brush-size-display');
+            let isDrawing = false;
+            let lastX = 0;
+            let lastY = 0;
+            
+            // Resize canvas to fit window on open/resize
+            const windowPaint = document.getElementById('window-paint');
+
+            function resizeCanvas() {
+                // Set canvas size to the inner size of the window-body
+                const body = document.getElementById('paint-body');
+                if (!body) return;
+
+                // 20px for side padding, 60px for controls+padding (approx)
+                canvas.width = body.clientWidth - 20; 
+                canvas.height = body.clientHeight - 60; 
+            }
+            
+            // Initial size and event listener for window resize
+            window.addEventListener('resize', resizeCanvas);
+            // Re-run resize when the window is opened/resized manually
+            const resizeObserver = new ResizeObserver(entries => {
+                for (let entry of entries) {
+                    if (entry.target.id === 'window-paint') {
+                        resizeCanvas();
+                    }
+                }
+            });
+            // Hamma windowlar to'liq yuklangandan keyin kuzatuvchini ishga tushiramiz
+            if(windowPaint) resizeObserver.observe(windowPaint);
+            resizeCanvas(); // Initial call
+
+            // Drawing logic
+            canvas.addEventListener('mousedown', (e) => {
+                isDrawing = true;
+                // Offset top/left of canvas relative to the window
+                const rect = canvas.getBoundingClientRect();
+                [lastX, lastY] = [e.clientX - rect.left, e.clientY - rect.top];
+            });
+
+            canvas.addEventListener('mousemove', draw);
+            canvas.addEventListener('mouseup', () => isDrawing = false);
+            canvas.addEventListener('mouseout', () => isDrawing = false);
+
+            function draw(e) {
+                if (!isDrawing) return;
+                
+                const rect = canvas.getBoundingClientRect();
+                const currentX = e.clientX - rect.left;
+                const currentY = e.clientY - rect.top;
+
+                ctx.beginPath();
+                ctx.moveTo(lastX, lastY);
+                ctx.lineTo(currentX, currentY);
+                
+                ctx.strokeStyle = colorPicker.value;
+                ctx.lineWidth = brushSize.value;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                
+                // Neon glow effect on stroke
+                ctx.shadowColor = colorPicker.value;
+                ctx.shadowBlur = Math.min(10, brushSize.value * 2);
+
+                ctx.stroke();
+
+                [lastX, lastY] = [currentX, currentY];
+            }
+
+            // Brush size update
+            brushSize.addEventListener('input', () => {
+                sizeDisplay.textContent = brushSize.value;
+            });
+        }
+
+        function clearCanvas() {
+            const canvas = document.getElementById('paint-canvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+    </script>
+</body>
+</html>
