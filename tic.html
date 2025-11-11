@@ -1,0 +1,1480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Terminal Tic-Tac-Toe | Hacker Edition</title>
+    <!--
+    ╔═══════════════════════════════════════════════════════════════════════════╗
+    ║                   TERMINAL TIC-TAC-TOE - HACKER EDITION                   ║
+    ╠═══════════════════════════════════════════════════════════════════════════╣
+    ║                                                                           ║
+    ║  A polished single-file Tic-Tac-Toe game with terminal/hacker aesthetic  ║
+    ║                                                                           ║
+    ║  FEATURES:                                                                ║
+    ║  • Play vs Bot (Easy/Medium/Hard AI with Minimax algorithm)               ║
+    ║  • 2-Player local mode                                                    ║
+    ║  • Full keyboard navigation (Arrow keys + Enter/Space)                    ║
+    ║  • Real-time console logging with move history                            ║
+    ║  • Command prompt (type: restart, undo, mode)                             ║
+    ║  • Score tracking, undo/redo, jump to previous moves                      ║
+    ║  • Responsive mobile & desktop design                                     ║
+    ║  • Accessibility: ARIA labels, focus outlines, scalable fonts             ║
+    ║  • Victory animations: ASCII fireworks & terminal beep                    ║
+    ║                                                                           ║
+    ║  CUSTOMIZATION:                                                           ║
+    ║  • Change bot difficulty: Look for `botDifficulty` variable in JS         ║
+    ║  • Modify colors: Search for CSS variables in :root section               ║
+    ║                                                                           ║
+    ║  DEPLOYMENT TO VERCEL (maqsadbek37.vercel.app):                           ║
+    ║  1. Install Vercel CLI: npm install -g vercel                             ║
+    ║  2. Navigate to project folder containing this file                       ║
+    ║  3. Run: vercel --prod                                                    ║
+    ║  4. Follow prompts to link to maqsadbek37 account                         ║
+    ║  5. Set project name if needed                                            ║
+    ║                                                                           ║
+    ║  ALTERNATIVE DEPLOYMENT:                                                  ║
+    ║  • Upload this file to GitHub repository                                  ║
+    ║  • Connect repository to Vercel dashboard                                 ║
+    ║  • Deploy with one click                                                  ║
+    ║                                                                           ║
+    ║  Author: Replit Agent                                                     ║
+    ║  Version: 1.0.0                                                           ║
+    ║  License: MIT                                                             ║
+    ║                                                                           ║
+    ╚═══════════════════════════════════════════════════════════════════════════╝
+    -->
+    <style>
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /*                         CSS VARIABLES & RESET                        */
+        /* ═══════════════════════════════════════════════════════════════════ */
+        
+        :root {
+            --terminal-bg: #0a0a0a;
+            --terminal-fg: #00ff41;
+            --terminal-dim: #00cc33;
+            --terminal-bright: #33ff66;
+            --terminal-red: #ff3333;
+            --terminal-yellow: #ffff00;
+            --terminal-blue: #3399ff;
+            --terminal-border: #00ff41;
+            --cell-size: 90px;
+            --font-primary: 'Courier New', 'Consolas', 'Monaco', monospace;
+            --transition-speed: 0.2s;
+            --glow-intensity: 0 0 10px var(--terminal-fg);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: var(--font-primary);
+            background-color: var(--terminal-bg);
+            color: var(--terminal-fg);
+            min-height: 100vh;
+            overflow-x: hidden;
+            line-height: 1.6;
+            font-size: 14px;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /*                           LOADING SCREEN                             */
+        /* ═══════════════════════════════════════════════════════════════════ */
+
+        #loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--terminal-bg);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            animation: fadeOut 0.5s ease 1.5s forwards;
+        }
+
+        #loading-screen .loading-text {
+            font-size: 1.2rem;
+            margin-bottom: 20px;
+            animation: blink 1s infinite;
+        }
+
+        #loading-screen .loading-bar {
+            width: 300px;
+            height: 4px;
+            background: rgba(0, 255, 65, 0.2);
+            position: relative;
+            overflow: hidden;
+        }
+
+        #loading-screen .loading-bar::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: var(--terminal-fg);
+            animation: loading 1.5s ease forwards;
+        }
+
+        @keyframes fadeOut {
+            to {
+                opacity: 0;
+                pointer-events: none;
+            }
+        }
+
+        @keyframes loading {
+            to {
+                left: 100%;
+            }
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /*                           MAIN CONTAINER                             */
+        /* ═══════════════════════════════════════════════════════════════════ */
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            opacity: 0;
+            animation: fadeIn 0.5s ease 2s forwards;
+        }
+
+        @keyframes fadeIn {
+            to {
+                opacity: 1;
+            }
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /*                              HEADER                                  */
+        /* ═══════════════════════════════════════════════════════════════════ */
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            border: 2px solid var(--terminal-border);
+            padding: 20px;
+            background: rgba(0, 255, 65, 0.05);
+            box-shadow: var(--glow-intensity);
+        }
+
+        h1 {
+            font-size: 2rem;
+            letter-spacing: 4px;
+            margin-bottom: 10px;
+            text-shadow: var(--glow-intensity);
+        }
+
+        .subtitle {
+            color: var(--terminal-dim);
+            font-size: 0.9rem;
+        }
+
+        .cursor {
+            display: inline-block;
+            width: 10px;
+            height: 18px;
+            background: var(--terminal-fg);
+            animation: blink 1s infinite;
+            margin-left: 5px;
+        }
+
+        @keyframes blink {
+            0%, 50% {
+                opacity: 1;
+            }
+            51%, 100% {
+                opacity: 0;
+            }
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /*                          GAME CONTROLS                               */
+        /* ═══════════════════════════════════════════════════════════════════ */
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            justify-content: center;
+            margin-bottom: 30px;
+            padding: 15px;
+            border: 1px solid var(--terminal-dim);
+        }
+
+        .btn {
+            background: transparent;
+            color: var(--terminal-fg);
+            border: 2px solid var(--terminal-fg);
+            padding: 10px 20px;
+            font-family: var(--font-primary);
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all var(--transition-speed);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn:hover {
+            background: var(--terminal-fg);
+            color: var(--terminal-bg);
+            box-shadow: var(--glow-intensity);
+        }
+
+        .btn:focus {
+            outline: 2px solid var(--terminal-bright);
+            outline-offset: 2px;
+        }
+
+        .btn:active {
+            transform: scale(0.95);
+        }
+
+        .btn.active {
+            background: var(--terminal-fg);
+            color: var(--terminal-bg);
+        }
+
+        select {
+            background: var(--terminal-bg);
+            color: var(--terminal-fg);
+            border: 2px solid var(--terminal-fg);
+            padding: 10px 15px;
+            font-family: var(--font-primary);
+            font-size: 0.9rem;
+            cursor: pointer;
+        }
+
+        select:focus {
+            outline: 2px solid var(--terminal-bright);
+            outline-offset: 2px;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /*                          GAME LAYOUT                                 */
+        /* ═══════════════════════════════════════════════════════════════════ */
+
+        .game-layout {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 30px;
+            align-items: start;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /*                            GAME BOARD                                */
+        /* ═══════════════════════════════════════════════════════════════════ */
+
+        .game-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .status-bar {
+            width: 100%;
+            max-width: 400px;
+            padding: 15px;
+            border: 1px solid var(--terminal-dim);
+            margin-bottom: 20px;
+            background: rgba(0, 255, 65, 0.05);
+            text-align: center;
+        }
+
+        .status-text {
+            font-size: 1.1rem;
+            margin-bottom: 5px;
+        }
+
+        .turn-indicator {
+            color: var(--terminal-yellow);
+            font-weight: bold;
+        }
+
+        .scoreboard {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 10px;
+            font-size: 0.9rem;
+        }
+
+        .score-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .board-container {
+            position: relative;
+        }
+
+        .board {
+            display: grid;
+            grid-template-columns: repeat(3, var(--cell-size));
+            grid-template-rows: repeat(3, var(--cell-size));
+            gap: 8px;
+            background: var(--terminal-bg);
+            padding: 15px;
+            border: 3px solid var(--terminal-border);
+            box-shadow: var(--glow-intensity);
+        }
+
+        .cell {
+            width: var(--cell-size);
+            height: var(--cell-size);
+            background: rgba(0, 255, 65, 0.1);
+            border: 2px solid var(--terminal-dim);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all var(--transition-speed);
+            position: relative;
+        }
+
+        .cell:hover:not(.filled) {
+            background: rgba(0, 255, 65, 0.2);
+            border-color: var(--terminal-bright);
+            box-shadow: inset var(--glow-intensity);
+        }
+
+        .cell.filled {
+            cursor: not-allowed;
+        }
+
+        .cell.selected {
+            border-color: var(--terminal-yellow);
+            box-shadow: 0 0 15px var(--terminal-yellow);
+        }
+
+        .cell.winning {
+            background: rgba(0, 255, 65, 0.3);
+            animation: winPulse 0.8s infinite;
+        }
+
+        .cell:focus {
+            outline: 3px solid var(--terminal-bright);
+            outline-offset: -3px;
+        }
+
+        .cell .mark {
+            animation: typeIn 0.3s ease;
+        }
+
+        @keyframes typeIn {
+            from {
+                opacity: 0;
+                transform: scale(0.5);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        @keyframes winPulse {
+            0%, 100% {
+                box-shadow: 0 0 10px var(--terminal-fg);
+            }
+            50% {
+                box-shadow: 0 0 25px var(--terminal-fg);
+            }
+        }
+
+        .keyboard-hints {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid var(--terminal-dim);
+            font-size: 0.8rem;
+            color: var(--terminal-dim);
+            text-align: center;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /*                          CONSOLE PANEL                               */
+        /* ═══════════════════════════════════════════════════════════════════ */
+
+        .console-panel {
+            width: 400px;
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid var(--terminal-border);
+            display: flex;
+            flex-direction: column;
+            max-height: 600px;
+        }
+
+        .console-header {
+            background: var(--terminal-fg);
+            color: var(--terminal-bg);
+            padding: 10px 15px;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .console-dots {
+            display: flex;
+            gap: 5px;
+        }
+
+        .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--terminal-bg);
+        }
+
+        .console-output {
+            flex: 1;
+            padding: 15px;
+            overflow-y: auto;
+            font-size: 0.85rem;
+            line-height: 1.8;
+            max-height: 400px;
+        }
+
+        .console-output::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .console-output::-webkit-scrollbar-track {
+            background: rgba(0, 255, 65, 0.1);
+        }
+
+        .console-output::-webkit-scrollbar-thumb {
+            background: var(--terminal-dim);
+        }
+
+        .console-line {
+            margin-bottom: 5px;
+            word-wrap: break-word;
+        }
+
+        .console-line.info {
+            color: var(--terminal-blue);
+        }
+
+        .console-line.success {
+            color: var(--terminal-fg);
+        }
+
+        .console-line.warning {
+            color: var(--terminal-yellow);
+        }
+
+        .console-line.error {
+            color: var(--terminal-red);
+        }
+
+        .console-line .timestamp {
+            color: var(--terminal-dim);
+            font-size: 0.75rem;
+        }
+
+        .console-input-area {
+            border-top: 1px solid var(--terminal-dim);
+            padding: 10px 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .console-prompt {
+            color: var(--terminal-bright);
+        }
+
+        .console-input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: var(--terminal-fg);
+            font-family: var(--font-primary);
+            font-size: 0.9rem;
+            outline: none;
+        }
+
+        .console-input::placeholder {
+            color: var(--terminal-dim);
+        }
+
+        .move-history {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid var(--terminal-dim);
+        }
+
+        .move-history-title {
+            color: var(--terminal-bright);
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+
+        .move-item {
+            padding: 5px 10px;
+            margin-bottom: 5px;
+            cursor: pointer;
+            border-left: 2px solid transparent;
+            transition: all var(--transition-speed);
+        }
+
+        .move-item:hover {
+            background: rgba(0, 255, 65, 0.1);
+            border-left-color: var(--terminal-fg);
+        }
+
+        .move-item.current {
+            background: rgba(0, 255, 65, 0.15);
+            border-left-color: var(--terminal-yellow);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /*                          ANIMATIONS                                  */
+        /* ═══════════════════════════════════════════════════════════════════ */
+
+        .firework {
+            position: fixed;
+            pointer-events: none;
+            color: var(--terminal-fg);
+            font-size: 1.5rem;
+            animation: explode 1s ease-out forwards;
+            z-index: 1000;
+        }
+
+        @keyframes explode {
+            0% {
+                opacity: 1;
+                transform: translate(0, 0) scale(1);
+            }
+            100% {
+                opacity: 0;
+                transform: translate(var(--x), var(--y)) scale(0.5);
+            }
+        }
+
+        .beep-flash {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--terminal-fg);
+            opacity: 0;
+            pointer-events: none;
+            animation: flash 0.2s ease;
+            z-index: 999;
+        }
+
+        @keyframes flash {
+            0%, 100% {
+                opacity: 0;
+            }
+            50% {
+                opacity: 0.3;
+            }
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /*                        RESPONSIVE DESIGN                             */
+        /* ═══════════════════════════════════════════════════════════════════ */
+
+        @media (max-width: 968px) {
+            .game-layout {
+                grid-template-columns: 1fr;
+            }
+
+            .console-panel {
+                width: 100%;
+                max-width: 100%;
+            }
+
+            .keyboard-hints {
+                display: none;
+            }
+
+            :root {
+                --cell-size: 80px;
+            }
+
+            h1 {
+                font-size: 1.5rem;
+                letter-spacing: 2px;
+            }
+
+            .controls {
+                font-size: 0.8rem;
+            }
+
+            .btn {
+                padding: 8px 15px;
+                font-size: 0.8rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            :root {
+                --cell-size: 70px;
+            }
+
+            .container {
+                padding: 10px;
+            }
+
+            h1 {
+                font-size: 1.2rem;
+            }
+
+            .cell {
+                font-size: 2rem;
+            }
+
+            .console-output {
+                font-size: 0.75rem;
+                max-height: 300px;
+            }
+
+            .controls {
+                gap: 8px;
+            }
+
+            .btn {
+                padding: 6px 12px;
+                font-size: 0.75rem;
+            }
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /*                        ACCESSIBILITY                                 */
+        /* ═══════════════════════════════════════════════════════════════════ */
+
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border-width: 0;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            * {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Loading Screen -->
+    <div id="loading-screen">
+        <div class="loading-text">&gt; INITIALIZING TERMINAL TIC-TAC-TOE<span class="cursor"></span></div>
+        <div class="loading-bar"></div>
+    </div>
+
+    <!-- Main Container -->
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <h1>╔═══ TERMINAL TIC-TAC-TOE ═══╗<span class="cursor"></span></h1>
+            <p class="subtitle">&gt; HACKER EDITION v1.0.0 | TYPE 'help' FOR COMMANDS</p>
+        </header>
+
+        <!-- Game Controls -->
+        <div class="controls">
+            <button class="btn active" id="btn-vs-bot" aria-label="Play against computer">VS BOT</button>
+            <button class="btn" id="btn-2player" aria-label="Two player mode">2 PLAYER</button>
+            <select id="difficulty-select" aria-label="Select bot difficulty">
+                <option value="easy">EASY</option>
+                <option value="medium">MEDIUM</option>
+                <option value="hard">HARD</option>
+            </select>
+            <button class="btn" id="btn-undo" aria-label="Undo last move">UNDO</button>
+            <button class="btn" id="btn-restart" aria-label="Restart game">RESTART</button>
+        </div>
+
+        <!-- Game Layout -->
+        <div class="game-layout">
+            <!-- Game Board Section -->
+            <div class="game-section">
+                <!-- Status Bar -->
+                <div class="status-bar">
+                    <div class="status-text" id="status-text" role="status" aria-live="polite">
+                        &gt; Game: <span class="turn-indicator">Ready to start</span>
+                    </div>
+                    <div class="scoreboard">
+                        <div class="score-item">
+                            <span>X:</span>
+                            <span id="score-x">0</span>
+                        </div>
+                        <div class="score-item">
+                            <span>O:</span>
+                            <span id="score-o">0</span>
+                        </div>
+                        <div class="score-item">
+                            <span>DRAW:</span>
+                            <span id="score-draw">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Board Container -->
+                <div class="board-container">
+                    <div class="board" id="board" role="grid" aria-label="Tic Tac Toe game board">
+                        <!-- Cells will be generated by JavaScript -->
+                    </div>
+                </div>
+
+                <!-- Keyboard Hints (Desktop Only) -->
+                <div class="keyboard-hints">
+                    &gt; USE ARROW KEYS TO NAVIGATE | ENTER/SPACE TO PLACE | TYPE COMMANDS IN CONSOLE
+                </div>
+            </div>
+
+            <!-- Console Panel -->
+            <aside class="console-panel">
+                <div class="console-header">
+                    <span>&gt; TERMINAL</span>
+                    <div class="console-dots">
+                        <span class="dot"></span>
+                        <span class="dot"></span>
+                        <span class="dot"></span>
+                    </div>
+                </div>
+                <div class="console-output" id="console-output" role="log" aria-live="polite" aria-atomic="false">
+                    <!-- Console logs will be added here -->
+                </div>
+                <div class="move-history" id="move-history-container" style="display: none;">
+                    <div class="move-history-title">&gt; MOVE HISTORY</div>
+                    <div id="move-history"></div>
+                </div>
+                <div class="console-input-area">
+                    <span class="console-prompt">&gt;</span>
+                    <input 
+                        type="text" 
+                        class="console-input" 
+                        id="console-input" 
+                        placeholder="Type command (restart, undo, mode, help)..."
+                        aria-label="Console command input"
+                        autocomplete="off"
+                    />
+                </div>
+            </aside>
+        </div>
+    </div>
+
+    <script>
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /*                         GAME STATE & CONFIG                          */
+        /* ═══════════════════════════════════════════════════════════════════ */
+
+        const gameState = {
+            board: Array(9).fill(null),
+            currentPlayer: 'X',
+            gameMode: 'bot', // 'bot' or '2player'
+            botDifficulty: 'medium', // 'easy', 'medium', 'hard'
+            isGameActive: true,
+            selectedCell: 4, // Center cell selected by default
+            moveHistory: [],
+            currentMoveIndex: -1,
+            scores: { X: 0, O: 0, draw: 0 }
+        };
+
+        const WINNING_COMBINATIONS = [
+            [0, 1, 2], [3, 4, 5], [6, 7, 8], // Rows
+            [0, 3, 6], [1, 4, 7], [2, 5, 8], // Columns
+            [0, 4, 8], [2, 4, 6]             // Diagonals
+        ];
+
+        const CELL_COORDS = ['A1', 'A2', 'A3', 'B1', 'B2', 'B3', 'C1', 'C2', 'C3'];
+
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /*                         DOM ELEMENTS                                 */
+        /* ═══════════════════════════════════════════════════════════════════ */
+
+        const boardElement = document.getElementById('board');
+        const statusText = document.getElementById('status-text');
+        const consoleOutput = document.getElementById('console-output');
+        const consoleInput = document.getElementById('console-input');
+        const moveHistoryContainer = document.getElementById('move-history-container');
+        const moveHistoryElement = document.getElementById('move-history');
+        const scoreX = document.getElementById('score-x');
+        const scoreO = document.getElementById('score-o');
+        const scoreDraw = document.getElementById('score-draw');
+
+        const btnVsBot = document.getElementById('btn-vs-bot');
+        const btn2Player = document.getElementById('btn-2player');
+        const btnUndo = document.getElementById('btn-undo');
+        const btnRestart = document.getElementById('btn-restart');
+        const difficultySelect = document.getElementById('difficulty-select');
+
+        let cells = [];
+
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /*                         INITIALIZATION                               */
+        /* ═══════════════════════════════════════════════════════════════════ */
+
+        function init() {
+            createBoard();
+            setupEventListeners();
+            logToConsole('System initialized successfully', 'success');
+            logToConsole('Welcome to Terminal Tic-Tac-Toe!', 'info');
+            logToConsole('Mode: VS BOT (Medium difficulty)', 'info');
+            logToConsole('Player X starts the game', 'info');
+            updateStatus();
+        }
+
+        function createBoard() {
+            boardElement.innerHTML = '';
+            cells = [];
+            
+            for (let i = 0; i < 9; i++) {
+                const cell = document.createElement('div');
+                cell.classList.add('cell');
+                cell.dataset.index = i;
+                cell.setAttribute('role', 'gridcell');
+                cell.setAttribute('aria-label', `Cell ${CELL_COORDS[i]}`);
+                cell.setAttribute('tabindex', '-1');
+                
+                cell.addEventListener('click', () => handleCellClick(i));
+                
+                boardElement.appendChild(cell);
+                cells.push(cell);
+            }
+            
+            updateSelectedCell();
+        }
+
+        function setupEventListeners() {
+            // Mode buttons
+            btnVsBot.addEventListener('click', () => setGameMode('bot'));
+            btn2Player.addEventListener('click', () => setGameMode('2player'));
+            
+            // Control buttons
+            btnUndo.addEventListener('click', undoMove);
+            btnRestart.addEventListener('click', restartGame);
+            
+            // Difficulty select
+            difficultySelect.addEventListener('change', (e) => {
+                gameState.botDifficulty = e.target.value;
+                logToConsole(`Difficulty changed to ${e.target.value.toUpperCase()}`, 'info');
+            });
+            
+            // Keyboard navigation
+            document.addEventListener('keydown', handleKeyPress);
+            
+            // Console input
+            consoleInput.addEventListener('keypress', handleConsoleCommand);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /*                         GAME LOGIC                                   */
+        /* ═══════════════════════════════════════════════════════════════════ */
+
+        function handleCellClick(index) {
+            if (!gameState.isGameActive || gameState.board[index] !== null) {
+                return;
+            }
+            
+            makeMove(index);
+        }
+
+        function makeMove(index) {
+            if (gameState.board[index] !== null) return;
+            
+            // Save move to history (truncate future moves if we're in the past)
+            if (gameState.currentMoveIndex < gameState.moveHistory.length - 1) {
+                gameState.moveHistory = gameState.moveHistory.slice(0, gameState.currentMoveIndex + 1);
+            }
+            
+            gameState.moveHistory.push({
+                board: [...gameState.board],
+                player: gameState.currentPlayer,
+                index: index
+            });
+            gameState.currentMoveIndex++;
+            
+            // Make the move
+            gameState.board[index] = gameState.currentPlayer;
+            
+            // Update UI
+            const cell = cells[index];
+            cell.classList.add('filled');
+            const mark = document.createElement('span');
+            mark.classList.add('mark');
+            mark.textContent = gameState.currentPlayer;
+            cell.appendChild(mark);
+            
+            // Log move
+            const timestamp = new Date().toLocaleTimeString('en-US', { hour12: false });
+            logToConsole(
+                `<span class="timestamp">[${timestamp}]</span> Player ${gameState.currentPlayer} → ${CELL_COORDS[index]}`,
+                'success'
+            );
+            
+            updateMoveHistory();
+            
+            // Check win/draw
+            const winner = checkWinner();
+            if (winner) {
+                handleWin(winner);
+                return;
+            }
+            
+            if (checkDraw()) {
+                handleDraw();
+                return;
+            }
+            
+            // Switch player
+            gameState.currentPlayer = gameState.currentPlayer === 'X' ? 'O' : 'X';
+            updateStatus();
+            
+            // Bot move
+            if (gameState.gameMode === 'bot' && gameState.currentPlayer === 'O' && gameState.isGameActive) {
+                setTimeout(makeBotMove, 500);
+            }
+        }
+
+        function checkWinner() {
+            for (const combo of WINNING_COMBINATIONS) {
+                const [a, b, c] = combo;
+                if (gameState.board[a] && 
+                    gameState.board[a] === gameState.board[b] && 
+                    gameState.board[a] === gameState.board[c]) {
+                    return { player: gameState.board[a], combo };
+                }
+            }
+            return null;
+        }
+
+        function checkDraw() {
+            return gameState.board.every(cell => cell !== null);
+        }
+
+        function handleWin(winner) {
+            gameState.isGameActive = false;
+            
+            // Highlight winning cells
+            winner.combo.forEach(index => {
+                cells[index].classList.add('winning');
+            });
+            
+            // Update scores
+            gameState.scores[winner.player]++;
+            updateScoreboard();
+            
+            // Update status
+            statusText.innerHTML = `&gt; Game: <span class="turn-indicator" style="color: var(--terminal-yellow);">Player ${winner.player} WINS!</span>`;
+            
+            // Log victory
+            logToConsole(`╔═══════════════════════════════════╗`, 'success');
+            logToConsole(`║   PLAYER ${winner.player} WINS THE GAME!     ║`, 'success');
+            logToConsole(`╚═══════════════════════════════════╝`, 'success');
+            
+            // Victory animations
+            terminalBeep();
+            setTimeout(() => createFireworks(), 200);
+        }
+
+        function handleDraw() {
+            gameState.isGameActive = false;
+            gameState.scores.draw++;
+            updateScoreboard();
+            
+            statusText.innerHTML = `&gt; Game: <span class="turn-indicator" style="color: var(--terminal-blue);">DRAW!</span>`;
+            logToConsole('Game ended in a draw', 'warning');
+        }
+
+        function updateStatus() {
+            if (!gameState.isGameActive) return;
+            
+            const modeText = gameState.gameMode === 'bot' ? 'VS BOT' : '2 PLAYER';
+            const turnText = gameState.gameMode === 'bot' && gameState.currentPlayer === 'O' 
+                ? 'Bot thinking...' 
+                : `Player ${gameState.currentPlayer}'s turn`;
+            
+            statusText.innerHTML = `&gt; Game: <span class="turn-indicator">${turnText}</span> | Mode: ${modeText}`;
+        }
+
+        function updateScoreboard() {
+            scoreX.textContent = gameState.scores.X;
+            scoreO.textContent = gameState.scores.O;
+            scoreDraw.textContent = gameState.scores.draw;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /*                         BOT AI (MINIMAX)                             */
+        /* ═══════════════════════════════════════════════════════════════════ */
+
+        function makeBotMove() {
+            if (!gameState.isGameActive) return;
+            
+            let move;
+            
+            switch (gameState.botDifficulty) {
+                case 'easy':
+                    move = getRandomMove();
+                    break;
+                case 'medium':
+                    move = Math.random() < 0.5 ? getBestMove() : getRandomMove();
+                    break;
+                case 'hard':
+                    move = getBestMove();
+                    break;
+            }
+            
+            if (move !== null) {
+                logToConsole('Bot analyzing position...', 'info');
+                makeMove(move);
+            }
+        }
+
+        function getRandomMove() {
+            const availableMoves = gameState.board
+                .map((cell, index) => cell === null ? index : null)
+                .filter(index => index !== null);
+            
+            return availableMoves.length > 0 
+                ? availableMoves[Math.floor(Math.random() * availableMoves.length)]
+                : null;
+        }
+
+        function getBestMove() {
+            let bestScore = -Infinity;
+            let bestMove = null;
+            
+            for (let i = 0; i < 9; i++) {
+                if (gameState.board[i] === null) {
+                    gameState.board[i] = 'O';
+                    const score = minimax(gameState.board, 0, false, -Infinity, Infinity);
+                    gameState.board[i] = null;
+                    
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestMove = i;
+                    }
+                }
+            }
+            
+            return bestMove;
+        }
+
+        function minimax(board, depth, isMaximizing, alpha, beta) {
+            const winner = checkWinnerForBoard(board);
+            
+            if (winner === 'O') return 10 - depth;
+            if (winner === 'X') return depth - 10;
+            if (board.every(cell => cell !== null)) return 0;
+            
+            if (isMaximizing) {
+                let maxScore = -Infinity;
+                for (let i = 0; i < 9; i++) {
+                    if (board[i] === null) {
+                        board[i] = 'O';
+                        const score = minimax(board, depth + 1, false, alpha, beta);
+                        board[i] = null;
+                        maxScore = Math.max(score, maxScore);
+                        alpha = Math.max(alpha, score);
+                        if (beta <= alpha) break; // Alpha-beta pruning
+                    }
+                }
+                return maxScore;
+            } else {
+                let minScore = Infinity;
+                for (let i = 0; i < 9; i++) {
+                    if (board[i] === null) {
+                        board[i] = 'X';
+                        const score = minimax(board, depth + 1, true, alpha, beta);
+                        board[i] = null;
+                        minScore = Math.min(score, minScore);
+                        beta = Math.min(beta, score);
+                        if (beta <= alpha) break; // Alpha-beta pruning
+                    }
+                }
+                return minScore;
+            }
+        }
+
+        function checkWinnerForBoard(board) {
+            for (const combo of WINNING_COMBINATIONS) {
+                const [a, b, c] = combo;
+                if (board[a] && board[a] === board[b] && board[a] === board[c]) {
+                    return board[a];
+                }
+            }
+            return null;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /*                      KEYBOARD NAVIGATION                             */
+        /* ═══════════════════════════════════════════════════════════════════ */
+
+        function handleKeyPress(e) {
+            // Don't handle if typing in input
+            if (e.target === consoleInput) return;
+            
+            if (!gameState.isGameActive) return;
+            
+            switch (e.key) {
+                case 'ArrowUp':
+                    e.preventDefault();
+                    moveSelection(-3);
+                    break;
+                case 'ArrowDown':
+                    e.preventDefault();
+                    moveSelection(3);
+                    break;
+                case 'ArrowLeft':
+                    e.preventDefault();
+                    moveSelection(-1);
+                    break;
+                case 'ArrowRight':
+                    e.preventDefault();
+                    moveSelection(1);
+                    break;
+                case 'Enter':
+                case ' ':
+                    e.preventDefault();
+                    if (gameState.board[gameState.selectedCell] === null) {
+                        handleCellClick(gameState.selectedCell);
+                    }
+                    break;
+            }
+        }
+
+        function moveSelection(offset) {
+            const newCell = gameState.selectedCell + offset;
+            
+            // Boundary checks
+            if (newCell < 0 || newCell > 8) return;
+            
+            // Prevent wrapping
+            if (offset === 1 && gameState.selectedCell % 3 === 2) return;
+            if (offset === -1 && gameState.selectedCell % 3 === 0) return;
+            
+            gameState.selectedCell = newCell;
+            updateSelectedCell();
+        }
+
+        function updateSelectedCell() {
+            cells.forEach((cell, index) => {
+                cell.classList.toggle('selected', index === gameState.selectedCell);
+                cell.setAttribute('tabindex', index === gameState.selectedCell ? '0' : '-1');
+            });
+            
+            cells[gameState.selectedCell].focus();
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /*                         GAME CONTROLS                                */
+        /* ═══════════════════════════════════════════════════════════════════ */
+
+        function setGameMode(mode) {
+            gameState.gameMode = mode;
+            
+            if (mode === 'bot') {
+                btnVsBot.classList.add('active');
+                btn2Player.classList.remove('active');
+                difficultySelect.style.display = 'inline-block';
+                logToConsole('Mode changed to VS BOT', 'info');
+            } else {
+                btn2Player.classList.add('active');
+                btnVsBot.classList.remove('active');
+                difficultySelect.style.display = 'none';
+                logToConsole('Mode changed to 2 PLAYER', 'info');
+            }
+            
+            restartGame();
+        }
+
+        function undoMove() {
+            if (gameState.currentMoveIndex < 0) {
+                logToConsole('No moves to undo', 'warning');
+                return;
+            }
+            
+            gameState.currentMoveIndex--;
+            
+            if (gameState.currentMoveIndex < 0) {
+                // Reset to initial state
+                gameState.board = Array(9).fill(null);
+                gameState.currentPlayer = 'X';
+                gameState.isGameActive = true;
+            } else {
+                // Restore previous state
+                const prevMove = gameState.moveHistory[gameState.currentMoveIndex];
+                gameState.board = [...prevMove.board];
+                gameState.currentPlayer = prevMove.player;
+                gameState.isGameActive = true;
+            }
+            
+            // Update UI
+            cells.forEach((cell, index) => {
+                cell.innerHTML = '';
+                cell.classList.remove('filled', 'winning');
+                
+                if (gameState.board[index] !== null) {
+                    cell.classList.add('filled');
+                    const mark = document.createElement('span');
+                    mark.classList.add('mark');
+                    mark.textContent = gameState.board[index];
+                    cell.appendChild(mark);
+                }
+            });
+            
+            updateStatus();
+            updateMoveHistory();
+            logToConsole('Move undone', 'info');
+        }
+
+        function restartGame() {
+            gameState.board = Array(9).fill(null);
+            gameState.currentPlayer = 'X';
+            gameState.isGameActive = true;
+            gameState.selectedCell = 4;
+            gameState.moveHistory = [];
+            gameState.currentMoveIndex = -1;
+            
+            cells.forEach(cell => {
+                cell.innerHTML = '';
+                cell.classList.remove('filled', 'winning');
+            });
+            
+            updateSelectedCell();
+            updateStatus();
+            updateMoveHistory();
+            
+            logToConsole('═══════════════════════════════════', 'info');
+            logToConsole('Game restarted', 'success');
+            logToConsole(`Mode: ${gameState.gameMode === 'bot' ? 'VS BOT' : '2 PLAYER'}`, 'info');
+            logToConsole('═══════════════════════════════════', 'info');
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /*                         MOVE HISTORY                                 */
+        /* ═══════════════════════════════════════════════════════════════════ */
+
+        function updateMoveHistory() {
+            if (gameState.moveHistory.length === 0) {
+                moveHistoryContainer.style.display = 'none';
+                return;
+            }
+            
+            moveHistoryContainer.style.display = 'block';
+            moveHistoryElement.innerHTML = '';
+            
+            // Add "Go to start" button
+            const startItem = document.createElement('div');
+            startItem.classList.add('move-item');
+            if (gameState.currentMoveIndex === -1) {
+                startItem.classList.add('current');
+            }
+            startItem.textContent = '↺ Go to game start';
+            startItem.addEventListener('click', () => jumpToMove(-1));
+            moveHistoryElement.appendChild(startItem);
+            
+            // Add move items
+            gameState.moveHistory.forEach((move, index) => {
+                const item = document.createElement('div');
+                item.classList.add('move-item');
+                if (index === gameState.currentMoveIndex) {
+                    item.classList.add('current');
+                }
+                item.textContent = `${index + 1}. ${move.player} → ${CELL_COORDS[move.index]}`;
+                item.addEventListener('click', () => jumpToMove(index));
+                moveHistoryElement.appendChild(item);
+            });
+        }
+
+        function jumpToMove(moveIndex) {
+            gameState.currentMoveIndex = moveIndex;
+            
+            if (moveIndex < 0) {
+                gameState.board = Array(9).fill(null);
+                gameState.currentPlayer = 'X';
+                gameState.isGameActive = true;
+            } else {
+                const move = gameState.moveHistory[moveIndex];
+                gameState.board = [...move.board];
+                gameState.board[move.index] = move.player;
+                gameState.currentPlayer = move.player === 'X' ? 'O' : 'X';
+                
+                // Check if this state has a winner
+                const winner = checkWinner();
+                gameState.isGameActive = !winner && !checkDraw();
+            }
+            
+            // Update UI
+            cells.forEach((cell, index) => {
+                cell.innerHTML = '';
+                cell.classList.remove('filled', 'winning');
+                
+                if (gameState.board[index] !== null) {
+                    cell.classList.add('filled');
+                    const mark = document.createElement('span');
+                    mark.classList.add('mark');
+                    mark.textContent = gameState.board[index];
+                    cell.appendChild(mark);
+                }
+            });
+            
+            updateStatus();
+            updateMoveHistory();
+            logToConsole(`Jumped to move ${moveIndex + 1}`, 'info');
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /*                         CONSOLE SYSTEM                               */
+        /* ═══════════════════════════════════════════════════════════════════ */
+
+        function logToConsole(message, type = 'info') {
+            const line = document.createElement('div');
+            line.classList.add('console-line', type);
+            line.innerHTML = `&gt; ${message}`;
+            consoleOutput.appendChild(line);
+            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+        }
+
+        function handleConsoleCommand(e) {
+            if (e.key !== 'Enter') return;
+            
+            const command = consoleInput.value.trim().toLowerCase();
+            consoleInput.value = '';
+            
+            if (!command) return;
+            
+            logToConsole(`Command: ${command}`, 'info');
+            
+            switch (command) {
+                case 'restart':
+                case 'reset':
+                case 'new':
+                    restartGame();
+                    break;
+                    
+                case 'undo':
+                case 'back':
+                    undoMove();
+                    break;
+                    
+                case 'mode':
+                case 'switch':
+                    setGameMode(gameState.gameMode === 'bot' ? '2player' : 'bot');
+                    break;
+                    
+                case 'help':
+                case '?':
+                    showHelp();
+                    break;
+                    
+                case 'clear':
+                case 'cls':
+                    consoleOutput.innerHTML = '';
+                    logToConsole('Console cleared', 'success');
+                    break;
+                    
+                case 'score':
+                case 'stats':
+                    logToConsole(`X: ${gameState.scores.X} | O: ${gameState.scores.O} | Draws: ${gameState.scores.draw}`, 'success');
+                    break;
+                    
+                default:
+                    logToConsole(`Unknown command: ${command}`, 'error');
+                    logToConsole('Type "help" for available commands', 'info');
+            }
+        }
+
+        function showHelp() {
+            logToConsole('═══════════════════════════════════', 'info');
+            logToConsole('AVAILABLE COMMANDS:', 'success');
+            logToConsole('  restart - Start a new game', 'info');
+            logToConsole('  undo - Undo last move', 'info');
+            logToConsole('  mode - Switch game mode', 'info');
+            logToConsole('  score - Show current scores', 'info');
+            logToConsole('  clear - Clear console', 'info');
+            logToConsole('  help - Show this help', 'info');
+            logToConsole('═══════════════════════════════════', 'info');
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /*                         ANIMATIONS                                   */
+        /* ═══════════════════════════════════════════════════════════════════ */
+
+        function terminalBeep() {
+            const flash = document.createElement('div');
+            flash.classList.add('beep-flash');
+            document.body.appendChild(flash);
+            
+            setTimeout(() => {
+                flash.remove();
+            }, 200);
+        }
+
+        function createFireworks() {
+            const symbols = ['*', '+', '×', '•', '◆', '★', '▲', '▼'];
+            const colors = ['var(--terminal-fg)', 'var(--terminal-yellow)', 'var(--terminal-blue)'];
+            
+            for (let i = 0; i < 20; i++) {
+                setTimeout(() => {
+                    const firework = document.createElement('div');
+                    firework.classList.add('firework');
+                    firework.textContent = symbols[Math.floor(Math.random() * symbols.length)];
+                    firework.style.color = colors[Math.floor(Math.random() * colors.length)];
+                    
+                    const startX = window.innerWidth / 2;
+                    const startY = window.innerHeight / 2;
+                    
+                    firework.style.left = startX + 'px';
+                    firework.style.top = startY + 'px';
+                    
+                    const angle = Math.random() * Math.PI * 2;
+                    const distance = 100 + Math.random() * 200;
+                    const x = Math.cos(angle) * distance;
+                    const y = Math.sin(angle) * distance;
+                    
+                    firework.style.setProperty('--x', `${x}px`);
+                    firework.style.setProperty('--y', `${y}px`);
+                    
+                    document.body.appendChild(firework);
+                    
+                    setTimeout(() => {
+                        firework.remove();
+                    }, 1000);
+                }, i * 50);
+            }
+            
+            // ASCII art in console
+            logToConsole('', 'success');
+            logToConsole('    ★ ･ﾟ ★ ･ﾟ ★ ･ﾟ ★ ･ﾟ ★', 'success');
+            logToConsole('  ･ﾟ  VICTORY!  ･ﾟ', 'success');
+            logToConsole('    ★ ･ﾟ ★ ･ﾟ ★ ･ﾟ ★ ･ﾟ ★', 'success');
+            logToConsole('', 'success');
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /*                         START GAME                                   */
+        /* ═══════════════════════════════════════════════════════════════════ */
+
+        // Initialize game when page loads
+        window.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
