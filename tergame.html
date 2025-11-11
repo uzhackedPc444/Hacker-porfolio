@@ -1,0 +1,1196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Terminal Escape Room - MAQSADBEK37</title>
+    <style>
+        /* ============================================
+           GLOBAL STYLES & RESET
+           ============================================ */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            background-color: #0a0a0a;
+            color: #39ff14;
+            overflow: hidden;
+            height: 100vh;
+            position: relative;
+        }
+
+        /* ============================================
+           CRT SCANLINE OVERLAY EFFECT
+           ============================================ */
+        .scanline {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(
+                to bottom,
+                rgba(255, 255, 255, 0) 50%,
+                rgba(0, 0, 0, 0.1) 50%
+            );
+            background-size: 100% 4px;
+            pointer-events: none;
+            z-index: 1000;
+            animation: scanlineMove 8s linear infinite;
+        }
+
+        @keyframes scanlineMove {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(4px); }
+        }
+
+        /* ============================================
+           MATRIX RAIN BACKGROUND (OPTIONAL)
+           ============================================ */
+        #matrix-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            opacity: 0;
+            transition: opacity 1s;
+        }
+
+        #matrix-canvas.active {
+            opacity: 0.15;
+        }
+
+        /* ============================================
+           MAIN TERMINAL CONTAINER
+           ============================================ */
+        .terminal-container {
+            position: relative;
+            z-index: 1;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        /* ============================================
+           ASCII TITLE BANNER
+           ============================================ */
+        .title-banner {
+            color: #00fff0;
+            font-size: 12px;
+            margin-bottom: 10px;
+            text-align: center;
+            text-shadow: 0 0 10px #00fff0;
+            animation: glowPulse 2s ease-in-out infinite;
+        }
+
+        @keyframes glowPulse {
+            0%, 100% { text-shadow: 0 0 10px #00fff0; }
+            50% { text-shadow: 0 0 20px #00fff0, 0 0 30px #00fff0; }
+        }
+
+        /* ============================================
+           TERMINAL OUTPUT AREA
+           ============================================ */
+        .output-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+            background-color: rgba(0, 0, 0, 0.3);
+            border: 1px solid #39ff14;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            box-shadow: 0 0 20px rgba(57, 255, 20, 0.3);
+        }
+
+        .output-area::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .output-area::-webkit-scrollbar-track {
+            background: #0a0a0a;
+        }
+
+        .output-area::-webkit-scrollbar-thumb {
+            background: #39ff14;
+            border-radius: 4px;
+        }
+
+        .output-line {
+            margin-bottom: 8px;
+            line-height: 1.4;
+        }
+
+        .output-line.error {
+            color: #ff3860;
+        }
+
+        .output-line.success {
+            color: #00fff0;
+            text-shadow: 0 0 5px #00fff0;
+        }
+
+        .output-line.warning {
+            color: #ffdd57;
+        }
+
+        .output-line.hint {
+            color: #ff79c6;
+            font-style: italic;
+        }
+
+        /* ============================================
+           PROGRESS BAR
+           ============================================ */
+        .progress-bar {
+            padding: 10px;
+            background-color: rgba(0, 0, 0, 0.5);
+            border: 1px solid #39ff14;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+
+        /* ============================================
+           INPUT AREA
+           ============================================ */
+        .input-area {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            background-color: rgba(0, 0, 0, 0.5);
+            border: 1px solid #39ff14;
+            border-radius: 5px;
+            box-shadow: 0 0 20px rgba(57, 255, 20, 0.3);
+        }
+
+        .prompt {
+            color: #00fff0;
+            margin-right: 10px;
+            font-weight: bold;
+        }
+
+        #terminal-input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: #39ff14;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 16px;
+            outline: none;
+        }
+
+        .cursor {
+            display: inline-block;
+            width: 10px;
+            height: 20px;
+            background-color: #39ff14;
+            margin-left: 2px;
+            animation: blink 1s step-end infinite;
+        }
+
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+
+        /* ============================================
+           GLITCH ANIMATION FOR LEVEL TRANSITIONS
+           ============================================ */
+        .glitch {
+            animation: glitch 0.3s ease-in-out;
+        }
+
+        @keyframes glitch {
+            0% { transform: translate(0); }
+            20% { transform: translate(-5px, 5px); color: #ff00ff; }
+            40% { transform: translate(-5px, -5px); color: #00ffff; }
+            60% { transform: translate(5px, 5px); color: #ffff00; }
+            80% { transform: translate(5px, -5px); color: #00ff00; }
+            100% { transform: translate(0); }
+        }
+
+        /* ============================================
+           VICTORY SCREEN
+           ============================================ */
+        .victory-screen {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.95);
+            border: 3px solid #00fff0;
+            padding: 40px;
+            border-radius: 10px;
+            text-align: center;
+            z-index: 2000;
+            box-shadow: 0 0 50px #00fff0;
+        }
+
+        .victory-screen.active {
+            display: block;
+            animation: victoryPulse 1s ease-in-out;
+        }
+
+        @keyframes victoryPulse {
+            0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
+            50% { transform: translate(-50%, -50%) scale(1.1); }
+            100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+        }
+
+        .victory-screen h1 {
+            color: #00fff0;
+            font-size: 32px;
+            margin-bottom: 20px;
+            text-shadow: 0 0 20px #00fff0;
+        }
+
+        .victory-screen p {
+            color: #39ff14;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+
+        .restart-btn {
+            margin-top: 20px;
+            padding: 12px 30px;
+            background: #00fff0;
+            color: #0a0a0a;
+            border: none;
+            border-radius: 5px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .restart-btn:hover {
+            background: #39ff14;
+            box-shadow: 0 0 20px #39ff14;
+            transform: scale(1.05);
+        }
+
+        /* ============================================
+           RESPONSIVE DESIGN
+           ============================================ */
+        @media (max-width: 768px) {
+            .terminal-container {
+                padding: 10px;
+            }
+
+            .title-banner {
+                font-size: 8px;
+            }
+
+            #terminal-input {
+                font-size: 14px;
+            }
+
+            .victory-screen {
+                width: 90%;
+                padding: 20px;
+            }
+
+            .victory-screen h1 {
+                font-size: 24px;
+            }
+        }
+
+        /* ============================================
+           LOADING ANIMATION
+           ============================================ */
+        .loading {
+            display: inline-block;
+            animation: loading 1.5s ease-in-out infinite;
+        }
+
+        @keyframes loading {
+            0%, 100% { content: '.'; }
+            33% { content: '..'; }
+            66% { content: '...'; }
+        }
+    </style>
+</head>
+<body>
+    <!-- CRT Scanline Overlay -->
+    <div class="scanline"></div>
+
+    <!-- Matrix Rain Canvas (Optional Background) -->
+    <canvas id="matrix-canvas"></canvas>
+
+    <!-- Main Terminal Container -->
+    <div class="terminal-container">
+        <!-- ASCII Title Banner -->
+        <pre class="title-banner">
+╔═══════════════════════════════════════════════════════════╗
+║  MAQSADBEK37 — TERMINAL ESCAPE ROOM                      ║
+║  [SYSTEM LOCKED] • 50 LEVELS • ESCAPE PROTOCOL REQUIRED  ║
+╚═══════════════════════════════════════════════════════════╝
+        </pre>
+
+        <!-- Terminal Output Area -->
+        <div class="output-area" id="output"></div>
+
+        <!-- Progress Bar -->
+        <div class="progress-bar" id="progress-bar">
+            > Progress: [░░░░░░░░░░░░░░] 0/50 levels complete
+        </div>
+
+        <!-- Input Area -->
+        <div class="input-area">
+            <span class="prompt">&gt;</span>
+            <input type="text" id="terminal-input" autocomplete="off" autofocus />
+            <span class="cursor"></span>
+        </div>
+    </div>
+
+    <!-- Victory Screen -->
+    <div class="victory-screen" id="victory-screen">
+        <h1>╔═══ ESCAPE SUCCESSFUL ═══╗</h1>
+        <pre>
+    ██████╗ ██████╗  ██████╗ ███╗   ██╗███████╗
+    ██╔══██╗██╔══██╗██╔═══██╗████╗  ██║██╔════╝
+    ██║  ██║██████╔╝██║   ██║██╔██╗ ██║█████╗  
+    ██║  ██║██╔══██╗██║   ██║██║╚██╗██║██╔══╝  
+    ██████╔╝██║  ██║╚██████╔╝██║ ╚████║███████╗
+    ╚═════╝ ╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═══╝╚══════╝
+        </pre>
+        <p>FINAL FIREWALL BREACHED.</p>
+        <p>SYSTEM UNLOCKED.</p>
+        <p>ACCESS GRANTED.</p>
+        <p style="color: #00fff0; margin-top: 20px; font-size: 18px;">
+            Congratulations, Agent MAQSADBEK37.
+        </p>
+        <button class="restart-btn" onclick="restartGame()">RESTART GAME</button>
+    </div>
+
+    <script>
+        /* ============================================
+           GAME STATE & CONFIGURATION
+           ============================================ */
+        
+        let currentLevel = 0;
+        let gameState = {
+            currentLevel: 0,
+            completedLevels: [],
+            startTime: Date.now()
+        };
+
+        /* ============================================
+           PUZZLE DATABASE - 50 LEVELS
+           
+           Each puzzle contains:
+           - id: Level number (1-50)
+           - prompt: The puzzle text shown to the player
+           - answer: The correct answer (case-insensitive)
+           - hint: A cryptic hint for the puzzle
+           - type: Puzzle category for organization
+           ============================================ */
+        
+        const levels = [
+            // LEVELS 1-10: BASIC ENCODING
+            {
+                id: 1,
+                prompt: "Decode this: SGVsbG8gV29ybGQ=",
+                answer: "Hello World",
+                hint: "This looks like Base64 encoding. Try decoding it.",
+                type: "base64"
+            },
+            {
+                id: 2,
+                prompt: "Binary message: 01001000 01101001",
+                answer: "Hi",
+                hint: "Binary to ASCII conversion needed.",
+                type: "binary"
+            },
+            {
+                id: 3,
+                prompt: "Caesar cipher (shift 3): Khoor",
+                answer: "Hello",
+                hint: "Each letter is shifted by 3 positions in the alphabet.",
+                type: "caesar"
+            },
+            {
+                id: 4,
+                prompt: "Decode Base64: UGFzc3dvcmQ=",
+                answer: "Password",
+                hint: "Another Base64 encoded string.",
+                type: "base64"
+            },
+            {
+                id: 5,
+                prompt: "What comes next? 2, 4, 8, 16, __",
+                answer: "32",
+                hint: "Each number is double the previous one.",
+                type: "pattern"
+            },
+            {
+                id: 6,
+                prompt: "Binary: 01000001 01000011 01000101",
+                answer: "ACE",
+                hint: "Convert binary to text.",
+                type: "binary"
+            },
+            {
+                id: 7,
+                prompt: "Caesar shift 5: Futrx",
+                answer: "Apple",
+                hint: "Shift back 5 letters in the alphabet.",
+                type: "caesar"
+            },
+            {
+                id: 8,
+                prompt: "Math puzzle: 7 * 6 + 8 = ?",
+                answer: "50",
+                hint: "Follow order of operations: multiply first, then add.",
+                type: "math"
+            },
+            {
+                id: 9,
+                prompt: "Decode: V29ybGQ=",
+                answer: "World",
+                hint: "Base64 encoding again.",
+                type: "base64"
+            },
+            {
+                id: 10,
+                prompt: "Pattern: 1, 1, 2, 3, 5, 8, __",
+                answer: "13",
+                hint: "This is the Fibonacci sequence. Add the last two numbers.",
+                type: "pattern"
+            },
+
+            // LEVELS 11-20: INTERMEDIATE CHALLENGES
+            {
+                id: 11,
+                prompt: "Hexadecimal to decimal: 2A",
+                answer: "42",
+                hint: "Convert hex 2A to base 10.",
+                type: "hex"
+            },
+            {
+                id: 12,
+                prompt: "Reverse this: TOOR",
+                answer: "ROOT",
+                hint: "Read it backwards.",
+                type: "reverse"
+            },
+            {
+                id: 13,
+                prompt: "Binary: 01010011 01001111 01010011",
+                answer: "SOS",
+                hint: "Distress signal in binary form.",
+                type: "binary"
+            },
+            {
+                id: 14,
+                prompt: "What has keys but no locks? (one word)",
+                answer: "Keyboard",
+                hint: "Think about typing devices.",
+                type: "riddle"
+            },
+            {
+                id: 15,
+                prompt: "Caesar shift 13: Uryyb (ROT13)",
+                answer: "Hello",
+                hint: "ROT13 is a special case: shift by 13.",
+                type: "caesar"
+            },
+            {
+                id: 16,
+                prompt: "Hex: 48454C50",
+                answer: "HELP",
+                hint: "Convert each hex pair to ASCII.",
+                type: "hex"
+            },
+            {
+                id: 17,
+                prompt: "Complete: Fire, Water, Earth, __",
+                answer: "Air",
+                hint: "The four classical elements.",
+                type: "pattern"
+            },
+            {
+                id: 18,
+                prompt: "Decode: QWNjZXNz",
+                answer: "Access",
+                hint: "Base64 encoded word.",
+                type: "base64"
+            },
+            {
+                id: 19,
+                prompt: "Math: 2^8 = ?",
+                answer: "256",
+                hint: "2 to the power of 8.",
+                type: "math"
+            },
+            {
+                id: 20,
+                prompt: "Missing number: 10, 20, __, 40, 50",
+                answer: "30",
+                hint: "Counting by tens.",
+                type: "pattern"
+            },
+
+            // LEVELS 21-30: ADVANCED PUZZLES
+            {
+                id: 21,
+                prompt: "LOG [192.168.1.1] ACCESS CODE: Decode RU5URVIgSEVSRQ==",
+                answer: "ENTER HERE",
+                hint: "System log with Base64 access code.",
+                type: "base64"
+            },
+            {
+                id: 22,
+                prompt: "I speak without a mouth and hear without ears. What am I?",
+                answer: "Echo",
+                hint: "Think about sound reflections.",
+                type: "riddle"
+            },
+            {
+                id: 23,
+                prompt: "Binary sequence: 01000111 01001111",
+                answer: "GO",
+                hint: "Two-letter word in binary.",
+                type: "binary"
+            },
+            {
+                id: 24,
+                prompt: "Substitution: A=1, B=2, C=3... Decode: 3-15-4-5",
+                answer: "CODE",
+                hint: "Replace numbers with their alphabet positions.",
+                type: "substitution"
+            },
+            {
+                id: 25,
+                prompt: "Hex color code to name: #FF0000",
+                answer: "Red",
+                hint: "This is a pure primary color in RGB.",
+                type: "hex"
+            },
+            {
+                id: 26,
+                prompt: "ROT13: Pelcgb",
+                answer: "Crypto",
+                hint: "Rotate by 13 positions.",
+                type: "caesar"
+            },
+            {
+                id: 27,
+                prompt: "Logic: If all Bloops are Razzies and all Razzies are Lazzies, are all Bloops definitely Lazzies? (yes/no)",
+                answer: "yes",
+                hint: "Transitive property: if A→B and B→C, then A→C.",
+                type: "logic"
+            },
+            {
+                id: 28,
+                prompt: "Morse code: .... . .-.. .--.",
+                answer: "HELP",
+                hint: "H(….) E(.) L(.-..) P(.–.)",
+                type: "morse"
+            },
+            {
+                id: 29,
+                prompt: "Prime number after 17?",
+                answer: "19",
+                hint: "Next number divisible only by 1 and itself.",
+                type: "math"
+            },
+            {
+                id: 30,
+                prompt: "Reverse and decode: =gMzVtQWY (reversed Base64)",
+                answer: "Exit",
+                hint: "First reverse the string, then decode Base64.",
+                type: "reverse"
+            },
+
+            // LEVELS 31-40: EXPERT CHALLENGES
+            {
+                id: 31,
+                prompt: "TRACE [LOG-5532]: Password hash MD5 first 4 chars: 5d41..., original 5-letter word?",
+                answer: "hello",
+                hint: "Common greeting word that hashes to 5d41402abc4b2a76b9719d911017c592.",
+                type: "hash"
+            },
+            {
+                id: 32,
+                prompt: "Binary math: 1010 + 0011 = ? (in decimal)",
+                answer: "13",
+                hint: "1010 is 10, 0011 is 3. Add them.",
+                type: "binary"
+            },
+            {
+                id: 33,
+                prompt: "What is always in front of you but can't be seen?",
+                answer: "Future",
+                hint: "Think about time and what lies ahead.",
+                type: "riddle"
+            },
+            {
+                id: 34,
+                prompt: "Decode: 01010011 01000101 01000011 01010010 01000101 01010100",
+                answer: "SECRET",
+                hint: "Six-letter word in binary.",
+                type: "binary"
+            },
+            {
+                id: 35,
+                prompt: "Cipher: Replace each letter with the next one: SGDQ",
+                answer: "TERM",
+                hint: "A→B, B→C, etc. Shift back one position.",
+                type: "caesar"
+            },
+            {
+                id: 36,
+                prompt: "IP trace shows: 127.0.0.1. What host?",
+                answer: "localhost",
+                hint: "This is the loopback address.",
+                type: "network"
+            },
+            {
+                id: 37,
+                prompt: "Hex ASCII: 4841434B",
+                answer: "HACK",
+                hint: "Convert hex pairs to letters.",
+                type: "hex"
+            },
+            {
+                id: 38,
+                prompt: "Pattern: 2, 6, 12, 20, 30, __",
+                answer: "42",
+                hint: "Differences: 4, 6, 8, 10... next is 12.",
+                type: "pattern"
+            },
+            {
+                id: 39,
+                prompt: "Base64 double-encoded: Vm14YVlWbFhVbGRpUkVKWVYw (decode twice, it's a 4-letter word)",
+                answer: "EXIT",
+                hint: "Decode once to get another Base64 string, then decode again.",
+                type: "base64"
+            },
+            {
+                id: 40,
+                prompt: "SQL injection test: SELECT password FROM users WHERE id=1; Result: 'GHOST'. What's the password?",
+                answer: "GHOST",
+                hint: "The result IS the password.",
+                type: "sql"
+            },
+
+            // LEVELS 41-50: MASTER LEVEL
+            {
+                id: 41,
+                prompt: "Multi-cipher: Decode Base64 'RVNDQVBF' then reverse it.",
+                answer: "EPACSE",
+                hint: "First decode Base64 to get a word, then reverse that word.",
+                type: "multi"
+            },
+            {
+                id: 42,
+                prompt: "The answer to life, the universe, and everything?",
+                answer: "42",
+                hint: "A famous number from 'The Hitchhiker's Guide to the Galaxy'.",
+                type: "culture"
+            },
+            {
+                id: 43,
+                prompt: "Binary: 01000110 01001001 01001110 01000001 01001100",
+                answer: "FINAL",
+                hint: "Five letters in binary.",
+                type: "binary"
+            },
+            {
+                id: 44,
+                prompt: "ROT13 then reverse: olleH → reverse → Hello. Now: yrtne → ?",
+                answer: "entry",
+                hint: "Just reverse the string (no ROT13 needed here).",
+                type: "reverse"
+            },
+            {
+                id: 45,
+                prompt: "Port scan shows open port 22. What service?",
+                answer: "SSH",
+                hint: "Secure Shell protocol runs on this port.",
+                type: "network"
+            },
+            {
+                id: 46,
+                prompt: "Hex: 5245424F4F54",
+                answer: "REBOOT",
+                hint: "System command in hexadecimal.",
+                type: "hex"
+            },
+            {
+                id: 47,
+                prompt: "Logic puzzle: Three switches, one bulb in another room. How many trips to determine which switch controls the bulb? (minimum)",
+                answer: "1",
+                hint: "Turn on switch 1 for 5 min, turn off, turn on switch 2, go check: if on→2, if warm→1, if cold→3.",
+                type: "logic"
+            },
+            {
+                id: 48,
+                prompt: "Decode the access key: U1lTVEVN",
+                answer: "SYSTEM",
+                hint: "Base64 encoded access key.",
+                type: "base64"
+            },
+            {
+                id: 49,
+                prompt: "Final verification: 10 in binary?",
+                answer: "1010",
+                hint: "Convert decimal 10 to binary.",
+                type: "binary"
+            },
+            {
+                id: 50,
+                prompt: "Ultimate password: Decode 'QUNDRVNT' (Base64) for FINAL ACCESS",
+                answer: "ACCESS",
+                hint: "The final key to freedom.",
+                type: "base64"
+            }
+        ];
+
+        /* ============================================
+           AVAILABLE COMMANDS
+           ============================================ */
+        
+        const commands = {
+            help: "List all available commands",
+            scan: "Scan the system for hints about current puzzle",
+            decrypt: "Attempt to decrypt/solve the current puzzle (requires answer)",
+            connect: "Advance to next level (works after solving puzzle)",
+            hint: "Get a cryptic hint for the current puzzle",
+            clear: "Clear terminal output",
+            level: "Show current progress",
+            "sudo reveal": "Easter egg - show hidden credits",
+            matrix: "Toggle Matrix rain background effect",
+            restart: "Restart the game from level 1"
+        };
+
+        /* ============================================
+           INITIALIZE GAME
+           ============================================ */
+        
+        function init() {
+            loadGameState();
+            showIntro();
+            setupMatrixRain();
+            document.getElementById('terminal-input').addEventListener('keypress', handleInput);
+            
+            // Auto-scroll to bottom when new output added
+            const output = document.getElementById('output');
+            const observer = new MutationObserver(() => {
+                output.scrollTop = output.scrollHeight;
+            });
+            observer.observe(output, { childList: true });
+        }
+
+        /* ============================================
+           LOCALSTORAGE - SAVE & LOAD PROGRESS
+           ============================================ */
+        
+        function saveGameState() {
+            localStorage.setItem('terminalEscapeRoom', JSON.stringify(gameState));
+        }
+
+        function loadGameState() {
+            const saved = localStorage.getItem('terminalEscapeRoom');
+            if (saved) {
+                gameState = JSON.parse(saved);
+                currentLevel = gameState.currentLevel;
+                typewriterOutput(`> PREVIOUS SESSION DETECTED.\n> RESUMING FROM LEVEL ${currentLevel + 1}...\n`, 'warning');
+            }
+        }
+
+        function resetGameState() {
+            gameState = {
+                currentLevel: 0,
+                completedLevels: [],
+                startTime: Date.now()
+            };
+            currentLevel = 0;
+            localStorage.removeItem('terminalEscapeRoom');
+        }
+
+        /* ============================================
+           INTRO SEQUENCE
+           ============================================ */
+        
+        function showIntro() {
+            setTimeout(() => {
+                typewriterOutput('> SYSTEM LOCKED.\n', 'error', 50);
+            }, 500);
+            setTimeout(() => {
+                typewriterOutput('> ESCAPE PROTOCOL REQUIRED.\n', 'warning', 50);
+            }, 1500);
+            setTimeout(() => {
+                typewriterOutput('> 50 SECURITY LAYERS DETECTED.\n', 'warning', 50);
+            }, 2500);
+            setTimeout(() => {
+                typewriterOutput('> Type "help" for available commands.\n\n', 'success', 50);
+            }, 3500);
+            setTimeout(() => {
+                if (currentLevel === 0) {
+                    showPuzzle();
+                } else {
+                    typewriterOutput(`> Resuming at LEVEL ${currentLevel + 1}...\n\n`, 'success', 30);
+                    showPuzzle();
+                }
+            }, 4500);
+        }
+
+        /* ============================================
+           DISPLAY CURRENT PUZZLE
+           ============================================ */
+        
+        function showPuzzle() {
+            if (currentLevel >= levels.length) {
+                showVictory();
+                return;
+            }
+
+            const puzzle = levels[currentLevel];
+            typewriterOutput(`\n╔════ LEVEL ${puzzle.id} / 50 ════╗\n`, 'success', 30);
+            typewriterOutput(`> ${puzzle.prompt}\n\n`, '', 30);
+            updateProgress();
+        }
+
+        /* ============================================
+           UPDATE PROGRESS BAR
+           ============================================ */
+        
+        function updateProgress() {
+            const total = 50;
+            const completed = currentLevel;
+            const percentage = completed / total;
+            const barLength = 14;
+            const filledLength = Math.floor(percentage * barLength);
+            
+            let bar = '';
+            for (let i = 0; i < barLength; i++) {
+                bar += i < filledLength ? '█' : '░';
+            }
+            
+            document.getElementById('progress-bar').innerHTML = 
+                `> Progress: [${bar}] ${completed}/${total} levels complete`;
+        }
+
+        /* ============================================
+           TYPEWRITER EFFECT FOR OUTPUT
+           
+           Creates immersive character-by-character text reveal
+           ============================================ */
+        
+        function typewriterOutput(text, className = '', speed = 20) {
+            const output = document.getElementById('output');
+            const line = document.createElement('div');
+            line.className = `output-line ${className}`;
+            output.appendChild(line);
+
+            let index = 0;
+            const interval = setInterval(() => {
+                if (index < text.length) {
+                    line.textContent += text[index];
+                    index++;
+                } else {
+                    clearInterval(interval);
+                }
+            }, speed);
+
+            // Uncomment below for typewriter sound effect (placeholder)
+            // playTypewriterSound();
+        }
+
+        /* ============================================
+           INSTANT OUTPUT (NO TYPEWRITER)
+           ============================================ */
+        
+        function addOutput(text, className = '') {
+            const output = document.getElementById('output');
+            const line = document.createElement('div');
+            line.className = `output-line ${className}`;
+            line.textContent = text;
+            output.appendChild(line);
+        }
+
+        /* ============================================
+           HANDLE USER INPUT
+           ============================================ */
+        
+        function handleInput(event) {
+            if (event.key === 'Enter') {
+                const input = document.getElementById('terminal-input');
+                const command = input.value.trim();
+                
+                if (command) {
+                    addOutput(`> ${command}`, 'success');
+                    parseCommand(command);
+                }
+                
+                input.value = '';
+            }
+        }
+
+        /* ============================================
+           COMMAND PARSER
+           
+           Processes all user commands and puzzle answers
+           ============================================ */
+        
+        function parseCommand(cmd) {
+            const command = cmd.toLowerCase();
+
+            // HELP command
+            if (command === 'help') {
+                addOutput('\n╔═══ AVAILABLE COMMANDS ═══╗', 'success');
+                for (const [key, desc] of Object.entries(commands)) {
+                    addOutput(`> ${key.padEnd(15)} - ${desc}`, '');
+                }
+                addOutput('╚═════════════════════════╝\n', 'success');
+                return;
+            }
+
+            // SCAN command
+            if (command === 'scan') {
+                typewriterOutput('> Scanning system...', '', 50);
+                setTimeout(() => {
+                    const puzzle = levels[currentLevel];
+                    addOutput(`> LEVEL ${puzzle.id} FIREWALL ACTIVE`, 'warning');
+                    addOutput(`> Puzzle type: ${puzzle.type.toUpperCase()}`, '');
+                    addOutput(`> Use "hint" for guidance or "decrypt <answer>" to solve.\n`, 'hint');
+                }, 800);
+                return;
+            }
+
+            // HINT command
+            if (command === 'hint') {
+                const puzzle = levels[currentLevel];
+                typewriterOutput(`> HINT: ${puzzle.hint}\n`, 'hint', 30);
+                return;
+            }
+
+            // DECRYPT command (puzzle solving)
+            if (command.startsWith('decrypt ')) {
+                const answer = cmd.substring(8).trim();
+                checkAnswer(answer);
+                return;
+            }
+
+            // CONNECT command (advance to next level)
+            if (command === 'connect') {
+                if (gameState.completedLevels.includes(currentLevel)) {
+                    nextLevel();
+                } else {
+                    addOutput('> ACCESS DENIED. Solve current puzzle first.', 'error');
+                }
+                return;
+            }
+
+            // LEVEL command
+            if (command === 'level') {
+                addOutput(`> Current Level: ${currentLevel + 1} / 50`, 'success');
+                addOutput(`> Levels completed: ${gameState.completedLevels.length}`, '');
+                return;
+            }
+
+            // CLEAR command
+            if (command === 'clear') {
+                document.getElementById('output').innerHTML = '';
+                typewriterOutput('> Terminal cleared.\n', 'success', 20);
+                return;
+            }
+
+            // SUDO REVEAL (Easter egg)
+            if (command === 'sudo reveal') {
+                typewriterOutput('\n╔═══ CLASSIFIED INFORMATION ═══╗\n', 'success', 30);
+                typewriterOutput('> SYSTEM ARCHITECT: MAQSADBEK37\n', '', 30);
+                typewriterOutput('> PROJECT: Terminal Escape Room\n', '', 30);
+                typewriterOutput('> PURPOSE: Portfolio Showcase\n', '', 30);
+                typewriterOutput('> WEBSITE: maqsadbek37.vercel.app\n', '', 30);
+                typewriterOutput('> STATUS: Fully Operational\n', 'success', 30);
+                typewriterOutput('╚═══════════════════════════════╝\n\n', 'success', 30);
+                return;
+            }
+
+            // MATRIX command (toggle background)
+            if (command === 'matrix') {
+                const canvas = document.getElementById('matrix-canvas');
+                canvas.classList.toggle('active');
+                const status = canvas.classList.contains('active') ? 'ENABLED' : 'DISABLED';
+                addOutput(`> Matrix rain background ${status}.`, 'success');
+                return;
+            }
+
+            // RESTART command
+            if (command === 'restart') {
+                restartGame();
+                return;
+            }
+
+            // Try direct answer (shortcut for decrypt)
+            checkAnswer(cmd);
+        }
+
+        /* ============================================
+           CHECK PUZZLE ANSWER
+           ============================================ */
+        
+        function checkAnswer(answer) {
+            const puzzle = levels[currentLevel];
+            
+            if (answer.toLowerCase() === puzzle.answer.toLowerCase()) {
+                // Correct answer!
+                gameState.completedLevels.push(currentLevel);
+                saveGameState();
+                
+                // Glitch effect
+                const output = document.getElementById('output');
+                output.classList.add('glitch');
+                setTimeout(() => output.classList.remove('glitch'), 300);
+                
+                typewriterOutput('\n> ███ ACCESS GRANTED ███\n', 'success', 40);
+                typewriterOutput('> Firewall bypassed!\n', 'success', 40);
+                
+                setTimeout(() => {
+                    nextLevel();
+                }, 1500);
+            } else {
+                addOutput('> INCORRECT. Access denied.', 'error');
+                addOutput('> Try "hint" for guidance.\n', 'hint');
+            }
+        }
+
+        /* ============================================
+           ADVANCE TO NEXT LEVEL
+           ============================================ */
+        
+        function nextLevel() {
+            currentLevel++;
+            gameState.currentLevel = currentLevel;
+            saveGameState();
+
+            if (currentLevel >= levels.length) {
+                showVictory();
+            } else {
+                typewriterOutput('> Proceeding to next level...\n', 'warning', 40);
+                setTimeout(() => {
+                    showPuzzle();
+                }, 800);
+            }
+        }
+
+        /* ============================================
+           VICTORY SCREEN
+           ============================================ */
+        
+        function showVictory() {
+            typewriterOutput('\n\n> FINAL FIREWALL BREACHED.\n', 'success', 50);
+            typewriterOutput('> SYSTEM UNLOCKED.\n', 'success', 50);
+            typewriterOutput('> ALL 50 LEVELS COMPLETED.\n', 'success', 50);
+            
+            setTimeout(() => {
+                const victoryScreen = document.getElementById('victory-screen');
+                victoryScreen.classList.add('active');
+                
+                // Calculate completion time
+                const timeElapsed = Math.floor((Date.now() - gameState.startTime) / 1000);
+                const minutes = Math.floor(timeElapsed / 60);
+                const seconds = timeElapsed % 60;
+                
+                // Uncomment to add completion time to victory screen
+                // victoryScreen.querySelector('p:last-of-type').innerHTML += 
+                //     `<br><br>Time: ${minutes}m ${seconds}s`;
+            }, 2000);
+        }
+
+        /* ============================================
+           RESTART GAME
+           ============================================ */
+        
+        function restartGame() {
+            resetGameState();
+            document.getElementById('output').innerHTML = '';
+            document.getElementById('victory-screen').classList.remove('active');
+            typewriterOutput('> SYSTEM REBOOTING...\n', 'warning', 50);
+            setTimeout(() => {
+                init();
+            }, 1000);
+        }
+
+        /* ============================================
+           MATRIX RAIN BACKGROUND EFFECT
+           
+           Optional animated background
+           ============================================ */
+        
+        function setupMatrixRain() {
+            const canvas = document.getElementById('matrix-canvas');
+            const ctx = canvas.getContext('2d');
+            
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+
+            const columns = Math.floor(canvas.width / 20);
+            const drops = Array(columns).fill(1);
+
+            const chars = '01アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン';
+
+            function drawMatrix() {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                ctx.fillStyle = '#0F0';
+                ctx.font = '15px monospace';
+
+                for (let i = 0; i < drops.length; i++) {
+                    const text = chars[Math.floor(Math.random() * chars.length)];
+                    ctx.fillText(text, i * 20, drops[i] * 20);
+
+                    if (drops[i] * 20 > canvas.height && Math.random() > 0.975) {
+                        drops[i] = 0;
+                    }
+                    drops[i]++;
+                }
+            }
+
+            setInterval(drawMatrix, 50);
+
+            // Resize handler
+            window.addEventListener('resize', () => {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            });
+        }
+
+        /* ============================================
+           SOUND EFFECTS (PLACEHOLDER)
+           
+           Uncomment and implement with Web Audio API
+           ============================================ */
+        
+        // function playTypewriterSound() {
+        //     // const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        //     // const oscillator = audioContext.createOscillator();
+        //     // oscillator.frequency.value = 800;
+        //     // oscillator.connect(audioContext.destination);
+        //     // oscillator.start();
+        //     // oscillator.stop(audioContext.currentTime + 0.01);
+        // }
+
+        /* ============================================
+           START GAME
+           ============================================ */
+        
+        window.addEventListener('load', init);
+    </script>
+</body>
+</html>
