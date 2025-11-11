@@ -1,0 +1,2244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MAQSADBEK37 — COLOR LAB</title>
+    
+    <!--
+    ╔══════════════════════════════════════════════════════════════════════════╗
+    ║  MAQSADBEK37 — COLOR LAB v1.0                                           ║
+    ║  A terminal-themed color picker utility                                  ║
+    ╚══════════════════════════════════════════════════════════════════════════╝
+    
+    USAGE:
+    This is a self-contained HTML file. Open directly in a browser or embed in your site.
+    
+    EMBEDDING IN maqsadbek37.vercel.app:
+    1. Upload this file to your /public or /static folder
+    2. Link from your portfolio: <a href="/color-lab.html">Color Lab</a>
+    3. Or embed in an iframe: <iframe src="/color-lab.html" width="100%" height="800px"></iframe>
+    
+    FEATURES:
+    - Screen color picker using Eyedropper API (Chrome/Edge 95+)
+    - Canvas-based fallback for image upload, paste, or drag-and-drop sampling
+    - Multi-format color input: HEX, RGB(A), HSL(A)
+    - WCAG contrast checker with AA/AAA compliance indicators
+    - Palette management with localStorage persistence (opt-in)
+    - Export/Import palette as JSON, PNG, or CSS
+    - Undo/Redo support (Ctrl+Z / Ctrl+Y)
+    - Keyboard accessible with full ARIA support
+    - Responsive mobile-first design
+    
+    BROWSER SUPPORT:
+    - Eyedropper API: Chrome/Edge 95+, Opera 81+
+    - Fallback works on all modern browsers (Firefox, Safari, etc.)
+    
+    NO EXTERNAL DEPENDENCIES - 100% self-contained
+    -->
+    
+    <style>
+        /* ═══════════════════════════════════════════════════════════════════
+           GLOBAL STYLES & VARIABLES
+           ═══════════════════════════════════════════════════════════════════ */
+        
+        :root {
+            --bg-primary: #0b0b0b;
+            --bg-secondary: #1a1a1a;
+            --bg-tertiary: #252525;
+            --neon-green: #39ff14;
+            --neon-cyan: #00f5ff;
+            --text-primary: #e0e0e0;
+            --text-secondary: #a0a0a0;
+            --border-color: #333;
+            --glow-green: 0 0 10px rgba(57, 255, 20, 0.5);
+            --glow-cyan: 0 0 10px rgba(0, 245, 255, 0.5);
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Courier New', 'Consolas', monospace;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            overflow-x: hidden;
+            position: relative;
+        }
+        
+        /* Scanline overlay effect */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: repeating-linear-gradient(
+                0deg,
+                rgba(0, 0, 0, 0.15),
+                rgba(0, 0, 0, 0.15) 1px,
+                transparent 1px,
+                transparent 2px
+            );
+            pointer-events: none;
+            z-index: 9999;
+            opacity: 0.3;
+        }
+        
+        /* Grain texture */
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+            opacity: 0.03;
+            pointer-events: none;
+            z-index: 9998;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            position: relative;
+            z-index: 1;
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════
+           HEADER & ASCII ART
+           ═══════════════════════════════════════════════════════════════════ */
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 2px solid var(--neon-green);
+            background: var(--bg-secondary);
+            box-shadow: var(--glow-green);
+        }
+        
+        .ascii-logo {
+            font-size: 12px;
+            line-height: 1.2;
+            color: var(--neon-green);
+            text-shadow: var(--glow-green);
+            white-space: pre;
+            overflow-x: auto;
+        }
+        
+        .tagline {
+            color: var(--neon-cyan);
+            font-size: 14px;
+            margin-top: 10px;
+            text-shadow: var(--glow-cyan);
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════
+           MAIN LAYOUT
+           ═══════════════════════════════════════════════════════════════════ */
+        
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        @media (max-width: 968px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .panel {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            padding: 20px;
+            border-radius: 4px;
+        }
+        
+        .panel-title {
+            color: var(--neon-green);
+            font-size: 16px;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border-color);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════
+           COLOR PREVIEW
+           ═══════════════════════════════════════════════════════════════════ */
+        
+        .preview-area {
+            width: 100%;
+            height: 250px;
+            border: 2px solid var(--neon-cyan);
+            border-radius: 4px;
+            position: relative;
+            overflow: hidden;
+            cursor: crosshair;
+            box-shadow: var(--glow-cyan);
+            transition: all 0.3s ease;
+        }
+        
+        .preview-area:hover {
+            box-shadow: 0 0 20px rgba(0, 245, 255, 0.7);
+        }
+        
+        .preview-hex {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 8px 15px;
+            border-radius: 3px;
+            font-size: 18px;
+            color: var(--neon-green);
+            text-shadow: var(--glow-green);
+            border: 1px solid var(--neon-green);
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════
+           PICKER CONTROLS
+           ═══════════════════════════════════════════════════════════════════ */
+        
+        .picker-container {
+            margin: 20px 0;
+        }
+        
+        .hsl-picker {
+            width: 100%;
+            height: 200px;
+            position: relative;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            cursor: crosshair;
+            margin-bottom: 15px;
+        }
+        
+        .hsl-cursor {
+            width: 20px;
+            height: 20px;
+            border: 3px solid white;
+            border-radius: 50%;
+            position: absolute;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.5), inset 0 0 5px rgba(0, 0, 0, 0.5);
+        }
+        
+        .hue-slider-container {
+            margin: 15px 0;
+        }
+        
+        .hue-slider {
+            width: 100%;
+            height: 30px;
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+            background: linear-gradient(to right, 
+                #ff0000 0%, #ffff00 17%, #00ff00 33%, 
+                #00ffff 50%, #0000ff 67%, #ff00ff 83%, #ff0000 100%);
+            position: relative;
+            cursor: pointer;
+        }
+        
+        .slider-thumb {
+            width: 6px;
+            height: 100%;
+            background: white;
+            position: absolute;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.8);
+            pointer-events: none;
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════
+           BUTTONS
+           ═══════════════════════════════════════════════════════════════════ */
+        
+        .btn {
+            background: var(--bg-tertiary);
+            color: var(--neon-green);
+            border: 1px solid var(--neon-green);
+            padding: 10px 20px;
+            font-family: inherit;
+            font-size: 14px;
+            cursor: pointer;
+            border-radius: 3px;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .btn:hover {
+            background: var(--neon-green);
+            color: var(--bg-primary);
+            box-shadow: var(--glow-green);
+        }
+        
+        .btn:active {
+            animation: flicker 0.1s;
+        }
+        
+        .btn-cyan {
+            color: var(--neon-cyan);
+            border-color: var(--neon-cyan);
+        }
+        
+        .btn-cyan:hover {
+            background: var(--neon-cyan);
+            box-shadow: var(--glow-cyan);
+        }
+        
+        .btn-small {
+            padding: 5px 10px;
+            font-size: 12px;
+        }
+        
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin: 15px 0;
+        }
+        
+        @keyframes flicker {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════
+           INPUT FIELDS
+           ═══════════════════════════════════════════════════════════════════ */
+        
+        .input-group {
+            margin: 15px 0;
+        }
+        
+        .input-label {
+            display: block;
+            color: var(--text-secondary);
+            font-size: 12px;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .input-field {
+            width: 100%;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 10px;
+            font-family: inherit;
+            font-size: 14px;
+            border-radius: 3px;
+            transition: all 0.3s ease;
+        }
+        
+        .input-field:focus {
+            outline: none;
+            border-color: var(--neon-green);
+            box-shadow: var(--glow-green);
+        }
+        
+        .input-with-copy {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .input-with-copy .input-field {
+            flex: 1;
+        }
+        
+        .slider-input {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 10px 0;
+        }
+        
+        .slider-input input[type="range"] {
+            flex: 1;
+            height: 8px;
+            background: var(--bg-tertiary);
+            border-radius: 4px;
+            outline: none;
+            -webkit-appearance: none;
+        }
+        
+        .slider-input input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            background: var(--neon-green);
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: var(--glow-green);
+        }
+        
+        .slider-input input[type="range"]::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            background: var(--neon-green);
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: var(--glow-green);
+            border: none;
+        }
+        
+        .slider-input input[type="number"] {
+            width: 70px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 5px;
+            font-family: inherit;
+            text-align: center;
+            border-radius: 3px;
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════
+           TERMINAL LOG
+           ═══════════════════════════════════════════════════════════════════ */
+        
+        .terminal-log {
+            background: var(--bg-primary);
+            border: 1px solid var(--neon-green);
+            padding: 15px;
+            height: 150px;
+            overflow-y: auto;
+            font-size: 12px;
+            border-radius: 4px;
+            box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
+        }
+        
+        .terminal-log::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .terminal-log::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+        }
+        
+        .terminal-log::-webkit-scrollbar-thumb {
+            background: var(--neon-green);
+            border-radius: 4px;
+        }
+        
+        .log-entry {
+            margin: 5px 0;
+            color: var(--text-secondary);
+            animation: typewriter 0.3s;
+        }
+        
+        .log-entry.success {
+            color: var(--neon-green);
+        }
+        
+        .log-entry.error {
+            color: #ff3333;
+        }
+        
+        .log-entry.info {
+            color: var(--neon-cyan);
+        }
+        
+        @keyframes typewriter {
+            from { opacity: 0; transform: translateX(-10px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════
+           PALETTE
+           ═══════════════════════════════════════════════════════════════════ */
+        
+        .palette-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(50px, 1fr));
+            gap: 10px;
+            margin: 15px 0;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .palette-color {
+            width: 100%;
+            aspect-ratio: 1;
+            border: 2px solid var(--border-color);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        
+        .palette-color:hover {
+            transform: scale(1.1);
+            border-color: var(--neon-green);
+            box-shadow: var(--glow-green);
+        }
+        
+        .palette-color .delete-btn {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            width: 20px;
+            height: 20px;
+            background: #ff3333;
+            border: 1px solid white;
+            border-radius: 50%;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        
+        .palette-color:hover .delete-btn {
+            display: flex;
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════
+           CONTRAST CHECKER
+           ═══════════════════════════════════════════════════════════════════ */
+        
+        .contrast-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin: 15px 0;
+        }
+        
+        .contrast-box {
+            padding: 15px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            text-align: center;
+        }
+        
+        .contrast-ratio {
+            font-size: 24px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        
+        .wcag-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            margin: 2px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+        
+        .wcag-pass {
+            background: var(--neon-green);
+            color: var(--bg-primary);
+        }
+        
+        .wcag-fail {
+            background: #ff3333;
+            color: white;
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════
+           CANVAS FALLBACK
+           ═══════════════════════════════════════════════════════════════════ */
+        
+        .canvas-container {
+            display: none;
+            margin: 15px 0;
+            border: 2px dashed var(--neon-cyan);
+            border-radius: 4px;
+            padding: 15px;
+            text-align: center;
+        }
+        
+        .canvas-container.active {
+            display: block;
+        }
+        
+        #imageCanvas {
+            max-width: 100%;
+            border: 1px solid var(--border-color);
+            cursor: crosshair;
+            display: block;
+            margin: 10px auto;
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════
+           TOAST NOTIFICATIONS
+           ═══════════════════════════════════════════════════════════════════ */
+        
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: var(--bg-secondary);
+            color: var(--neon-green);
+            padding: 15px 25px;
+            border: 2px solid var(--neon-green);
+            border-radius: 4px;
+            box-shadow: var(--glow-green), 0 5px 20px rgba(0, 0, 0, 0.5);
+            z-index: 10000;
+            animation: slideIn 0.3s ease, slideOut 0.3s ease 2.7s;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        @keyframes slideIn {
+            from { transform: translateX(400px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        
+        @keyframes slideOut {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(400px); opacity: 0; }
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════
+           MODAL
+           ═══════════════════════════════════════════════════════════════════ */
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 10001;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal.active {
+            display: flex;
+        }
+        
+        .modal-content {
+            background: var(--bg-secondary);
+            border: 2px solid var(--neon-green);
+            border-radius: 4px;
+            padding: 30px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: var(--glow-green);
+        }
+        
+        .modal-title {
+            color: var(--neon-green);
+            font-size: 20px;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+        
+        .modal-close {
+            float: right;
+            font-size: 24px;
+            cursor: pointer;
+            color: var(--neon-cyan);
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════
+           MATRIX RAIN
+           ═══════════════════════════════════════════════════════════════════ */
+        
+        #matrixCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+            display: none;
+        }
+        
+        #matrixCanvas.active {
+            display: block;
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════
+           TOGGLE SWITCH
+           ═══════════════════════════════════════════════════════════════════ */
+        
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 10px 0;
+        }
+        
+        .toggle {
+            position: relative;
+            width: 50px;
+            height: 24px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .toggle.active {
+            background: var(--neon-green);
+            border-color: var(--neon-green);
+            box-shadow: var(--glow-green);
+        }
+        
+        .toggle-knob {
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 18px;
+            height: 18px;
+            background: white;
+            border-radius: 50%;
+            transition: all 0.3s ease;
+        }
+        
+        .toggle.active .toggle-knob {
+            left: 28px;
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════
+           PRESET PALETTES
+           ═══════════════════════════════════════════════════════════════════ */
+        
+        .preset-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin: 15px 0;
+        }
+        
+        .preset-btn {
+            padding: 12px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+        
+        .preset-btn:hover {
+            border-color: var(--neon-green);
+            box-shadow: var(--glow-green);
+        }
+        
+        .preset-colors {
+            display: flex;
+            gap: 3px;
+            margin-top: 8px;
+        }
+        
+        .preset-color {
+            flex: 1;
+            height: 20px;
+            border-radius: 2px;
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════
+           GRADIENT BUILDER (BONUS)
+           ═══════════════════════════════════════════════════════════════════ */
+        
+        .gradient-preview {
+            width: 100%;
+            height: 80px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════
+           RESPONSIVE
+           ═══════════════════════════════════════════════════════════════════ */
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .ascii-logo {
+                font-size: 8px;
+            }
+            
+            .contrast-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .btn-group {
+                flex-direction: column;
+            }
+            
+            .btn {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Matrix Rain Canvas -->
+    <canvas id="matrixCanvas"></canvas>
+    
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="ascii-logo" aria-label="Maqsadbek37 Color Lab Logo">
+╔══════════════════════════════════════════════════════════════════╗
+║  > MAQSADBEK37 — COLOR LAB v1.0                                 ║
+║  > Terminal-Based Color Picker & Analysis Tool                   ║
+╚══════════════════════════════════════════════════════════════════╝</div>
+            <p class="tagline">[CTRL+SHIFT+C to activate] • [? for help]</p>
+        </header>
+        
+        <!-- Main Grid -->
+        <div class="main-grid">
+            <!-- Left Column: Preview & Picker -->
+            <div>
+                <div class="panel">
+                    <h2 class="panel-title">█ Color Preview</h2>
+                    <div class="preview-area" id="previewArea" role="img" aria-label="Color preview">
+                        <div class="preview-hex" id="previewHex">#39FF14</div>
+                    </div>
+                    
+                    <div class="btn-group">
+                        <button class="btn" id="eyedropperBtn" aria-label="Pick color from screen">
+                            <span id="eyedropperIcon">⊙</span> Pick from Screen
+                        </button>
+                        <button class="btn btn-cyan" id="uploadImageBtn" aria-label="Upload image to sample">
+                            ▲ Upload Image
+                        </button>
+                        <button class="btn" id="saveColorBtn" aria-label="Save current color to palette">
+                            + Save to Palette
+                        </button>
+                        <button class="btn" id="undoBtn" aria-label="Undo last change" title="Ctrl+Z">
+                            ↶ Undo
+                        </button>
+                        <button class="btn" id="redoBtn" aria-label="Redo last change" title="Ctrl+Y">
+                            ↷ Redo
+                        </button>
+                    </div>
+                    
+                    <input type="file" id="imageUpload" accept="image/*" style="display: none;">
+                    
+                    <!-- Canvas Fallback Container -->
+                    <div class="canvas-container" id="canvasContainer">
+                        <p style="color: var(--neon-cyan); margin-bottom: 10px;">
+                            Click on the image to sample a color
+                        </p>
+                        <canvas id="imageCanvas"></canvas>
+                        <button class="btn btn-small btn-cyan" id="closeCanvasBtn">✕ Close</button>
+                    </div>
+                </div>
+                
+                <!-- HSL Picker -->
+                <div class="panel">
+                    <h2 class="panel-title">█ Color Picker</h2>
+                    <div class="hsl-picker" id="hslPicker" role="slider" aria-label="Hue and Saturation picker" tabindex="0">
+                        <div class="hsl-cursor" id="hslCursor"></div>
+                    </div>
+                    
+                    <div class="hue-slider-container">
+                        <label class="input-label">Hue</label>
+                        <div class="hue-slider" id="hueSlider" role="slider" aria-label="Hue slider" tabindex="0">
+                            <div class="slider-thumb" id="hueThumb"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="slider-input">
+                        <label style="width: 80px; color: var(--text-secondary);">Brightness:</label>
+                        <input type="range" id="brightnessSlider" min="0" max="100" value="50" aria-label="Brightness">
+                        <input type="number" id="brightnessInput" min="0" max="100" value="50" aria-label="Brightness value">
+                    </div>
+                    
+                    <div class="slider-input">
+                        <label style="width: 80px; color: var(--text-secondary);">Alpha:</label>
+                        <input type="range" id="alphaSlider" min="0" max="100" value="100" aria-label="Alpha transparency">
+                        <input type="number" id="alphaInput" min="0" max="100" value="100" aria-label="Alpha value">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Right Column: Formats & Controls -->
+            <div>
+                <!-- Color Formats -->
+                <div class="panel">
+                    <h2 class="panel-title">█ Color Formats</h2>
+                    
+                    <div class="input-group">
+                        <label class="input-label" for="hexInput">HEX</label>
+                        <div class="input-with-copy">
+                            <input type="text" class="input-field" id="hexInput" value="#39FF14" aria-label="Hexadecimal color value">
+                            <button class="btn btn-small" onclick="copyToClipboard('hexInput')" aria-label="Copy HEX">Copy</button>
+                        </div>
+                    </div>
+                    
+                    <div class="input-group">
+                        <label class="input-label" for="rgbInput">RGB</label>
+                        <div class="input-with-copy">
+                            <input type="text" class="input-field" id="rgbInput" readonly aria-label="RGB color value">
+                            <button class="btn btn-small" onclick="copyToClipboard('rgbInput')" aria-label="Copy RGB">Copy</button>
+                        </div>
+                    </div>
+                    
+                    <div class="input-group">
+                        <label class="input-label" for="hslInput">HSL</label>
+                        <div class="input-with-copy">
+                            <input type="text" class="input-field" id="hslInput" readonly aria-label="HSL color value">
+                            <button class="btn btn-small" onclick="copyToClipboard('hslInput')" aria-label="Copy HSL">Copy</button>
+                        </div>
+                    </div>
+                    
+                    <div class="input-group">
+                        <label class="input-label" for="cssVarInput">CSS Variable</label>
+                        <div class="input-with-copy">
+                            <input type="text" class="input-field" id="cssVarInput" readonly aria-label="CSS variable">
+                            <button class="btn btn-small" onclick="copyToClipboard('cssVarInput')" aria-label="Copy CSS Variable">Copy</button>
+                        </div>
+                    </div>
+                    
+                    <div class="input-group">
+                        <label class="input-label">Color Name</label>
+                        <p id="colorName" style="color: var(--neon-cyan); font-size: 14px;">Neon Green</p>
+                    </div>
+                </div>
+                
+                <!-- Contrast Checker -->
+                <div class="panel">
+                    <h2 class="panel-title">█ WCAG Contrast Checker</h2>
+                    <div class="contrast-grid">
+                        <div class="contrast-box" id="contrastWhite" style="background: white; color: black;">
+                            <div style="font-size: 12px; opacity: 0.7;">vs White</div>
+                            <div class="contrast-ratio" id="ratioWhite">4.5:1</div>
+                            <div id="wcagWhite"></div>
+                            <div style="margin-top: 10px; font-size: 12px;">
+                                Sample Text
+                            </div>
+                        </div>
+                        <div class="contrast-box" id="contrastBlack" style="background: black; color: white;">
+                            <div style="font-size: 12px; opacity: 0.7;">vs Black</div>
+                            <div class="contrast-ratio" id="ratioBlack">4.5:1</div>
+                            <div id="wcagBlack"></div>
+                            <div style="margin-top: 10px; font-size: 12px;">
+                                Sample Text
+                            </div>
+                        </div>
+                    </div>
+                    <p style="font-size: 11px; color: var(--text-secondary); margin-top: 10px;">
+                        Recommended: <span id="recommendedText" style="color: var(--neon-green);">Use white text</span>
+                    </p>
+                </div>
+                
+                <!-- Terminal Log -->
+                <div class="panel">
+                    <h2 class="panel-title">█ System Log</h2>
+                    <div class="terminal-log" id="terminalLog" role="log" aria-live="polite" aria-atomic="false"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Preset Palettes -->
+        <div class="panel">
+            <h2 class="panel-title">█ Preset Palettes</h2>
+            <div class="preset-grid" id="presetGrid"></div>
+        </div>
+        
+        <!-- Gradient Builder (Bonus) -->
+        <div class="panel">
+            <h2 class="panel-title">█ Gradient Builder</h2>
+            <div class="gradient-preview" id="gradientPreview"></div>
+            <div class="btn-group">
+                <button class="btn btn-small" id="setGradientStart">Set Start Color</button>
+                <button class="btn btn-small" id="setGradientEnd">Set End Color</button>
+                <button class="btn btn-small btn-cyan" onclick="copyGradientCSS()">Copy CSS</button>
+            </div>
+            <div class="input-group">
+                <label class="input-label">Gradient CSS</label>
+                <input type="text" class="input-field" id="gradientCSS" readonly>
+            </div>
+        </div>
+        
+        <!-- Saved Palette -->
+        <div class="panel">
+            <h2 class="panel-title">█ Saved Palette</h2>
+            <div class="toggle-container">
+                <div class="toggle" id="storageToggle" role="switch" aria-checked="false" tabindex="0">
+                    <div class="toggle-knob"></div>
+                </div>
+                <label>Remember Palettes (localStorage)</label>
+            </div>
+            <div class="palette-grid" id="paletteGrid"></div>
+            <div class="btn-group">
+                <button class="btn btn-small" id="exportPaletteBtn">Export JSON</button>
+                <button class="btn btn-small" id="importPaletteBtn">Import JSON</button>
+                <button class="btn btn-small btn-cyan" id="exportPNGBtn">Export PNG</button>
+                <button class="btn btn-small btn-cyan" id="exportCSSBtn">Export CSS</button>
+                <button class="btn btn-small" id="clearPaletteBtn">Clear All</button>
+            </div>
+            <input type="file" id="importPaletteInput" accept=".json" style="display: none;">
+        </div>
+        
+        <!-- Settings -->
+        <div class="panel">
+            <h2 class="panel-title">█ Settings</h2>
+            <div class="toggle-container">
+                <div class="toggle" id="matrixToggle" role="switch" aria-checked="false" tabindex="0">
+                    <div class="toggle-knob"></div>
+                </div>
+                <label>Matrix Rain Effect</label>
+            </div>
+            <div class="btn-group">
+                <button class="btn btn-small btn-cyan" id="helpBtn">? Help</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Help Modal -->
+    <div class="modal" id="helpModal" role="dialog" aria-labelledby="helpTitle" aria-modal="true">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closeHelp()" aria-label="Close help">&times;</span>
+            <h2 class="modal-title" id="helpTitle">Help & Instructions</h2>
+            <div style="color: var(--text-secondary); line-height: 1.8;">
+                <h3 style="color: var(--neon-green); margin-top: 15px;">Screen Color Picker</h3>
+                <p>Click "Pick from Screen" to activate the eyedropper tool (Chrome/Edge 95+). Click anywhere on your screen to sample that color.</p>
+                <p style="color: var(--neon-cyan);"><strong>Fallback:</strong> If eyedropper is not supported, use "Upload Image" to load an image and click on it to sample colors.</p>
+                
+                <h3 style="color: var(--neon-green); margin-top: 15px;">Manual Color Selection</h3>
+                <p>• Drag in the color picker square to adjust hue and saturation<br>
+                • Use the hue slider to change the base color<br>
+                • Adjust brightness and alpha with sliders<br>
+                • Enter HEX values directly in the input field</p>
+                
+                <h3 style="color: var(--neon-green); margin-top: 15px;">Keyboard Shortcuts</h3>
+                <p>• <code>Ctrl+Z</code> - Undo<br>
+                • <code>Ctrl+Y</code> - Redo<br>
+                • <code>Ctrl+Shift+C</code> - Activate screen picker<br>
+                • <code>Esc</code> - Cancel picker/close modal<br>
+                • <code>Tab</code> - Navigate controls</p>
+                
+                <h3 style="color: var(--neon-green); margin-top: 15px;">Palette Management</h3>
+                <p>• Click "Save to Palette" to add current color<br>
+                • Enable "Remember Palettes" to persist across sessions<br>
+                • Export palette as JSON, PNG, or CSS variables<br>
+                • Click saved colors to reselect them</p>
+                
+                <h3 style="color: var(--neon-green); margin-top: 15px;">Image Sampling (Fallback)</h3>
+                <p>When eyedropper is unavailable:<br>
+                1. Click "Upload Image" or paste/drag an image<br>
+                2. Click anywhere on the image to sample that pixel's color<br>
+                3. The color will be automatically selected</p>
+                
+                <h3 style="color: var(--neon-green); margin-top: 15px;">Browser Support</h3>
+                <p style="color: var(--neon-cyan);">Eyedropper API: Chrome/Edge 95+, Opera 81+<br>
+                Fallback mode works on all modern browsers.</p>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        /* ═══════════════════════════════════════════════════════════════════
+           CORE STATE MANAGEMENT
+           ═══════════════════════════════════════════════════════════════════ */
+        
+        let currentColor = {
+            h: 100,    // Hue (0-360)
+            s: 100,    // Saturation (0-100)
+            l: 50,     // Lightness (0-100)
+            a: 1       // Alpha (0-1)
+        };
+        
+        let gradientColors = {
+            start: '#39ff14',
+            end: '#00f5ff'
+        };
+        
+        let savedPalette = [];
+        let colorHistory = [];
+        let historyIndex = -1;
+        let storageEnabled = false;
+        
+        /* ═══════════════════════════════════════════════════════════════════
+           COLOR CONVERSION UTILITIES
+           ═══════════════════════════════════════════════════════════════════ */
+        
+        /**
+         * Convert HSL to RGB
+         * @param {number} h - Hue (0-360)
+         * @param {number} s - Saturation (0-100)
+         * @param {number} l - Lightness (0-100)
+         * @returns {object} RGB values {r, g, b} (0-255)
+         */
+        function hslToRgb(h, s, l) {
+            h = h / 360;
+            s = s / 100;
+            l = l / 100;
+            
+            let r, g, b;
+            
+            if (s === 0) {
+                r = g = b = l;
+            } else {
+                const hue2rgb = (p, q, t) => {
+                    if (t < 0) t += 1;
+                    if (t > 1) t -= 1;
+                    if (t < 1/6) return p + (q - p) * 6 * t;
+                    if (t < 1/2) return q;
+                    if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+                    return p;
+                };
+                
+                const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+                const p = 2 * l - q;
+                
+                r = hue2rgb(p, q, h + 1/3);
+                g = hue2rgb(p, q, h);
+                b = hue2rgb(p, q, h - 1/3);
+            }
+            
+            return {
+                r: Math.round(r * 255),
+                g: Math.round(g * 255),
+                b: Math.round(b * 255)
+            };
+        }
+        
+        /**
+         * Convert RGB to HSL
+         * @param {number} r - Red (0-255)
+         * @param {number} g - Green (0-255)
+         * @param {number} b - Blue (0-255)
+         * @returns {object} HSL values {h, s, l}
+         */
+        function rgbToHsl(r, g, b) {
+            r /= 255;
+            g /= 255;
+            b /= 255;
+            
+            const max = Math.max(r, g, b);
+            const min = Math.min(r, g, b);
+            let h, s, l = (max + min) / 2;
+            
+            if (max === min) {
+                h = s = 0;
+            } else {
+                const d = max - min;
+                s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+                
+                switch (max) {
+                    case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
+                    case g: h = ((b - r) / d + 2) / 6; break;
+                    case b: h = ((r - g) / d + 4) / 6; break;
+                }
+            }
+            
+            return {
+                h: Math.round(h * 360),
+                s: Math.round(s * 100),
+                l: Math.round(l * 100)
+            };
+        }
+        
+        /**
+         * Convert HEX to RGB
+         * @param {string} hex - Hex color string (#RGB or #RRGGBB or #RRGGBBAA)
+         * @returns {object} RGBA values {r, g, b, a}
+         */
+        function hexToRgb(hex) {
+            hex = hex.replace('#', '');
+            
+            if (hex.length === 3) {
+                hex = hex.split('').map(c => c + c).join('');
+            }
+            
+            const r = parseInt(hex.substring(0, 2), 16);
+            const g = parseInt(hex.substring(2, 4), 16);
+            const b = parseInt(hex.substring(4, 6), 16);
+            const a = hex.length === 8 ? parseInt(hex.substring(6, 8), 16) / 255 : 1;
+            
+            return { r, g, b, a };
+        }
+        
+        /**
+         * Convert RGB to HEX
+         * @param {number} r - Red (0-255)
+         * @param {number} g - Green (0-255)
+         * @param {number} b - Blue (0-255)
+         * @param {number} a - Alpha (0-1)
+         * @returns {string} Hex color string
+         */
+        function rgbToHex(r, g, b, a = 1) {
+            const toHex = (n) => {
+                const hex = Math.round(n).toString(16).padStart(2, '0');
+                return hex;
+            };
+            
+            let hex = '#' + toHex(r) + toHex(g) + toHex(b);
+            if (a < 1) {
+                hex += toHex(a * 255);
+            }
+            return hex.toUpperCase();
+        }
+        
+        /**
+         * Calculate relative luminance for WCAG contrast
+         * @param {number} r - Red (0-255)
+         * @param {number} g - Green (0-255)
+         * @param {number} b - Blue (0-255)
+         * @returns {number} Luminance value
+         */
+        function getLuminance(r, g, b) {
+            const [rs, gs, bs] = [r, g, b].map(c => {
+                c = c / 255;
+                return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+            });
+            return 0.2126 * rs + 0.7152 * gs + 0.0722 * bs;
+        }
+        
+        /**
+         * Calculate contrast ratio between two colors
+         * @param {object} rgb1 - First RGB color {r, g, b}
+         * @param {object} rgb2 - Second RGB color {r, g, b}
+         * @returns {number} Contrast ratio
+         */
+        function getContrastRatio(rgb1, rgb2) {
+            const l1 = getLuminance(rgb1.r, rgb1.g, rgb1.b);
+            const l2 = getLuminance(rgb2.r, rgb2.g, rgb2.b);
+            const lighter = Math.max(l1, l2);
+            const darker = Math.min(l1, l2);
+            return (lighter + 0.05) / (darker + 0.05);
+        }
+        
+        /**
+         * Get nearest named color approximation
+         * @param {object} rgb - RGB color {r, g, b}
+         * @returns {string} Color name
+         */
+        function getColorName(rgb) {
+            const namedColors = {
+                'Red': {r: 255, g: 0, b: 0},
+                'Green': {r: 0, g: 128, b: 0},
+                'Blue': {r: 0, g: 0, b: 255},
+                'Yellow': {r: 255, g: 255, b: 0},
+                'Cyan': {r: 0, g: 255, b: 255},
+                'Magenta': {r: 255, g: 0, b: 255},
+                'Orange': {r: 255, g: 165, b: 0},
+                'Purple': {r: 128, g: 0, b: 128},
+                'Pink': {r: 255, g: 192, b: 203},
+                'Brown': {r: 165, g: 42, b: 42},
+                'Gray': {r: 128, g: 128, b: 128},
+                'Black': {r: 0, g: 0, b: 0},
+                'White': {r: 255, g: 255, b: 255},
+                'Lime': {r: 0, g: 255, b: 0},
+                'Navy': {r: 0, g: 0, b: 128},
+                'Teal': {r: 0, g: 128, b: 128},
+                'Olive': {r: 128, g: 128, b: 0},
+                'Maroon': {r: 128, g: 0, b: 0},
+                'Aqua': {r: 0, g: 255, b: 255},
+                'Silver': {r: 192, g: 192, b: 192}
+            };
+            
+            let minDistance = Infinity;
+            let closestName = 'Unknown';
+            
+            for (let [name, color] of Object.entries(namedColors)) {
+                const distance = Math.sqrt(
+                    Math.pow(rgb.r - color.r, 2) +
+                    Math.pow(rgb.g - color.g, 2) +
+                    Math.pow(rgb.b - color.b, 2)
+                );
+                
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    closestName = name;
+                }
+            }
+            
+            // Add descriptors based on HSL values
+            const hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
+            let descriptor = '';
+            
+            if (hsl.l > 90) descriptor = 'Very Light ';
+            else if (hsl.l > 70) descriptor = 'Light ';
+            else if (hsl.l < 20) descriptor = 'Very Dark ';
+            else if (hsl.l < 40) descriptor = 'Dark ';
+            
+            if (hsl.s > 80) descriptor += 'Vivid ';
+            else if (hsl.s < 20) descriptor += 'Muted ';
+            
+            return descriptor + closestName;
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════
+           UI UPDATE FUNCTIONS
+           ═══════════════════════════════════════════════════════════════════ */
+        
+        /**
+         * Update all UI elements to reflect current color
+         */
+        function updateUI() {
+            const rgb = hslToRgb(currentColor.h, currentColor.s, currentColor.l);
+            const hex = rgbToHex(rgb.r, rgb.g, rgb.b, currentColor.a);
+            
+            // Update preview
+            document.getElementById('previewArea').style.backgroundColor = hex;
+            document.getElementById('previewHex').textContent = hex;
+            
+            // Update format inputs
+            document.getElementById('hexInput').value = hex;
+            document.getElementById('rgbInput').value = currentColor.a < 1 
+                ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${currentColor.a.toFixed(2)})`
+                : `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`;
+            document.getElementById('hslInput').value = currentColor.a < 1
+                ? `hsla(${currentColor.h}, ${currentColor.s}%, ${currentColor.l}%, ${currentColor.a.toFixed(2)})`
+                : `hsl(${currentColor.h}, ${currentColor.s}%, ${currentColor.l}%)`;
+            document.getElementById('cssVarInput').value = `--maqsadbek-accent: ${hex};`;
+            
+            // Update color name
+            document.getElementById('colorName').textContent = getColorName(rgb);
+            
+            // Update picker position
+            updatePickerPosition();
+            
+            // Update hue slider
+            const huePercent = (currentColor.h / 360) * 100;
+            document.getElementById('hueThumb').style.left = `${huePercent}%`;
+            
+            // Update sliders
+            document.getElementById('brightnessSlider').value = currentColor.l;
+            document.getElementById('brightnessInput').value = currentColor.l;
+            document.getElementById('alphaSlider').value = currentColor.a * 100;
+            document.getElementById('alphaInput').value = Math.round(currentColor.a * 100);
+            
+            // Update contrast checker
+            updateContrastChecker(rgb);
+            
+            // Update gradient
+            updateGradient();
+        }
+        
+        /**
+         * Update HSL picker cursor position
+         */
+        function updatePickerPosition() {
+            const picker = document.getElementById('hslPicker');
+            const cursor = document.getElementById('hslCursor');
+            
+            const x = (currentColor.s / 100) * picker.offsetWidth;
+            const y = ((100 - currentColor.l) / 100) * picker.offsetHeight;
+            
+            cursor.style.left = `${x}px`;
+            cursor.style.top = `${y}px`;
+            
+            // Update picker background
+            picker.style.background = `
+                linear-gradient(to top, #000, transparent),
+                linear-gradient(to right, #fff, hsl(${currentColor.h}, 100%, 50%))
+            `;
+        }
+        
+        /**
+         * Update WCAG contrast checker
+         * @param {object} rgb - Current RGB color
+         */
+        function updateContrastChecker(rgb) {
+            const white = {r: 255, g: 255, b: 255};
+            const black = {r: 0, g: 0, b: 0};
+            
+            const ratioWhite = getContrastRatio(rgb, white);
+            const ratioBlack = getContrastRatio(rgb, black);
+            
+            // Update contrast boxes
+            document.getElementById('contrastWhite').style.color = rgbToHex(rgb.r, rgb.g, rgb.b);
+            document.getElementById('contrastBlack').style.color = rgbToHex(rgb.r, rgb.g, rgb.b);
+            
+            document.getElementById('ratioWhite').textContent = ratioWhite.toFixed(2) + ':1';
+            document.getElementById('ratioBlack').textContent = ratioBlack.toFixed(2) + ':1';
+            
+            // WCAG compliance badges
+            const wcagWhite = getWCAGBadges(ratioWhite);
+            const wcagBlack = getWCAGBadges(ratioBlack);
+            
+            document.getElementById('wcagWhite').innerHTML = wcagWhite;
+            document.getElementById('wcagBlack').innerHTML = wcagBlack;
+            
+            // Recommended text color
+            const recommended = ratioWhite > ratioBlack ? 'Use white text' : 'Use black text';
+            document.getElementById('recommendedText').textContent = recommended;
+        }
+        
+        /**
+         * Generate WCAG compliance badges HTML
+         * @param {number} ratio - Contrast ratio
+         * @returns {string} HTML string with badges
+         */
+        function getWCAGBadges(ratio) {
+            const badges = [];
+            
+            // Normal text
+            if (ratio >= 7) {
+                badges.push('<span class="wcag-badge wcag-pass">AAA Normal</span>');
+            } else if (ratio >= 4.5) {
+                badges.push('<span class="wcag-badge wcag-pass">AA Normal</span>');
+            } else {
+                badges.push('<span class="wcag-badge wcag-fail">Fail Normal</span>');
+            }
+            
+            // Large text
+            if (ratio >= 4.5) {
+                badges.push('<span class="wcag-badge wcag-pass">AAA Large</span>');
+            } else if (ratio >= 3) {
+                badges.push('<span class="wcag-badge wcag-pass">AA Large</span>');
+            } else {
+                badges.push('<span class="wcag-badge wcag-fail">Fail Large</span>');
+            }
+            
+            return badges.join(' ');
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════
+           TERMINAL LOG FUNCTIONS
+           ═══════════════════════════════════════════════════════════════════ */
+        
+        /**
+         * Add entry to terminal log with typewriter effect
+         * @param {string} message - Log message
+         * @param {string} type - Log type (success, error, info)
+         */
+        function addLog(message, type = 'info') {
+            const log = document.getElementById('terminalLog');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            
+            const timestamp = new Date().toLocaleTimeString();
+            entry.textContent = `[${timestamp}] ${message}`;
+            
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+            
+            // Keep only last 50 entries
+            while (log.children.length > 50) {
+                log.removeChild(log.firstChild);
+            }
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════
+           EYEDROPPER API & FALLBACK
+           ═══════════════════════════════════════════════════════════════════ */
+        
+        /**
+         * Activate screen color picker using EyeDropper API or fallback
+         */
+        async function activateEyedropper() {
+            // Check if EyeDropper API is supported
+            if ('EyeDropper' in window) {
+                try {
+                    const eyeDropper = new EyeDropper();
+                    addLog('Eyedropper activated. Click to pick a color...', 'info');
+                    
+                    const result = await eyeDropper.open();
+                    const hex = result.sRGBHex;
+                    
+                    addLog(`Picked color: ${hex}`, 'success');
+                    setColorFromHex(hex);
+                    addToHistory();
+                } catch (e) {
+                    if (e.name !== 'AbortError') {
+                        addLog('Eyedropper cancelled', 'info');
+                    }
+                }
+            } else {
+                // Fallback: prompt user to upload image
+                addLog('EyeDropper API not supported. Please upload an image.', 'error');
+                showToast('EyeDropper not supported. Use image upload instead.');
+                document.getElementById('uploadImageBtn').click();
+            }
+        }
+        
+        /**
+         * Handle image upload for color sampling
+         */
+        function handleImageUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                loadImageToCanvas(event.target.result);
+            };
+            reader.readAsDataURL(file);
+        }
+        
+        /**
+         * Load image to canvas for pixel sampling
+         * @param {string} imageSrc - Image source (data URL or URL)
+         */
+        function loadImageToCanvas(imageSrc) {
+            const canvas = document.getElementById('imageCanvas');
+            const ctx = canvas.getContext('2d');
+            const img = new Image();
+            
+            img.onload = function() {
+                // Account for device pixel ratio for accurate sampling
+                const dpr = window.devicePixelRatio || 1;
+                const maxWidth = 600;
+                const scale = Math.min(1, maxWidth / img.width);
+                
+                canvas.width = img.width * scale;
+                canvas.height = img.height * scale;
+                
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                
+                document.getElementById('canvasContainer').classList.add('active');
+                addLog('Image loaded. Click to sample a pixel.', 'success');
+            };
+            
+            img.src = imageSrc;
+        }
+        
+        /**
+         * Sample color from canvas at click position
+         * @param {MouseEvent} e - Click event
+         */
+        function sampleFromCanvas(e) {
+            const canvas = document.getElementById('imageCanvas');
+            const ctx = canvas.getContext('2d');
+            const rect = canvas.getBoundingClientRect();
+            
+            // Account for canvas scaling
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            
+            const x = (e.clientX - rect.left) * scaleX;
+            const y = (e.clientY - rect.top) * scaleY;
+            
+            const pixel = ctx.getImageData(x, y, 1, 1).data;
+            const hex = rgbToHex(pixel[0], pixel[1], pixel[2], pixel[3] / 255);
+            
+            addLog(`Sampled color at (${Math.round(x)}, ${Math.round(y)}): ${hex}`, 'success');
+            setColorFromHex(hex);
+            addToHistory();
+        }
+        
+        /**
+         * Handle image paste from clipboard
+         */
+        async function handlePaste(e) {
+            const items = e.clipboardData?.items;
+            if (!items) return;
+            
+            for (let item of items) {
+                if (item.type.startsWith('image/')) {
+                    const blob = item.getAsFile();
+                    const url = URL.createObjectURL(blob);
+                    loadImageToCanvas(url);
+                    addLog('Image pasted from clipboard', 'success');
+                    break;
+                }
+            }
+        }
+        
+        /**
+         * Handle image drag and drop
+         */
+        function handleDrop(e) {
+            e.preventDefault();
+            const file = e.dataTransfer.files[0];
+            
+            if (file && file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = (event) => loadImageToCanvas(event.target.result);
+                reader.readAsDataURL(file);
+                addLog('Image dropped', 'success');
+            }
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════
+           COLOR PICKER INTERACTIONS
+           ═══════════════════════════════════════════════════════════════════ */
+        
+        let isDragging = false;
+        
+        /**
+         * Handle HSL picker interaction
+         * @param {MouseEvent} e - Mouse event
+         */
+        function handlePickerClick(e) {
+            const picker = document.getElementById('hslPicker');
+            const rect = picker.getBoundingClientRect();
+            
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            currentColor.s = Math.max(0, Math.min(100, (x / rect.width) * 100));
+            currentColor.l = Math.max(0, Math.min(100, 100 - (y / rect.height) * 100));
+            
+            updateUI();
+        }
+        
+        /**
+         * Handle hue slider interaction
+         * @param {MouseEvent} e - Mouse event
+         */
+        function handleHueSliderClick(e) {
+            const slider = document.getElementById('hueSlider');
+            const rect = slider.getBoundingClientRect();
+            
+            const x = e.clientX - rect.left;
+            currentColor.h = Math.max(0, Math.min(360, (x / rect.width) * 360));
+            
+            updateUI();
+        }
+        
+        /**
+         * Set color from hex input
+         * @param {string} hex - Hex color string
+         */
+        function setColorFromHex(hex) {
+            try {
+                const rgb = hexToRgb(hex);
+                const hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
+                
+                currentColor.h = hsl.h;
+                currentColor.s = hsl.s;
+                currentColor.l = hsl.l;
+                currentColor.a = rgb.a;
+                
+                updateUI();
+            } catch (e) {
+                addLog('Invalid hex color', 'error');
+            }
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════
+           CLIPBOARD FUNCTIONS
+           ═══════════════════════════════════════════════════════════════════ */
+        
+        /**
+         * Copy text to clipboard with fallback
+         * @param {string} elementId - ID of input element to copy
+         */
+        async function copyToClipboard(elementId) {
+            const element = document.getElementById(elementId);
+            const text = element.value;
+            
+            try {
+                // Modern Clipboard API
+                await navigator.clipboard.writeText(text);
+                showToast('Copied!');
+                addLog(`Copied: ${text}`, 'success');
+            } catch (e) {
+                // Fallback to execCommand
+                element.select();
+                document.execCommand('copy');
+                showToast('Copied!');
+                addLog(`Copied: ${text}`, 'success');
+            }
+        }
+        
+        /**
+         * Copy gradient CSS to clipboard
+         */
+        async function copyGradientCSS() {
+            const css = document.getElementById('gradientCSS').value;
+            try {
+                await navigator.clipboard.writeText(css);
+                showToast('Gradient CSS Copied!');
+                addLog('Gradient CSS copied', 'success');
+            } catch (e) {
+                addLog('Failed to copy gradient CSS', 'error');
+            }
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════
+           PALETTE MANAGEMENT
+           ═══════════════════════════════════════════════════════════════════ */
+        
+        /**
+         * Save current color to palette
+         */
+        function saveColorToPalette() {
+            const rgb = hslToRgb(currentColor.h, currentColor.s, currentColor.l);
+            const hex = rgbToHex(rgb.r, rgb.g, rgb.b, currentColor.a);
+            
+            if (savedPalette.length >= 20) {
+                savedPalette.shift(); // Remove oldest
+            }
+            
+            savedPalette.push(hex);
+            updatePaletteGrid();
+            
+            if (storageEnabled) {
+                localStorage.setItem('colorLabPalette', JSON.stringify(savedPalette));
+            }
+            
+            addLog(`Color saved: ${hex}`, 'success');
+            showToast('Color Saved!');
+        }
+        
+        /**
+         * Update palette grid display
+         */
+        function updatePaletteGrid() {
+            const grid = document.getElementById('paletteGrid');
+            grid.innerHTML = '';
+            
+            savedPalette.forEach((color, index) => {
+                const div = document.createElement('div');
+                div.className = 'palette-color';
+                div.style.backgroundColor = color;
+                div.title = color;
+                div.onclick = () => {
+                    setColorFromHex(color);
+                    addToHistory();
+                    addLog(`Selected: ${color}`, 'info');
+                };
+                
+                const deleteBtn = document.createElement('div');
+                deleteBtn.className = 'delete-btn';
+                deleteBtn.textContent = '×';
+                deleteBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    savedPalette.splice(index, 1);
+                    updatePaletteGrid();
+                    if (storageEnabled) {
+                        localStorage.setItem('colorLabPalette', JSON.stringify(savedPalette));
+                    }
+                    addLog(`Deleted: ${color}`, 'info');
+                };
+                
+                div.appendChild(deleteBtn);
+                grid.appendChild(div);
+            });
+        }
+        
+        /**
+         * Export palette as JSON
+         */
+        function exportPaletteJSON() {
+            const json = JSON.stringify(savedPalette, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'color-palette.json';
+            a.click();
+            addLog('Palette exported as JSON', 'success');
+        }
+        
+        /**
+         * Import palette from JSON
+         */
+        function importPaletteJSON(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                try {
+                    const imported = JSON.parse(event.target.result);
+                    if (Array.isArray(imported)) {
+                        savedPalette = imported.slice(0, 20);
+                        updatePaletteGrid();
+                        if (storageEnabled) {
+                            localStorage.setItem('colorLabPalette', JSON.stringify(savedPalette));
+                        }
+                        addLog('Palette imported successfully', 'success');
+                        showToast('Palette Imported!');
+                    }
+                } catch (e) {
+                    addLog('Invalid JSON file', 'error');
+                }
+            };
+            reader.readAsText(file);
+        }
+        
+        /**
+         * Export palette as PNG image
+         */
+        function exportPalettePNG() {
+            const canvas = document.createElement('canvas');
+            const size = 100;
+            canvas.width = size * savedPalette.length;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            
+            savedPalette.forEach((color, i) => {
+                ctx.fillStyle = color;
+                ctx.fillRect(i * size, 0, size, size);
+            });
+            
+            canvas.toBlob(blob => {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'color-palette.png';
+                a.click();
+                addLog('Palette exported as PNG', 'success');
+            });
+        }
+        
+        /**
+         * Export palette as CSS variables
+         */
+        function exportPaletteCSS() {
+            let css = ':root {\n';
+            savedPalette.forEach((color, i) => {
+                css += `  --color-${i + 1}: ${color};\n`;
+            });
+            css += '}';
+            
+            const blob = new Blob([css], { type: 'text/css' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'palette.css';
+            a.click();
+            addLog('Palette exported as CSS', 'success');
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════
+           HISTORY & UNDO/REDO
+           ═══════════════════════════════════════════════════════════════════ */
+        
+        /**
+         * Add current color to history
+         */
+        function addToHistory() {
+            // Remove any redo history
+            colorHistory = colorHistory.slice(0, historyIndex + 1);
+            
+            colorHistory.push({...currentColor});
+            historyIndex++;
+            
+            // Keep max 50 history items
+            if (colorHistory.length > 50) {
+                colorHistory.shift();
+                historyIndex--;
+            }
+        }
+        
+        /**
+         * Undo last color change
+         */
+        function undo() {
+            if (historyIndex > 0) {
+                historyIndex--;
+                currentColor = {...colorHistory[historyIndex]};
+                updateUI();
+                addLog('Undo', 'info');
+            }
+        }
+        
+        /**
+         * Redo last undone change
+         */
+        function redo() {
+            if (historyIndex < colorHistory.length - 1) {
+                historyIndex++;
+                currentColor = {...colorHistory[historyIndex]};
+                updateUI();
+                addLog('Redo', 'info');
+            }
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════
+           GRADIENT BUILDER
+           ═══════════════════════════════════════════════════════════════════ */
+        
+        /**
+         * Update gradient preview and CSS
+         */
+        function updateGradient() {
+            const preview = document.getElementById('gradientPreview');
+            const css = `linear-gradient(90deg, ${gradientColors.start}, ${gradientColors.end})`;
+            preview.style.background = css;
+            document.getElementById('gradientCSS').value = `background: ${css};`;
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════
+           PRESET PALETTES
+           ═══════════════════════════════════════════════════════════════════ */
+        
+        const presetPalettes = {
+            'Neon Hacker': ['#39ff14', '#00f5ff', '#ff006e', '#ffbe0b', '#8338ec'],
+            'Monochrome': ['#000000', '#404040', '#808080', '#c0c0c0', '#ffffff'],
+            'Pastel': ['#ffd6e8', '#c2f0fc', '#fff0b3', '#d4f5d4', '#e6d4ff'],
+            'Gradient Starter': ['#667eea', '#764ba2', '#f093fb', '#4facfe', '#00f2fe'],
+            'Sunset': ['#ff6b6b', '#ff8c42', '#ffd93d', '#6bcf7f', '#4d96ff'],
+            'Ocean': ['#03045e', '#023e8a', '#0077b6', '#0096c7', '#00b4d8']
+        };
+        
+        /**
+         * Initialize preset palette buttons
+         */
+        function initPresets() {
+            const grid = document.getElementById('presetGrid');
+            
+            Object.entries(presetPalettes).forEach(([name, colors]) => {
+                const btn = document.createElement('div');
+                btn.className = 'preset-btn';
+                btn.innerHTML = `
+                    <div>${name}</div>
+                    <div class="preset-colors">
+                        ${colors.map(c => `<div class="preset-color" style="background: ${c}"></div>`).join('')}
+                    </div>
+                `;
+                btn.onclick = () => {
+                    savedPalette = [...colors];
+                    updatePaletteGrid();
+                    if (storageEnabled) {
+                        localStorage.setItem('colorLabPalette', JSON.stringify(savedPalette));
+                    }
+                    addLog(`Applied preset: ${name}`, 'success');
+                    showToast(`${name} Applied!`);
+                };
+                grid.appendChild(btn);
+            });
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════
+           TOAST NOTIFICATIONS
+           ═══════════════════════════════════════════════════════════════════ */
+        
+        /**
+         * Show toast notification
+         * @param {string} message - Toast message
+         */
+        function showToast(message) {
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.remove();
+            }, 3000);
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════
+           MODAL FUNCTIONS
+           ═══════════════════════════════════════════════════════════════════ */
+        
+        function openHelp() {
+            document.getElementById('helpModal').classList.add('active');
+            addLog('Help modal opened', 'info');
+        }
+        
+        function closeHelp() {
+            document.getElementById('helpModal').classList.remove('active');
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════
+           MATRIX RAIN EFFECT
+           ═══════════════════════════════════════════════════════════════════ */
+        
+        let matrixInterval = null;
+        
+        /**
+         * Initialize and animate Matrix rain effect
+         */
+        function initMatrix() {
+            const canvas = document.getElementById('matrixCanvas');
+            const ctx = canvas.getContext('2d');
+            
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            
+            const chars = '01アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン';
+            const fontSize = 14;
+            const columns = canvas.width / fontSize;
+            const drops = Array(Math.floor(columns)).fill(1);
+            
+            function draw() {
+                ctx.fillStyle = 'rgba(11, 11, 11, 0.05)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                ctx.fillStyle = '#39ff14';
+                ctx.font = fontSize + 'px monospace';
+                
+                for (let i = 0; i < drops.length; i++) {
+                    const text = chars[Math.floor(Math.random() * chars.length)];
+                    ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+                    
+                    if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
+                        drops[i] = 0;
+                    }
+                    drops[i]++;
+                }
+            }
+            
+            matrixInterval = setInterval(draw, 33);
+        }
+        
+        /**
+         * Toggle Matrix rain effect
+         */
+        function toggleMatrix(enabled) {
+            const canvas = document.getElementById('matrixCanvas');
+            if (enabled) {
+                canvas.classList.add('active');
+                initMatrix();
+                addLog('Matrix rain activated', 'success');
+            } else {
+                canvas.classList.remove('active');
+                if (matrixInterval) {
+                    clearInterval(matrixInterval);
+                    matrixInterval = null;
+                }
+                addLog('Matrix rain deactivated', 'info');
+            }
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════
+           EVENT LISTENERS
+           ═══════════════════════════════════════════════════════════════════ */
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            // Boot log
+            addLog('System initializing...', 'info');
+            addLog('Color Lab v1.0 loaded', 'success');
+            addLog('Ready for input', 'success');
+            
+            // Initialize presets
+            initPresets();
+            
+            // Load saved palette from localStorage
+            const stored = localStorage.getItem('colorLabPalette');
+            if (stored) {
+                try {
+                    savedPalette = JSON.parse(stored);
+                    updatePaletteGrid();
+                    document.getElementById('storageToggle').classList.add('active');
+                    document.getElementById('storageToggle').setAttribute('aria-checked', 'true');
+                    storageEnabled = true;
+                    addLog('Loaded saved palette from storage', 'info');
+                } catch (e) {
+                    addLog('Failed to load saved palette', 'error');
+                }
+            }
+            
+            // Initialize first history entry
+            addToHistory();
+            
+            // Update UI
+            updateUI();
+            
+            // HSL Picker events
+            const hslPicker = document.getElementById('hslPicker');
+            hslPicker.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                handlePickerClick(e);
+                addToHistory();
+            });
+            
+            document.addEventListener('mousemove', (e) => {
+                if (isDragging) {
+                    handlePickerClick(e);
+                }
+            });
+            
+            document.addEventListener('mouseup', () => {
+                isDragging = false;
+            });
+            
+            // Hue slider events
+            const hueSlider = document.getElementById('hueSlider');
+            let hueDragging = false;
+            
+            hueSlider.addEventListener('mousedown', (e) => {
+                hueDragging = true;
+                handleHueSliderClick(e);
+                addToHistory();
+            });
+            
+            document.addEventListener('mousemove', (e) => {
+                if (hueDragging) {
+                    handleHueSliderClick(e);
+                }
+            });
+            
+            document.addEventListener('mouseup', () => {
+                hueDragging = false;
+            });
+            
+            // Brightness slider
+            document.getElementById('brightnessSlider').addEventListener('input', (e) => {
+                currentColor.l = parseInt(e.target.value);
+                updateUI();
+            });
+            
+            document.getElementById('brightnessInput').addEventListener('input', (e) => {
+                currentColor.l = Math.max(0, Math.min(100, parseInt(e.target.value) || 0));
+                updateUI();
+            });
+            
+            // Alpha slider
+            document.getElementById('alphaSlider').addEventListener('input', (e) => {
+                currentColor.a = parseInt(e.target.value) / 100;
+                updateUI();
+            });
+            
+            document.getElementById('alphaInput').addEventListener('input', (e) => {
+                currentColor.a = Math.max(0, Math.min(100, parseInt(e.target.value) || 0)) / 100;
+                updateUI();
+            });
+            
+            // Hex input
+            document.getElementById('hexInput').addEventListener('change', (e) => {
+                setColorFromHex(e.target.value);
+                addToHistory();
+            });
+            
+            // Eyedropper button
+            document.getElementById('eyedropperBtn').addEventListener('click', activateEyedropper);
+            
+            // Upload image button
+            document.getElementById('uploadImageBtn').addEventListener('click', () => {
+                document.getElementById('imageUpload').click();
+            });
+            
+            document.getElementById('imageUpload').addEventListener('change', handleImageUpload);
+            
+            // Canvas sampling
+            document.getElementById('imageCanvas').addEventListener('click', sampleFromCanvas);
+            
+            document.getElementById('closeCanvasBtn').addEventListener('click', () => {
+                document.getElementById('canvasContainer').classList.remove('active');
+            });
+            
+            // Save color button
+            document.getElementById('saveColorBtn').addEventListener('click', saveColorToPalette);
+            
+            // Undo/Redo buttons
+            document.getElementById('undoBtn').addEventListener('click', undo);
+            document.getElementById('redoBtn').addEventListener('click', redo);
+            
+            // Palette export/import
+            document.getElementById('exportPaletteBtn').addEventListener('click', exportPaletteJSON);
+            document.getElementById('importPaletteBtn').addEventListener('click', () => {
+                document.getElementById('importPaletteInput').click();
+            });
+            document.getElementById('importPaletteInput').addEventListener('change', importPaletteJSON);
+            document.getElementById('exportPNGBtn').addEventListener('click', exportPalettePNG);
+            document.getElementById('exportCSSBtn').addEventListener('click', exportPaletteCSS);
+            document.getElementById('clearPaletteBtn').addEventListener('click', () => {
+                if (confirm('Clear all saved colors?')) {
+                    savedPalette = [];
+                    updatePaletteGrid();
+                    if (storageEnabled) {
+                        localStorage.removeItem('colorLabPalette');
+                    }
+                    addLog('Palette cleared', 'info');
+                }
+            });
+            
+            // Storage toggle
+            document.getElementById('storageToggle').addEventListener('click', function() {
+                storageEnabled = !storageEnabled;
+                this.classList.toggle('active');
+                this.setAttribute('aria-checked', storageEnabled);
+                
+                if (storageEnabled) {
+                    localStorage.setItem('colorLabPalette', JSON.stringify(savedPalette));
+                    addLog('Palette persistence enabled', 'success');
+                } else {
+                    localStorage.removeItem('colorLabPalette');
+                    addLog('Palette persistence disabled', 'info');
+                }
+            });
+            
+            // Matrix toggle
+            document.getElementById('matrixToggle').addEventListener('click', function() {
+                const enabled = !this.classList.contains('active');
+                this.classList.toggle('active');
+                this.setAttribute('aria-checked', enabled);
+                toggleMatrix(enabled);
+            });
+            
+            // Help button
+            document.getElementById('helpBtn').addEventListener('click', openHelp);
+            
+            // Gradient builder
+            document.getElementById('setGradientStart').addEventListener('click', () => {
+                const rgb = hslToRgb(currentColor.h, currentColor.s, currentColor.l);
+                gradientColors.start = rgbToHex(rgb.r, rgb.g, rgb.b);
+                updateGradient();
+                addLog('Gradient start color set', 'success');
+            });
+            
+            document.getElementById('setGradientEnd').addEventListener('click', () => {
+                const rgb = hslToRgb(currentColor.h, currentColor.s, currentColor.l);
+                gradientColors.end = rgbToHex(rgb.r, rgb.g, rgb.b);
+                updateGradient();
+                addLog('Gradient end color set', 'success');
+            });
+            
+            // Keyboard shortcuts
+            document.addEventListener('keydown', (e) => {
+                // Ctrl+Z - Undo
+                if (e.ctrlKey && e.key === 'z' && !e.shiftKey) {
+                    e.preventDefault();
+                    undo();
+                }
+                
+                // Ctrl+Y or Ctrl+Shift+Z - Redo
+                if ((e.ctrlKey && e.key === 'y') || (e.ctrlKey && e.shiftKey && e.key === 'z')) {
+                    e.preventDefault();
+                    redo();
+                }
+                
+                // Ctrl+Shift+C - Activate eyedropper
+                if (e.ctrlKey && e.shiftKey && e.key === 'C') {
+                    e.preventDefault();
+                    activateEyedropper();
+                }
+                
+                // Escape - Close modal/canvas
+                if (e.key === 'Escape') {
+                    closeHelp();
+                    document.getElementById('canvasContainer').classList.remove('active');
+                }
+                
+                // ? - Open help
+                if (e.key === '?' && !e.ctrlKey && !e.shiftKey) {
+                    openHelp();
+                }
+            });
+            
+            // Paste event for image
+            document.addEventListener('paste', handlePaste);
+            
+            // Drag and drop for preview area
+            const previewArea = document.getElementById('previewArea');
+            previewArea.addEventListener('dragover', (e) => e.preventDefault());
+            previewArea.addEventListener('drop', handleDrop);
+            
+            // Modal click outside to close
+            document.getElementById('helpModal').addEventListener('click', (e) => {
+                if (e.target.id === 'helpModal') {
+                    closeHelp();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
