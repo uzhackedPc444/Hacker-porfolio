@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MAQSADBEK37 — CYBER CLOCK</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-dark: #0b0b0b;
+            --neon-green: #39ff14;
+            --neon-cyan: #00f5ff;
+            --faded-text: #7f8c8d;
+            --glow-intensity: 0 0 10px, 0 0 20px, 0 0 30px;
+        }
+
+        body {
+            font-family: 'Courier New', 'Consolas', 'Monaco', monospace;
+            background: var(--bg-dark);
+            color: var(--neon-green);
+            overflow-x: hidden;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        /* Scanline overlay */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: repeating-linear-gradient(
+                0deg,
+                rgba(0, 0, 0, 0.15),
+                rgba(0, 0, 0, 0.15) 1px,
+                transparent 1px,
+                transparent 2px
+            );
+            pointer-events: none;
+            z-index: 1000;
+            animation: scanline 8s linear infinite;
+        }
+
+        /* Grain overlay */
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' /%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.05'/%3E%3C/svg%3E");
+            pointer-events: none;
+            z-index: 999;
+            opacity: 0.3;
+        }
+
+        @keyframes scanline {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(10px); }
+        }
+
+        /* Boot screen */
+        #boot-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--bg-dark);
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            opacity: 1;
+            transition: opacity 0.5s;
+        }
+
+        #boot-screen.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .boot-text {
+            color: var(--neon-green);
+            font-size: 1rem;
+            margin: 5px 0;
+            opacity: 0;
+            animation: fadeIn 0.3s forwards;
+        }
+
+        @keyframes fadeIn {
+            to { opacity: 1; }
+        }
+
+        .boot-text:nth-child(1) { animation-delay: 0s; }
+        .boot-text:nth-child(2) { animation-delay: 0.5s; }
+        .boot-text:nth-child(3) { animation-delay: 1s; }
+
+        /* Matrix rain canvas */
+        #matrix-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            opacity: 0;
+            transition: opacity 0.5s;
+            pointer-events: none;
+        }
+
+        #matrix-canvas.active {
+            opacity: 0.15;
+        }
+
+        /* Main container */
+        .container {
+            position: relative;
+            z-index: 10;
+            text-align: center;
+            padding: 20px;
+            opacity: 0;
+            animation: containerFadeIn 0.8s 1.5s forwards;
+        }
+
+        @keyframes containerFadeIn {
+            to { opacity: 1; }
+        }
+
+        /* ASCII Header */
+        .ascii-header {
+            font-size: clamp(0.8rem, 2vw, 1rem);
+            color: var(--neon-cyan);
+            text-shadow: var(--glow-intensity) var(--neon-cyan);
+            margin-bottom: 30px;
+            letter-spacing: 2px;
+            animation: flicker 0.5s ease-in-out 3;
+        }
+
+        @keyframes flicker {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        /* Clock container */
+        .clock-container {
+            position: relative;
+            width: clamp(250px, 60vw, 500px);
+            height: clamp(250px, 60vw, 500px);
+            margin: 0 auto 30px;
+        }
+
+        /* Analog clock */
+        .clock {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: rgba(11, 11, 11, 0.8);
+            border: 3px solid var(--neon-green);
+            box-shadow: 
+                0 0 20px var(--neon-green),
+                0 0 40px var(--neon-green),
+                inset 0 0 20px rgba(57, 255, 20, 0.1);
+            position: relative;
+            backdrop-filter: blur(10px);
+        }
+
+        /* Clock center dot */
+        .clock-center {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 16px;
+            height: 16px;
+            background: var(--neon-green);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 10px var(--neon-green);
+            z-index: 10;
+        }
+
+        /* Clock hands */
+        .hand {
+            position: absolute;
+            bottom: 50%;
+            left: 50%;
+            transform-origin: 50% 100%;
+            border-radius: 10px 10px 0 0;
+            box-shadow: 0 0 10px currentColor;
+        }
+
+        .hour-hand {
+            width: 8px;
+            height: 28%;
+            background: var(--neon-cyan);
+            color: var(--neon-cyan);
+            margin-left: -4px;
+            z-index: 3;
+        }
+
+        .minute-hand {
+            width: 6px;
+            height: 38%;
+            background: var(--neon-green);
+            color: var(--neon-green);
+            margin-left: -3px;
+            z-index: 4;
+        }
+
+        .second-hand {
+            width: 3px;
+            height: 42%;
+            background: #ff0055;
+            color: #ff0055;
+            margin-left: -1.5px;
+            z-index: 5;
+        }
+
+        /* Clock markers */
+        .marker {
+            position: absolute;
+            width: 2px;
+            height: 10px;
+            background: var(--faded-text);
+            left: 50%;
+            top: 5px;
+            transform-origin: 50% calc(50vh - 50% - 5px);
+            margin-left: -1px;
+        }
+
+        .marker.hour-marker {
+            height: 15px;
+            width: 3px;
+            background: var(--neon-green);
+            opacity: 0.5;
+        }
+
+        /* Clock numbers */
+        .clock-number {
+            position: absolute;
+            font-size: clamp(1.2rem, 3vw, 1.8rem);
+            font-weight: 700;
+            color: var(--neon-cyan);
+            text-shadow: 0 0 10px var(--neon-cyan);
+            left: 50%;
+            top: 50%;
+            transform-origin: center;
+            user-select: none;
+        }
+
+        /* Digital display */
+        .digital-display {
+            margin-top: 20px;
+        }
+
+        .digital-time {
+            font-size: clamp(1.5rem, 5vw, 2.5rem);
+            color: var(--neon-green);
+            text-shadow: var(--glow-intensity) var(--neon-green);
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            margin-bottom: 10px;
+        }
+
+        .colon {
+            animation: blink 1s step-end infinite;
+        }
+
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+
+        .digital-date {
+            font-size: clamp(1rem, 3vw, 1.3rem);
+            color: var(--neon-cyan);
+            text-shadow: var(--glow-intensity) var(--neon-cyan);
+            position: relative;
+            cursor: help;
+        }
+
+        .digital-date:hover .weekday-tooltip {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .weekday-tooltip {
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(57, 255, 20, 0.9);
+            color: var(--bg-dark);
+            padding: 5px 15px;
+            border-radius: 5px;
+            font-size: 0.9rem;
+            white-space: nowrap;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s, visibility 0.3s;
+            margin-bottom: 10px;
+            box-shadow: 0 0 20px var(--neon-green);
+        }
+
+        /* Controls */
+        .controls {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 100;
+            display: flex;
+            gap: 10px;
+            flex-direction: column;
+            align-items: flex-end;
+        }
+
+        .control-btn {
+            background: rgba(11, 11, 11, 0.9);
+            border: 2px solid var(--neon-green);
+            color: var(--neon-green);
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-family: 'Courier New', 'Consolas', 'Monaco', monospace;
+            font-size: 0.85rem;
+            transition: all 0.3s;
+            box-shadow: 0 0 10px rgba(57, 255, 20, 0.3);
+        }
+
+        .control-btn:hover,
+        .control-btn:focus {
+            background: var(--neon-green);
+            color: var(--bg-dark);
+            box-shadow: 0 0 20px var(--neon-green);
+            outline: none;
+        }
+
+        .control-btn:active {
+            transform: scale(0.95);
+        }
+
+        /* Copy button */
+        .copy-btn {
+            margin-top: 20px;
+            background: rgba(11, 11, 11, 0.9);
+            border: 2px solid var(--neon-cyan);
+            color: var(--neon-cyan);
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-family: 'Courier New', 'Consolas', 'Monaco', monospace;
+            font-size: 0.9rem;
+            transition: all 0.3s;
+            box-shadow: 0 0 10px rgba(0, 245, 255, 0.3);
+        }
+
+        .copy-btn:hover,
+        .copy-btn:focus {
+            background: var(--neon-cyan);
+            color: var(--bg-dark);
+            box-shadow: 0 0 20px var(--neon-cyan);
+            outline: none;
+        }
+
+        /* Toast notification */
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: rgba(57, 255, 20, 0.95);
+            color: var(--bg-dark);
+            padding: 15px 30px;
+            border-radius: 5px;
+            font-weight: 700;
+            box-shadow: 0 0 30px var(--neon-green);
+            z-index: 3000;
+            opacity: 0;
+            transition: all 0.3s;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .clock-container {
+                width: clamp(200px, 80vw, 400px);
+                height: clamp(200px, 80vw, 400px);
+            }
+
+            .controls {
+                top: 10px;
+                right: 10px;
+            }
+
+            .control-btn {
+                padding: 6px 12px;
+                font-size: 0.75rem;
+            }
+
+            .ascii-header {
+                font-size: 0.7rem;
+                margin-bottom: 20px;
+            }
+        }
+
+        /* Accessibility */
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border-width: 0;
+        }
+    </style>
+</head>
+<body>
+    <!-- Boot screen -->
+    <div id="boot-screen">
+        <div class="boot-text">[boot] Initializing systems...</div>
+        <div class="boot-text">[boot] Loading cyber clock interface...</div>
+        <div class="boot-text">[boot] Ready.</div>
+    </div>
+
+    <!-- Matrix rain canvas -->
+    <canvas id="matrix-canvas"></canvas>
+
+    <!-- Controls -->
+    <div class="controls">
+        <button class="control-btn" id="time-format-btn" aria-label="Toggle 12/24 hour format" tabindex="0">
+            24H
+        </button>
+        <button class="control-btn" id="matrix-toggle-btn" aria-label="Toggle matrix rain effect" tabindex="0">
+            MATRIX: OFF
+        </button>
+    </div>
+
+    <!-- Main container -->
+    <div class="container">
+        <!-- ASCII Header -->
+        <div class="ascii-header" aria-label="Cyber clock header">
+            &gt; MAQSADBEK37 — CYBER CLOCK
+        </div>
+
+        <!-- Clock container -->
+        <div class="clock-container">
+            <div class="clock" role="img" aria-label="Analog clock face">
+                <!-- Generate 60 markers -->
+                <div id="markers"></div>
+                
+                <!-- Clock hands -->
+                <div class="hand hour-hand" id="hour-hand" aria-hidden="true"></div>
+                <div class="hand minute-hand" id="minute-hand" aria-hidden="true"></div>
+                <div class="hand second-hand" id="second-hand" aria-hidden="true"></div>
+                
+                <!-- Center dot -->
+                <div class="clock-center" aria-hidden="true"></div>
+            </div>
+        </div>
+
+        <!-- Digital display -->
+        <div class="digital-display">
+            <div class="digital-time" id="digital-time" role="timer" aria-live="polite" aria-atomic="true">
+                <span id="hours">00</span><span class="colon">:</span><span id="minutes">00</span><span class="colon">:</span><span id="seconds">00</span>
+            </div>
+            <div class="digital-date" id="digital-date" aria-label="Current date">
+                <span class="weekday-tooltip" id="weekday-tooltip">Monday</span>
+                <span id="date-text">01, January 2025</span>
+            </div>
+        </div>
+
+        <!-- Copy button -->
+        <button class="copy-btn" id="copy-btn" aria-label="Copy current time and date">
+            COPY TIME
+        </button>
+    </div>
+
+    <!-- Toast notification -->
+    <div class="toast" id="toast" role="alert" aria-live="assertive">Copied!</div>
+
+    <!-- Screen reader announcements -->
+    <div class="sr-only" role="status" aria-live="polite" id="sr-time"></div>
+
+    <script>
+        // ========================================
+        // INITIALIZATION & BOOT SEQUENCE
+        // ========================================
+        
+        // Wait for DOM to be ready
+        document.addEventListener('DOMContentLoaded', () => {
+            // Boot sequence
+            setTimeout(() => {
+                document.getElementById('boot-screen').classList.add('hidden');
+            }, 2000);
+
+            // Initialize clock markers
+            initializeClockMarkers();
+            
+            // Initialize matrix rain
+            initializeMatrix();
+            
+            // Start clock updates
+            updateClock();
+            setInterval(updateClock, 1000);
+            
+            // Initialize event listeners
+            initializeEventListeners();
+        });
+
+        // ========================================
+        // CLOCK MARKERS GENERATION
+        // ========================================
+        
+        function initializeClockMarkers() {
+            const markersContainer = document.getElementById('markers');
+            const clockSize = document.querySelector('.clock').offsetWidth;
+            
+            // Add tick markers (60 total)
+            for (let i = 0; i < 60; i++) {
+                const marker = document.createElement('div');
+                marker.className = i % 5 === 0 ? 'marker hour-marker' : 'marker';
+                marker.style.transform = `rotate(${i * 6}deg) translateY(-${clockSize / 2 - 5}px)`;
+                markersContainer.appendChild(marker);
+            }
+            
+            // Add hour numbers (12, 1, 2, 3, ... 11)
+            for (let hour = 1; hour <= 12; hour++) {
+                const number = document.createElement('div');
+                number.className = 'clock-number';
+                number.textContent = hour;
+                
+                // Calculate position for each number
+                // 12 is at 0 degrees (top), numbers increase clockwise
+                const angle = (hour * 30 - 90) * (Math.PI / 180); // Convert to radians
+                const radius = clockSize / 2 - 35; // Distance from center
+                
+                const x = Math.cos(angle) * radius;
+                const y = Math.sin(angle) * radius;
+                
+                number.style.transform = `translate(-50%, -50%) translate(${x}px, ${y}px)`;
+                markersContainer.appendChild(number);
+            }
+        }
+
+        // ========================================
+        // TIME UPDATE LOGIC
+        // ========================================
+        
+        let is24HourFormat = true;
+        let lastDate = null;
+
+        function updateClock() {
+            const now = new Date();
+            
+            // Get time components
+            let hours = now.getHours();
+            const minutes = now.getMinutes();
+            const seconds = now.getSeconds();
+            const milliseconds = now.getMilliseconds();
+            
+            // Calculate smooth hand rotations
+            // Second hand: moves smoothly through each second
+            const secondAngle = ((seconds + milliseconds / 1000) * 6);
+            
+            // Minute hand: moves smoothly based on seconds
+            const minuteAngle = ((minutes + seconds / 60) * 6);
+            
+            // Hour hand: moves smoothly based on minutes
+            const hourAngle = ((hours % 12 + minutes / 60 + seconds / 3600) * 30);
+            
+            // Apply rotations to hands
+            document.getElementById('second-hand').style.transform = `rotate(${secondAngle}deg)`;
+            document.getElementById('minute-hand').style.transform = `rotate(${minuteAngle}deg)`;
+            document.getElementById('hour-hand').style.transform = `rotate(${hourAngle}deg)`;
+            
+            // Update digital time
+            updateDigitalTime(hours, minutes, seconds);
+            
+            // Update date (check if day changed)
+            const currentDate = now.toDateString();
+            if (lastDate !== currentDate) {
+                updateDigitalDate(now);
+                lastDate = currentDate;
+            }
+            
+            // Update screen reader announcement (every minute)
+            if (seconds === 0) {
+                updateScreenReaderTime(hours, minutes);
+            }
+        }
+
+        // ========================================
+        // DIGITAL TIME DISPLAY
+        // ========================================
+        
+        function updateDigitalTime(hours, minutes, seconds) {
+            let displayHours = hours;
+            
+            // Handle 12h/24h format toggle
+            if (!is24HourFormat) {
+                displayHours = hours % 12 || 12;
+            }
+            
+            // Update display with zero-padding
+            document.getElementById('hours').textContent = String(displayHours).padStart(2, '0');
+            document.getElementById('minutes').textContent = String(minutes).padStart(2, '0');
+            document.getElementById('seconds').textContent = String(seconds).padStart(2, '0');
+        }
+
+        // ========================================
+        // DIGITAL DATE DISPLAY
+        // ========================================
+        
+        function updateDigitalDate(date) {
+            const months = ['January', 'February', 'March', 'April', 'May', 'June',
+                          'July', 'August', 'September', 'October', 'November', 'December'];
+            const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+            
+            const day = date.getDate();
+            const month = months[date.getMonth()];
+            const year = date.getFullYear();
+            const weekday = weekdays[date.getDay()];
+            
+            document.getElementById('date-text').textContent = `${day}, ${month} ${year}`;
+            document.getElementById('weekday-tooltip').textContent = weekday;
+        }
+
+        // ========================================
+        // SCREEN READER ACCESSIBILITY
+        // ========================================
+        
+        function updateScreenReaderTime(hours, minutes) {
+            const srElement = document.getElementById('sr-time');
+            srElement.textContent = `Current time: ${hours}:${String(minutes).padStart(2, '0')}`;
+        }
+
+        // ========================================
+        // 12H/24H FORMAT TOGGLE
+        // ========================================
+        
+        function toggleTimeFormat() {
+            is24HourFormat = !is24HourFormat;
+            const btn = document.getElementById('time-format-btn');
+            btn.textContent = is24HourFormat ? '24H' : '12H';
+            updateClock(); // Immediate update
+        }
+
+        // ========================================
+        // MATRIX RAIN EFFECT
+        // ========================================
+        
+        let matrixActive = false;
+        let matrixAnimation = null;
+        
+        function initializeMatrix() {
+            const canvas = document.getElementById('matrix-canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Set canvas size
+            function resizeCanvas() {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            }
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+            
+            // Matrix characters
+            const chars = 'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン01';
+            const fontSize = 14;
+            const columns = canvas.width / fontSize;
+            const drops = Array(Math.floor(columns)).fill(1);
+            
+            // Draw matrix rain
+            function drawMatrix() {
+                ctx.fillStyle = 'rgba(11, 11, 11, 0.05)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                ctx.fillStyle = '#39ff14';
+                ctx.font = fontSize + 'px monospace';
+                
+                for (let i = 0; i < drops.length; i++) {
+                    const text = chars[Math.floor(Math.random() * chars.length)];
+                    ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+                    
+                    if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
+                        drops[i] = 0;
+                    }
+                    drops[i]++;
+                }
+            }
+            
+            // Store draw function for toggle
+            window.matrixDraw = drawMatrix;
+        }
+        
+        function toggleMatrix() {
+            matrixActive = !matrixActive;
+            const canvas = document.getElementById('matrix-canvas');
+            const btn = document.getElementById('matrix-toggle-btn');
+            
+            if (matrixActive) {
+                canvas.classList.add('active');
+                btn.textContent = 'MATRIX: ON';
+                matrixAnimation = setInterval(window.matrixDraw, 50);
+            } else {
+                canvas.classList.remove('active');
+                btn.textContent = 'MATRIX: OFF';
+                clearInterval(matrixAnimation);
+            }
+        }
+
+        // ========================================
+        // COPY TO CLIPBOARD FUNCTIONALITY
+        // ========================================
+        
+        function copyTimeToClipboard() {
+            const now = new Date();
+            let hours = now.getHours();
+            const minutes = now.getMinutes();
+            const seconds = now.getSeconds();
+            
+            // Format based on current setting
+            if (!is24HourFormat) {
+                hours = hours % 12 || 12;
+            }
+            
+            const months = ['January', 'February', 'March', 'April', 'May', 'June',
+                          'July', 'August', 'September', 'October', 'November', 'December'];
+            
+            const timeString = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            const dateString = `${now.getDate()}, ${months[now.getMonth()]} ${now.getFullYear()}`;
+            const fullString = `${timeString} — ${dateString}`;
+            
+            // Copy to clipboard
+            navigator.clipboard.writeText(fullString).then(() => {
+                showToast();
+            }).catch(err => {
+                console.error('Failed to copy:', err);
+            });
+        }
+
+        // ========================================
+        // TOAST NOTIFICATION
+        // ========================================
+        
+        function showToast() {
+            const toast = document.getElementById('toast');
+            toast.classList.add('show');
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 2000);
+        }
+
+        // ========================================
+        // EVENT LISTENERS
+        // ========================================
+        
+        function initializeEventListeners() {
+            // Time format toggle
+            const timeFormatBtn = document.getElementById('time-format-btn');
+            timeFormatBtn.addEventListener('click', toggleTimeFormat);
+            timeFormatBtn.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    toggleTimeFormat();
+                }
+            });
+            
+            // Matrix toggle
+            const matrixToggleBtn = document.getElementById('matrix-toggle-btn');
+            matrixToggleBtn.addEventListener('click', toggleMatrix);
+            matrixToggleBtn.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    toggleMatrix();
+                }
+            });
+            
+            // Copy button
+            const copyBtn = document.getElementById('copy-btn');
+            copyBtn.addEventListener('click', copyTimeToClipboard);
+            copyBtn.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    copyTimeToClipboard();
+                }
+            });
+            
+            // Responsive resize - update markers on window resize
+            let resizeTimeout;
+            window.addEventListener('resize', () => {
+                clearTimeout(resizeTimeout);
+                resizeTimeout = setTimeout(() => {
+                    document.getElementById('markers').innerHTML = '';
+                    initializeClockMarkers();
+                }, 250);
+            });
+        }
+    </script>
+</body>
+</html>
