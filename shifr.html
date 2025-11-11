@@ -1,0 +1,1576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MAQSADBEK37 — CRYPTO LAB</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #0b0b0b;
+            --bg-secondary: #1a1a1a;
+            --neon-green: #39ff14;
+            --neon-cyan: #00f5ff;
+            --text-primary: #e0e0e0;
+            --text-dim: #888;
+            --border-color: #333;
+            --error-red: #ff073a;
+            --warning-yellow: #ffd700;
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: 'Courier New', Courier, monospace;
+            min-height: 100vh;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        /* Scanline overlay effect */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: repeating-linear-gradient(
+                0deg,
+                rgba(0, 0, 0, 0.15),
+                rgba(0, 0, 0, 0.15) 1px,
+                transparent 1px,
+                transparent 2px
+            );
+            pointer-events: none;
+            z-index: 9999;
+            animation: scanline 8s linear infinite;
+        }
+
+        @keyframes scanline {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(10px); }
+        }
+
+        /* Matrix rain background */
+        #matrix-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            opacity: 0;
+            transition: opacity 0.5s;
+            pointer-events: none;
+        }
+
+        #matrix-canvas.active {
+            opacity: 0.15;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 2px solid var(--neon-green);
+            background: rgba(57, 255, 20, 0.05);
+            box-shadow: 0 0 20px rgba(57, 255, 20, 0.3);
+            position: relative;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -2px;
+            left: -2px;
+            right: -2px;
+            bottom: -2px;
+            background: linear-gradient(45deg, var(--neon-green), var(--neon-cyan), var(--neon-green));
+            z-index: -1;
+            border-radius: 4px;
+            opacity: 0.3;
+            animation: glow-pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes glow-pulse {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 0.6; }
+        }
+
+        .ascii-logo {
+            font-size: 14px;
+            line-height: 1.2;
+            color: var(--neon-green);
+            text-shadow: 0 0 10px var(--neon-green);
+            white-space: pre;
+            overflow-x: auto;
+        }
+
+        .subtitle {
+            color: var(--neon-cyan);
+            font-size: 12px;
+            margin-top: 10px;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+        }
+
+        /* Mode tabs */
+        .mode-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .mode-tab {
+            flex: 1;
+            min-width: 150px;
+            padding: 15px 20px;
+            background: var(--bg-secondary);
+            border: 2px solid var(--border-color);
+            color: var(--text-dim);
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            font-weight: bold;
+            letter-spacing: 2px;
+            position: relative;
+        }
+
+        .mode-tab:hover {
+            border-color: var(--neon-cyan);
+            color: var(--neon-cyan);
+        }
+
+        .mode-tab.active {
+            background: rgba(57, 255, 20, 0.1);
+            border-color: var(--neon-green);
+            color: var(--neon-green);
+            box-shadow: 0 0 20px rgba(57, 255, 20, 0.4);
+        }
+
+        /* Main grid */
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 968px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Panel */
+        .panel {
+            background: var(--bg-secondary);
+            border: 2px solid var(--border-color);
+            padding: 20px;
+            position: relative;
+        }
+
+        .panel-header {
+            color: var(--neon-cyan);
+            font-size: 14px;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .hint {
+            font-size: 11px;
+            color: var(--warning-yellow);
+            font-style: italic;
+        }
+
+        /* Textarea */
+        textarea {
+            width: 100%;
+            min-height: 300px;
+            background: #000;
+            color: var(--neon-green);
+            border: 1px solid var(--border-color);
+            padding: 15px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 14px;
+            resize: vertical;
+            outline: none;
+            transition: all 0.3s;
+        }
+
+        textarea:focus {
+            border-color: var(--neon-cyan);
+            box-shadow: 0 0 10px rgba(0, 245, 255, 0.3);
+        }
+
+        textarea.output-area {
+            color: var(--neon-cyan);
+        }
+
+        /* Form controls */
+        .controls {
+            margin-bottom: 20px;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            color: var(--text-primary);
+            margin-bottom: 5px;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+
+        input[type="text"],
+        input[type="password"],
+        input[type="number"],
+        select {
+            width: 100%;
+            padding: 10px;
+            background: #000;
+            color: var(--neon-green);
+            border: 1px solid var(--border-color);
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 14px;
+            outline: none;
+            transition: all 0.3s;
+        }
+
+        input:focus,
+        select:focus {
+            border-color: var(--neon-cyan);
+            box-shadow: 0 0 10px rgba(0, 245, 255, 0.3);
+        }
+
+        .input-group {
+            position: relative;
+        }
+
+        .toggle-password {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: var(--neon-cyan);
+            cursor: pointer;
+            font-size: 18px;
+            padding: 5px;
+        }
+
+        .toggle-password:hover {
+            color: var(--neon-green);
+        }
+
+        /* Buttons */
+        .button-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 15px;
+        }
+
+        button {
+            padding: 12px 24px;
+            background: var(--bg-secondary);
+            border: 2px solid var(--neon-green);
+            color: var(--neon-green);
+            cursor: pointer;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 13px;
+            text-transform: uppercase;
+            font-weight: bold;
+            letter-spacing: 1px;
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        button::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            background: rgba(57, 255, 20, 0.3);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+
+        button:hover::before {
+            width: 300px;
+            height: 300px;
+        }
+
+        button:hover {
+            box-shadow: 0 0 20px rgba(57, 255, 20, 0.6);
+            border-color: var(--neon-green);
+        }
+
+        button:active {
+            transform: scale(0.95);
+        }
+
+        button.primary {
+            background: rgba(57, 255, 20, 0.2);
+        }
+
+        button.secondary {
+            border-color: var(--neon-cyan);
+            color: var(--neon-cyan);
+        }
+
+        button.secondary:hover {
+            box-shadow: 0 0 20px rgba(0, 245, 255, 0.6);
+        }
+
+        button.danger {
+            border-color: var(--error-red);
+            color: var(--error-red);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Algorithm selector */
+        .algorithm-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        /* Presets */
+        .presets {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 15px;
+        }
+
+        .preset-btn {
+            padding: 8px 16px;
+            font-size: 11px;
+            border-color: var(--text-dim);
+            color: var(--text-dim);
+        }
+
+        /* History */
+        .history-panel {
+            margin-top: 20px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .history-item {
+            padding: 10px;
+            background: #000;
+            border: 1px solid var(--border-color);
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .history-item:hover {
+            border-color: var(--neon-cyan);
+            background: rgba(0, 245, 255, 0.05);
+        }
+
+        .history-meta {
+            font-size: 10px;
+            color: var(--text-dim);
+            margin-bottom: 5px;
+        }
+
+        .history-preview {
+            font-size: 12px;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 20px;
+            border-top: 1px solid var(--border-color);
+            margin-top: 40px;
+            font-size: 11px;
+            color: var(--text-dim);
+        }
+
+        .footer a {
+            color: var(--neon-cyan);
+            text-decoration: none;
+        }
+
+        .footer a:hover {
+            text-shadow: 0 0 10px var(--neon-cyan);
+        }
+
+        .security-notice {
+            color: var(--warning-yellow);
+            margin-top: 10px;
+            font-size: 12px;
+        }
+
+        /* Progress indicator */
+        .progress {
+            display: none;
+            margin: 10px 0;
+            padding: 10px;
+            background: rgba(57, 255, 20, 0.1);
+            border: 1px solid var(--neon-green);
+            color: var(--neon-green);
+            font-size: 12px;
+            animation: flicker 0.5s infinite;
+        }
+
+        .progress.active {
+            display: block;
+        }
+
+        @keyframes flicker {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        /* Status messages */
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-left: 4px solid;
+            font-size: 12px;
+            display: none;
+        }
+
+        .status.active {
+            display: block;
+        }
+
+        .status.success {
+            background: rgba(57, 255, 20, 0.1);
+            border-color: var(--neon-green);
+            color: var(--neon-green);
+        }
+
+        .status.error {
+            background: rgba(255, 7, 58, 0.1);
+            border-color: var(--error-red);
+            color: var(--error-red);
+        }
+
+        .status.info {
+            background: rgba(0, 245, 255, 0.1);
+            border-color: var(--neon-cyan);
+            color: var(--neon-cyan);
+        }
+
+        /* Settings toggle */
+        .settings-toggle {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+            font-size: 12px;
+        }
+
+        .settings-toggle input[type="checkbox"] {
+            width: auto;
+        }
+
+        /* Collapsible section */
+        .collapsible {
+            margin-bottom: 15px;
+        }
+
+        .collapsible-header {
+            background: var(--bg-primary);
+            padding: 10px;
+            cursor: pointer;
+            border: 1px solid var(--border-color);
+            color: var(--neon-cyan);
+            font-size: 12px;
+            text-transform: uppercase;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .collapsible-header:hover {
+            background: rgba(0, 245, 255, 0.05);
+        }
+
+        .collapsible-content {
+            display: none;
+            padding: 15px;
+            border: 1px solid var(--border-color);
+            border-top: none;
+        }
+
+        .collapsible.open .collapsible-content {
+            display: block;
+        }
+
+        .collapsible.open .collapsible-header::after {
+            content: '▼';
+        }
+
+        .collapsible-header::after {
+            content: '▶';
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .ascii-logo {
+                font-size: 10px;
+            }
+            
+            .button-group {
+                flex-direction: column;
+            }
+            
+            button {
+                width: 100%;
+            }
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-primary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--neon-green);
+            border: 1px solid var(--bg-primary);
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--neon-cyan);
+        }
+    </style>
+</head>
+<body>
+    <canvas id="matrix-canvas"></canvas>
+    
+    <div class="container">
+        <header class="header">
+            <div class="ascii-logo">
+ ███▄ ▄███▓ ▄▄▄       █████   ██████  ▄▄▄      ▓█████▄  ▄▄▄▄   ▓█████  ██ ▄█▀
+▓██▒▀█▀ ██▒▒████▄   ▒██▓  ██▒▒██    ▒ ▒████▄    ▒██▀ ██▌▓█████▄ ▓█   ▀  ██▄█▒ 
+▓██    ▓██░▒██  ▀█▄ ▒██▒  ██░░ ▓██▄   ▒██  ▀█▄  ░██   █▌▒██▒ ▄██▒███   ▓███▄░ 
+▒██    ▒██ ░██▄▄▄▄██░██  █▀ ░  ▒   ██▒░██▄▄▄▄██ ░▓█▄   ▌▒██░█▀  ▒▓█  ▄ ▓██ █▄ 
+▒██▒   ░██▒ ▓█   ▓██░▒███▒█▄ ▒██████▒▒ ▓█   ▓██▒░▒████▓ ░▓█  ▀█▓░▒████▒▒██▒ █▄
+░ ▒░   ░  ░ ▒▒   ▓▒█░░ ▒▒░ ▒ ▒ ▒▓▒ ▒ ░ ▒▒   ▓▒█░ ▒▒▓  ▒ ░▒▓███▀▒░░ ▒░ ░▒ ▒▒ ▓▒
+            </div>
+            <div class="subtitle">// CRYPTO LAB v1.0 — TERMINAL INTERFACE //</div>
+        </header>
+
+        <div class="mode-tabs">
+            <div class="mode-tab active" data-mode="encrypt" onclick="switchMode('encrypt')">
+                🔒 ENCRYPT
+            </div>
+            <div class="mode-tab" data-mode="decrypt" onclick="switchMode('decrypt')">
+                🔓 DECRYPT
+            </div>
+        </div>
+
+        <div class="main-grid">
+            <div class="panel">
+                <div class="panel-header">
+                    <span>INPUT</span>
+                    <div class="presets">
+                        <button class="preset-btn" onclick="loadPreset('html')">Sample HTML</button>
+                        <button class="preset-btn" onclick="loadPreset('js')">Sample JS</button>
+                        <button class="preset-btn" onclick="loadPreset('text')">Sample Text</button>
+                    </div>
+                </div>
+                <textarea id="input-area" aria-label="Input text" placeholder="Enter your text here..."></textarea>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header">
+                    <span>OUTPUT</span>
+                    <span class="hint" id="output-hint"></span>
+                </div>
+                <textarea id="output-area" class="output-area" aria-label="Output text" readonly placeholder="Result will appear here..."></textarea>
+                <div class="status" id="status-message"></div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-header">ALGORITHM & SETTINGS</div>
+            
+            <div class="control-group">
+                <label for="algorithm">Select Algorithm</label>
+                <select id="algorithm" onchange="updateAlgorithmSettings()">
+                    <option value="base64">Base64 (Encode/Decode)</option>
+                    <option value="aes-gcm">AES-GCM (Advanced Encryption Standard)</option>
+                    <option value="xor">XOR Cipher (Demo)</option>
+                    <option value="rot13">ROT13 / Caesar Cipher</option>
+                </select>
+            </div>
+
+            <div id="algorithm-settings"></div>
+
+            <div class="progress" id="progress-indicator">
+                <span id="progress-text">Processing...</span>
+            </div>
+
+            <div class="button-group">
+                <button class="primary" onclick="executeEncrypt()" id="encrypt-btn">
+                    🔒 ENCRYPT
+                </button>
+                <button class="primary" onclick="executeDecrypt()" id="decrypt-btn">
+                    🔓 DECRYPT
+                </button>
+                <button class="secondary" onclick="copyOutput()">
+                    📋 COPY OUTPUT
+                </button>
+                <button class="secondary" onclick="downloadOutput()">
+                    💾 DOWNLOAD
+                </button>
+                <button class="danger" onclick="clearAll()">
+                    ❌ CLEAR
+                </button>
+            </div>
+        </div>
+
+        <div class="collapsible" id="history-collapsible">
+            <div class="collapsible-header" onclick="toggleCollapsible('history-collapsible')">
+                📜 OPERATION HISTORY (Last 10)
+            </div>
+            <div class="collapsible-content">
+                <div id="history-list"></div>
+                <button class="secondary" onclick="clearHistory()" style="margin-top: 10px;">Clear History</button>
+            </div>
+        </div>
+
+        <div class="collapsible">
+            <div class="collapsible-header" onclick="toggleCollapsible(this.parentElement)">
+                ⚙️ ADVANCED SETTINGS
+            </div>
+            <div class="collapsible-content">
+                <div class="settings-toggle">
+                    <input type="checkbox" id="matrix-toggle" onchange="toggleMatrix()">
+                    <label for="matrix-toggle" style="margin: 0;">Enable Matrix Rain Background</label>
+                </div>
+                <div class="settings-toggle">
+                    <input type="checkbox" id="remember-settings" onchange="toggleRememberSettings()">
+                    <label for="remember-settings" style="margin: 0;">Remember Algorithm Preferences</label>
+                </div>
+                <div class="settings-toggle">
+                    <input type="checkbox" id="pretty-json">
+                    <label for="pretty-json" style="margin: 0;">Pretty-print JSON Output</label>
+                </div>
+            </div>
+        </div>
+
+        <footer class="footer">
+            <div>MAQSADBEK37 CRYPTO LAB © 2025 | Portfolio: <a href="https://maqsadbek37.vercel.app" target="_blank">maqsadbek37.vercel.app</a></div>
+            <div class="security-notice">
+                🔐 All cryptographic operations run entirely in your browser — nothing is sent anywhere.<br>
+                ⚠️ This is a demonstration tool. Do not use for highly sensitive production secrets without understanding key management.
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        /**
+         * MAQSADBEK37 CRYPTO LAB
+         * Single-file encryption/decryption tool with client-side cryptography
+         * 
+         * CRYPTOGRAPHY IMPLEMENTATION NOTES:
+         * 
+         * 1. AES-GCM (Advanced Encryption Standard - Galois/Counter Mode):
+         *    - Uses Web Crypto API (native browser implementation)
+         *    - Authenticated encryption (prevents tampering)
+         *    - Key derivation via PBKDF2 (Password-Based Key Derivation Function 2)
+         *    - PBKDF2 iterations (default: 100,000) make brute-force attacks harder
+         *    - Each encryption generates random IV (Initialization Vector) and salt
+         *    - IV and salt MUST be stored with ciphertext for decryption
+         *    - Output format: JSON envelope with version, algorithm, salt, IV, ciphertext
+         * 
+         * 2. PBKDF2 Key Derivation:
+         *    - Converts user password into cryptographic key
+         *    - Uses SHA-256 hash function
+         *    - Salt prevents rainbow table attacks
+         *    - Iterations increase computational cost for attackers
+         *    - Random salt generated for each encryption
+         * 
+         * 3. Base64:
+         *    - Encoding binary data as ASCII text
+         *    - Used for portable representation of encrypted data
+         *    - Not encryption (easily reversible)
+         * 
+         * 4. XOR Cipher:
+         *    - Simple demo cipher (NOT secure for real use)
+         *    - Each byte XORed with repeating key
+         *    - Symmetric (same operation for encrypt/decrypt)
+         * 
+         * 5. ROT13/Caesar:
+         *    - Character substitution cipher
+         *    - Demo purposes only (trivial to break)
+         */
+
+        // Global state
+        let currentMode = 'encrypt';
+        let history = JSON.parse(localStorage.getItem('cryptoHistory') || '[]');
+        let matrixAnimationId = null;
+
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', () => {
+            updateAlgorithmSettings();
+            renderHistory();
+            setupKeyboardShortcuts();
+            loadSavedSettings();
+            detectInputFormat();
+        });
+
+        /**
+         * Switch between ENCRYPT and DECRYPT modes
+         */
+        function switchMode(mode) {
+            currentMode = mode;
+            document.querySelectorAll('.mode-tab').forEach(tab => {
+                tab.classList.toggle('active', tab.dataset.mode === mode);
+            });
+            
+            // Update button visibility
+            document.getElementById('encrypt-btn').style.display = mode === 'encrypt' ? 'inline-block' : 'none';
+            document.getElementById('decrypt-btn').style.display = mode === 'decrypt' ? 'inline-block' : 'none';
+            
+            detectInputFormat();
+        }
+
+        /**
+         * Update algorithm-specific settings UI
+         */
+        function updateAlgorithmSettings() {
+            const algorithm = document.getElementById('algorithm').value;
+            const settingsDiv = document.getElementById('algorithm-settings');
+            
+            let html = '';
+            
+            if (algorithm === 'aes-gcm') {
+                html = `
+                    <div class="control-group">
+                        <label for="passphrase">Passphrase / Password</label>
+                        <div class="input-group">
+                            <input type="password" id="passphrase" placeholder="Enter strong passphrase" autocomplete="off">
+                            <button class="toggle-password" onclick="togglePasswordVisibility('passphrase')" type="button">👁️</button>
+                        </div>
+                    </div>
+                    <div class="control-group">
+                        <label for="pbkdf2-iterations">PBKDF2 Iterations (higher = more secure, slower)</label>
+                        <input type="number" id="pbkdf2-iterations" value="100000" min="1000" max="1000000">
+                    </div>
+                    <div class="control-group">
+                        <label for="output-format">Output Format</label>
+                        <select id="output-format">
+                            <option value="json">JSON Envelope (Recommended)</option>
+                            <option value="base64">Compact Base64</option>
+                        </select>
+                    </div>
+                `;
+            } else if (algorithm === 'xor') {
+                html = `
+                    <div class="control-group">
+                        <label for="xor-key">XOR Key (text or hex)</label>
+                        <input type="text" id="xor-key" placeholder="Enter key" value="SECRET">
+                    </div>
+                    <div class="control-group">
+                        <label for="xor-format">Key Format</label>
+                        <select id="xor-format">
+                            <option value="text">Text</option>
+                            <option value="hex">Hexadecimal</option>
+                        </select>
+                    </div>
+                `;
+            } else if (algorithm === 'rot13') {
+                html = `
+                    <div class="control-group">
+                        <label for="rot-shift">Caesar Shift (ROT13 = 13)</label>
+                        <input type="number" id="rot-shift" value="13" min="1" max="25">
+                    </div>
+                `;
+            }
+            
+            settingsDiv.innerHTML = html;
+        }
+
+        /**
+         * Toggle password visibility
+         */
+        function togglePasswordVisibility(fieldId) {
+            const field = document.getElementById(fieldId);
+            const button = event.target;
+            
+            if (field.type === 'password') {
+                field.type = 'text';
+                button.textContent = '🙈';
+            } else {
+                field.type = 'password';
+                button.textContent = '👁️';
+            }
+        }
+
+        /**
+         * ENCRYPTION: Main encrypt function
+         */
+        async function executeEncrypt() {
+            const input = document.getElementById('input-area').value;
+            const algorithm = document.getElementById('algorithm').value;
+            
+            if (!input) {
+                showStatus('Please enter text to encrypt', 'error');
+                return;
+            }
+            
+            showProgress('Encrypting...');
+            
+            try {
+                let result;
+                
+                switch (algorithm) {
+                    case 'base64':
+                        result = btoa(unescape(encodeURIComponent(input)));
+                        break;
+                    case 'aes-gcm':
+                        result = await encryptAESGCM(input);
+                        break;
+                    case 'xor':
+                        result = encryptXOR(input);
+                        break;
+                    case 'rot13':
+                        result = encryptROT(input);
+                        break;
+                }
+                
+                document.getElementById('output-area').value = result;
+                addToHistory('encrypt', algorithm, input.substring(0, 50));
+                showStatus('Encryption successful!', 'success');
+            } catch (error) {
+                console.error('Encryption error:', error);
+                showStatus('Encryption failed: ' + error.message, 'error');
+            } finally {
+                hideProgress();
+            }
+        }
+
+        /**
+         * DECRYPTION: Main decrypt function
+         */
+        async function executeDecrypt() {
+            const input = document.getElementById('input-area').value;
+            const algorithm = document.getElementById('algorithm').value;
+            
+            if (!input) {
+                showStatus('Please enter text to decrypt', 'error');
+                return;
+            }
+            
+            showProgress('Decrypting...');
+            
+            try {
+                let result;
+                
+                switch (algorithm) {
+                    case 'base64':
+                        result = decodeURIComponent(escape(atob(input.trim())));
+                        break;
+                    case 'aes-gcm':
+                        result = await decryptAESGCM(input);
+                        break;
+                    case 'xor':
+                        result = decryptXOR(input);
+                        break;
+                    case 'rot13':
+                        result = decryptROT(input);
+                        break;
+                }
+                
+                // Pretty-print JSON if enabled
+                if (document.getElementById('pretty-json')?.checked) {
+                    try {
+                        const parsed = JSON.parse(result);
+                        result = JSON.stringify(parsed, null, 2);
+                    } catch (e) {
+                        // Not JSON, keep as is
+                    }
+                }
+                
+                document.getElementById('output-area').value = result;
+                addToHistory('decrypt', algorithm, input.substring(0, 50));
+                showStatus('Decryption successful!', 'success');
+            } catch (error) {
+                console.error('Decryption error:', error);
+                showStatus('Decryption failed: ' + error.message + ' (Check passphrase/key or format)', 'error');
+            } finally {
+                hideProgress();
+            }
+        }
+
+        /**
+         * AES-GCM ENCRYPTION
+         * Uses Web Crypto API for strong encryption with authentication
+         */
+        async function encryptAESGCM(plaintext) {
+            const passphrase = document.getElementById('passphrase').value;
+            const iterations = parseInt(document.getElementById('pbkdf2-iterations').value);
+            const outputFormat = document.getElementById('output-format').value;
+            
+            if (!passphrase) {
+                throw new Error('Passphrase is required for AES-GCM');
+            }
+            
+            // Generate random salt (16 bytes)
+            // Salt prevents rainbow table attacks - different salt = different derived key
+            const salt = crypto.getRandomValues(new Uint8Array(16));
+            
+            // Generate random IV (12 bytes for GCM)
+            // IV (Initialization Vector) must be unique for each encryption
+            // Never reuse the same IV with the same key!
+            const iv = crypto.getRandomValues(new Uint8Array(12));
+            
+            // Derive key from passphrase using PBKDF2
+            // This is the critical step that converts a user password into a cryptographic key
+            const keyMaterial = await crypto.subtle.importKey(
+                'raw',
+                new TextEncoder().encode(passphrase),
+                'PBKDF2',
+                false,
+                ['deriveBits', 'deriveKey']
+            );
+            
+            // PBKDF2 parameters:
+            // - salt: random bytes prevent precomputed attacks
+            // - iterations: computational cost (100k iterations ≈ 100ms on modern CPU)
+            // - hash: SHA-256 is the hash function used
+            const key = await crypto.subtle.deriveKey(
+                {
+                    name: 'PBKDF2',
+                    salt: salt,
+                    iterations: iterations,
+                    hash: 'SHA-256'
+                },
+                keyMaterial,
+                { name: 'AES-GCM', length: 256 },
+                false,
+                ['encrypt', 'decrypt']
+            );
+            
+            // Encrypt the plaintext
+            // AES-GCM provides both confidentiality and authentication
+            const encrypted = await crypto.subtle.encrypt(
+                {
+                    name: 'AES-GCM',
+                    iv: iv
+                },
+                key,
+                new TextEncoder().encode(plaintext)
+            );
+            
+            // Convert to Base64 for text representation
+            const ciphertext = arrayBufferToBase64(encrypted);
+            const saltB64 = arrayBufferToBase64(salt);
+            const ivB64 = arrayBufferToBase64(iv);
+            
+            // Return structured envelope with all necessary data for decryption
+            // Must include: salt (for key derivation), IV (for decryption), ciphertext
+            if (outputFormat === 'json') {
+                return JSON.stringify({
+                    version: 1,
+                    alg: 'AES-GCM',
+                    kdf: 'PBKDF2',
+                    iterations: iterations,
+                    salt: saltB64,
+                    iv: ivB64,
+                    ct: ciphertext
+                }, null, 2);
+            } else {
+                // Compact format: iterations:salt:iv:ciphertext (all base64)
+                return `${iterations}:${saltB64}:${ivB64}:${ciphertext}`;
+            }
+        }
+
+        /**
+         * AES-GCM DECRYPTION
+         * Reverses the encryption process
+         */
+        async function decryptAESGCM(ciphertext) {
+            const passphrase = document.getElementById('passphrase').value;
+            
+            if (!passphrase) {
+                throw new Error('Passphrase is required for AES-GCM decryption');
+            }
+            
+            let salt, iv, ct, iterations;
+            
+            // Parse input format (JSON or compact)
+            try {
+                const parsed = JSON.parse(ciphertext);
+                if (parsed.alg === 'AES-GCM') {
+                    salt = base64ToArrayBuffer(parsed.salt);
+                    iv = base64ToArrayBuffer(parsed.iv);
+                    ct = base64ToArrayBuffer(parsed.ct);
+                    iterations = parsed.iterations || 100000;
+                } else {
+                    throw new Error('Unsupported algorithm');
+                }
+            } catch (e) {
+                // Try compact format
+                const parts = ciphertext.trim().split(':');
+                if (parts.length === 4) {
+                    iterations = parseInt(parts[0]);
+                    salt = base64ToArrayBuffer(parts[1]);
+                    iv = base64ToArrayBuffer(parts[2]);
+                    ct = base64ToArrayBuffer(parts[3]);
+                } else {
+                    throw new Error('Invalid ciphertext format');
+                }
+            }
+            
+            // Derive the same key from passphrase
+            // Must use the SAME salt and iterations as encryption
+            const keyMaterial = await crypto.subtle.importKey(
+                'raw',
+                new TextEncoder().encode(passphrase),
+                'PBKDF2',
+                false,
+                ['deriveBits', 'deriveKey']
+            );
+            
+            const key = await crypto.subtle.deriveKey(
+                {
+                    name: 'PBKDF2',
+                    salt: salt,
+                    iterations: iterations,
+                    hash: 'SHA-256'
+                },
+                keyMaterial,
+                { name: 'AES-GCM', length: 256 },
+                false,
+                ['encrypt', 'decrypt']
+            );
+            
+            // Decrypt
+            // If passphrase is wrong or data is corrupted, this will throw an error
+            const decrypted = await crypto.subtle.decrypt(
+                {
+                    name: 'AES-GCM',
+                    iv: iv
+                },
+                key,
+                ct
+            );
+            
+            return new TextDecoder().decode(decrypted);
+        }
+
+        /**
+         * XOR CIPHER (Demo only - NOT secure!)
+         * XOR each byte of plaintext with repeating key
+         */
+        function encryptXOR(text) {
+            const key = document.getElementById('xor-key').value;
+            const format = document.getElementById('xor-format').value;
+            
+            if (!key) {
+                throw new Error('XOR key is required');
+            }
+            
+            let keyBytes;
+            if (format === 'hex') {
+                keyBytes = hexToBytes(key);
+            } else {
+                keyBytes = new TextEncoder().encode(key);
+            }
+            
+            const textBytes = new TextEncoder().encode(text);
+            const result = new Uint8Array(textBytes.length);
+            
+            // XOR operation: each byte XORed with corresponding key byte (repeating)
+            for (let i = 0; i < textBytes.length; i++) {
+                result[i] = textBytes[i] ^ keyBytes[i % keyBytes.length];
+            }
+            
+            return arrayBufferToBase64(result);
+        }
+
+        /**
+         * XOR DECRYPTION
+         * XOR is symmetric - same operation for encrypt/decrypt
+         */
+        function decryptXOR(ciphertext) {
+            const key = document.getElementById('xor-key').value;
+            const format = document.getElementById('xor-format').value;
+            
+            if (!key) {
+                throw new Error('XOR key is required');
+            }
+            
+            let keyBytes;
+            if (format === 'hex') {
+                keyBytes = hexToBytes(key);
+            } else {
+                keyBytes = new TextEncoder().encode(key);
+            }
+            
+            const ctBytes = base64ToArrayBuffer(ciphertext.trim());
+            const result = new Uint8Array(ctBytes.byteLength);
+            
+            for (let i = 0; i < ctBytes.byteLength; i++) {
+                result[i] = ctBytes[i] ^ keyBytes[i % keyBytes.length];
+            }
+            
+            return new TextDecoder().decode(result);
+        }
+
+        /**
+         * ROT13 / CAESAR CIPHER
+         * Character substitution cipher (demo only)
+         */
+        function encryptROT(text) {
+            const shift = parseInt(document.getElementById('rot-shift').value);
+            return text.replace(/[a-zA-Z]/g, char => {
+                const start = char <= 'Z' ? 65 : 97;
+                return String.fromCharCode(((char.charCodeAt(0) - start + shift) % 26) + start);
+            });
+        }
+
+        /**
+         * ROT DECRYPTION
+         * Reverse the shift
+         */
+        function decryptROT(text) {
+            const shift = parseInt(document.getElementById('rot-shift').value);
+            return text.replace(/[a-zA-Z]/g, char => {
+                const start = char <= 'Z' ? 65 : 97;
+                return String.fromCharCode(((char.charCodeAt(0) - start - shift + 26) % 26) + start);
+            });
+        }
+
+        /**
+         * UTILITY FUNCTIONS
+         */
+        
+        // Convert ArrayBuffer to Base64
+        function arrayBufferToBase64(buffer) {
+            const bytes = new Uint8Array(buffer);
+            let binary = '';
+            for (let i = 0; i < bytes.byteLength; i++) {
+                binary += String.fromCharCode(bytes[i]);
+            }
+            return btoa(binary);
+        }
+
+        // Convert Base64 to ArrayBuffer
+        function base64ToArrayBuffer(base64) {
+            const binary = atob(base64);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) {
+                bytes[i] = binary.charCodeAt(i);
+            }
+            return bytes;
+        }
+
+        // Convert hex string to bytes
+        function hexToBytes(hex) {
+            const bytes = new Uint8Array(hex.length / 2);
+            for (let i = 0; i < hex.length; i += 2) {
+                bytes[i / 2] = parseInt(hex.substr(i, 2), 16);
+            }
+            return bytes;
+        }
+
+        /**
+         * Copy output to clipboard
+         */
+        async function copyOutput() {
+            const output = document.getElementById('output-area').value;
+            if (!output) {
+                showStatus('Nothing to copy', 'error');
+                return;
+            }
+            
+            try {
+                await navigator.clipboard.writeText(output);
+                showStatus('Copied to clipboard!', 'success');
+            } catch (error) {
+                // Fallback for older browsers
+                document.getElementById('output-area').select();
+                document.execCommand('copy');
+                showStatus('Copied to clipboard!', 'success');
+            }
+        }
+
+        /**
+         * Download output as text file
+         */
+        function downloadOutput() {
+            const output = document.getElementById('output-area').value;
+            if (!output) {
+                showStatus('Nothing to download', 'error');
+                return;
+            }
+            
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
+            const filename = `${currentMode}ed-${timestamp}.txt`;
+            
+            const blob = new Blob([output], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            showStatus(`Downloaded as ${filename}`, 'success');
+        }
+
+        /**
+         * Clear all fields
+         */
+        function clearAll() {
+            document.getElementById('input-area').value = '';
+            document.getElementById('output-area').value = '';
+            document.getElementById('output-hint').textContent = '';
+            showStatus('Cleared', 'info');
+        }
+
+        /**
+         * Load preset examples
+         */
+        function loadPreset(type) {
+            let text = '';
+            
+            switch (type) {
+                case 'html':
+                    text = `<!DOCTYPE html>
+<html>
+<head>
+    <title>Sample Page</title>
+</head>
+<body>
+    <h1>Hello, World!</h1>
+    <p>This is a sample HTML snippet.</p>
+</body>
+</html>`;
+                    break;
+                case 'js':
+                    text = `function greet(name) {
+    console.log(\`Hello, \${name}!\`);
+    return \`Welcome to CRYPTO LAB\`;
+}
+
+const result = greet('MAQSADBEK37');`;
+                    break;
+                case 'text':
+                    text = `The quick brown fox jumps over the lazy dog.
+This is a sample text for encryption testing.
+Supports multi-line content and special characters: !@#$%^&*()`;
+                    break;
+            }
+            
+            document.getElementById('input-area').value = text;
+            showStatus(`Loaded ${type.toUpperCase()} preset`, 'info');
+        }
+
+        /**
+         * Auto-detect input format in decrypt mode
+         */
+        function detectInputFormat() {
+            if (currentMode !== 'decrypt') {
+                document.getElementById('output-hint').textContent = '';
+                return;
+            }
+            
+            const input = document.getElementById('input-area').value.trim();
+            const hintEl = document.getElementById('output-hint');
+            
+            if (!input) {
+                hintEl.textContent = '';
+                return;
+            }
+            
+            // Check for JSON envelope
+            try {
+                const parsed = JSON.parse(input);
+                if (parsed.alg === 'AES-GCM') {
+                    hintEl.textContent = '🔍 Detected: AES-GCM JSON envelope';
+                    document.getElementById('algorithm').value = 'aes-gcm';
+                    updateAlgorithmSettings();
+                    return;
+                }
+            } catch (e) {}
+            
+            // Check for Base64
+            if (/^[A-Za-z0-9+/]+=*$/.test(input)) {
+                hintEl.textContent = '🔍 Looks like Base64';
+            } else if (/^\d+:[A-Za-z0-9+/=]+:[A-Za-z0-9+/=]+:[A-Za-z0-9+/=]+$/.test(input)) {
+                hintEl.textContent = '🔍 Detected: AES-GCM compact format';
+                document.getElementById('algorithm').value = 'aes-gcm';
+                updateAlgorithmSettings();
+            } else {
+                hintEl.textContent = '';
+            }
+        }
+
+        // Listen for input changes
+        document.getElementById('input-area').addEventListener('input', detectInputFormat);
+
+        /**
+         * HISTORY MANAGEMENT
+         */
+        function addToHistory(mode, algorithm, preview) {
+            const item = {
+                timestamp: new Date().toISOString(),
+                mode,
+                algorithm,
+                preview
+            };
+            
+            history.unshift(item);
+            history = history.slice(0, 10); // Keep last 10
+            localStorage.setItem('cryptoHistory', JSON.stringify(history));
+            renderHistory();
+        }
+
+        function renderHistory() {
+            const listEl = document.getElementById('history-list');
+            
+            if (history.length === 0) {
+                listEl.innerHTML = '<p style="color: var(--text-dim); font-size: 12px;">No history yet</p>';
+                return;
+            }
+            
+            listEl.innerHTML = history.map((item, index) => `
+                <div class="history-item" onclick="loadFromHistory(${index})">
+                    <div class="history-meta">
+                        ${new Date(item.timestamp).toLocaleString()} | ${item.mode.toUpperCase()} | ${item.algorithm.toUpperCase()}
+                    </div>
+                    <div class="history-preview">${escapeHtml(item.preview)}...</div>
+                </div>
+            `).join('');
+        }
+
+        function loadFromHistory(index) {
+            const item = history[index];
+            document.getElementById('input-area').value = item.preview;
+            showStatus('Loaded from history', 'info');
+        }
+
+        function clearHistory() {
+            if (confirm('Clear all history?')) {
+                history = [];
+                localStorage.removeItem('cryptoHistory');
+                renderHistory();
+                showStatus('History cleared', 'info');
+            }
+        }
+
+        /**
+         * KEYBOARD SHORTCUTS
+         */
+        function setupKeyboardShortcuts() {
+            document.addEventListener('keydown', (e) => {
+                // Ctrl+Enter: Encrypt
+                if (e.ctrlKey && e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    executeEncrypt();
+                }
+                // Ctrl+Shift+Enter: Decrypt
+                else if (e.ctrlKey && e.shiftKey && e.key === 'Enter') {
+                    e.preventDefault();
+                    executeDecrypt();
+                }
+                // Ctrl+C when output is focused: Copy (handled by browser, but we can show message)
+            });
+        }
+
+        /**
+         * MATRIX RAIN ANIMATION
+         */
+        function toggleMatrix() {
+            const canvas = document.getElementById('matrix-canvas');
+            const enabled = document.getElementById('matrix-toggle').checked;
+            
+            if (enabled) {
+                canvas.classList.add('active');
+                startMatrixRain();
+            } else {
+                canvas.classList.remove('active');
+                if (matrixAnimationId) {
+                    cancelAnimationFrame(matrixAnimationId);
+                    matrixAnimationId = null;
+                }
+            }
+        }
+
+        function startMatrixRain() {
+            const canvas = document.getElementById('matrix-canvas');
+            const ctx = canvas.getContext('2d');
+            
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            
+            const chars = '01アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン';
+            const fontSize = 14;
+            const columns = canvas.width / fontSize;
+            const drops = Array(Math.floor(columns)).fill(1);
+            
+            function draw() {
+                ctx.fillStyle = 'rgba(11, 11, 11, 0.05)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                ctx.fillStyle = '#39ff14';
+                ctx.font = fontSize + 'px monospace';
+                
+                for (let i = 0; i < drops.length; i++) {
+                    const text = chars[Math.floor(Math.random() * chars.length)];
+                    ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+                    
+                    if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
+                        drops[i] = 0;
+                    }
+                    drops[i]++;
+                }
+                
+                matrixAnimationId = requestAnimationFrame(draw);
+            }
+            
+            draw();
+        }
+
+        // Resize canvas on window resize
+        window.addEventListener('resize', () => {
+            if (document.getElementById('matrix-toggle').checked) {
+                const canvas = document.getElementById('matrix-canvas');
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            }
+        });
+
+        /**
+         * SETTINGS PERSISTENCE
+         */
+        function toggleRememberSettings() {
+            const enabled = document.getElementById('remember-settings').checked;
+            if (enabled) {
+                saveSettings();
+            } else {
+                localStorage.removeItem('cryptoSettings');
+            }
+        }
+
+        function saveSettings() {
+            const settings = {
+                algorithm: document.getElementById('algorithm').value,
+                prettyJson: document.getElementById('pretty-json')?.checked || false,
+                matrixEnabled: document.getElementById('matrix-toggle')?.checked || false
+            };
+            localStorage.setItem('cryptoSettings', JSON.stringify(settings));
+        }
+
+        function loadSavedSettings() {
+            const saved = localStorage.getItem('cryptoSettings');
+            if (saved) {
+                try {
+                    const settings = JSON.parse(saved);
+                    document.getElementById('algorithm').value = settings.algorithm || 'base64';
+                    if (document.getElementById('pretty-json')) {
+                        document.getElementById('pretty-json').checked = settings.prettyJson;
+                    }
+                    if (document.getElementById('matrix-toggle')) {
+                        document.getElementById('matrix-toggle').checked = settings.matrixEnabled;
+                        if (settings.matrixEnabled) {
+                            toggleMatrix();
+                        }
+                    }
+                    updateAlgorithmSettings();
+                } catch (e) {}
+            }
+        }
+
+        // Auto-save settings if remember is enabled
+        document.getElementById('algorithm').addEventListener('change', () => {
+            if (document.getElementById('remember-settings')?.checked) {
+                saveSettings();
+            }
+        });
+
+        /**
+         * UI HELPER FUNCTIONS
+         */
+        function showProgress(text) {
+            const progress = document.getElementById('progress-indicator');
+            document.getElementById('progress-text').textContent = text;
+            progress.classList.add('active');
+        }
+
+        function hideProgress() {
+            setTimeout(() => {
+                document.getElementById('progress-indicator').classList.remove('active');
+            }, 500);
+        }
+
+        function showStatus(message, type) {
+            const status = document.getElementById('status-message');
+            status.textContent = message;
+            status.className = 'status active ' + type;
+            
+            setTimeout(() => {
+                status.classList.remove('active');
+            }, 4000);
+        }
+
+        function toggleCollapsible(element) {
+            if (typeof element === 'string') {
+                element = document.getElementById(element);
+            }
+            element.classList.toggle('open');
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
