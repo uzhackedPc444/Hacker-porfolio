@@ -1,0 +1,1427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MAQSADBEK37 — HANGMAN LAB</title>
+    <style>
+        /* ============================================
+           CUSTOMIZATION SECTION - COLORS & THEME
+           ============================================ */
+        :root {
+            --bg-primary: #0b0b0b;
+            --bg-secondary: #1a1a1a;
+            --neon-green: #39ff14;
+            --neon-cyan: #00f5ff;
+            --neon-red: #ff073a;
+            --neon-yellow: #ffea00;
+            --text-primary: #e0e0e0;
+            --text-muted: #888;
+            --glow-spread: 8px;
+            --font-mono: 'Courier New', 'Consolas', monospace;
+        }
+
+        /* Global Reset & Base Styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: var(--font-mono);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* Matrix Rain Background */
+        #matrix-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            opacity: 0;
+            transition: opacity 0.5s;
+            pointer-events: none;
+        }
+
+        #matrix-canvas.active {
+            opacity: 0.15;
+        }
+
+        /* CRT Scanlines */
+        .scanlines {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+            background: repeating-linear-gradient(
+                0deg,
+                rgba(0, 0, 0, 0.15),
+                rgba(0, 0, 0, 0.15) 1px,
+                transparent 1px,
+                transparent 2px
+            );
+            animation: scanline-move 8s linear infinite;
+        }
+
+        @keyframes scanline-move {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(10px); }
+        }
+
+        /* Main Container */
+        .container {
+            position: relative;
+            z-index: 2;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: var(--bg-secondary);
+            border: 2px solid var(--neon-green);
+            border-radius: 4px;
+            box-shadow: 0 0 var(--glow-spread) var(--neon-green);
+        }
+
+        .ascii-logo {
+            font-size: 16px;
+            line-height: 1.2;
+            color: var(--neon-green);
+            text-shadow: 0 0 10px var(--neon-green);
+            white-space: pre;
+            overflow-x: auto;
+        }
+
+        /* Terminal Log */
+        .terminal-log {
+            background: var(--bg-secondary);
+            border: 2px solid var(--neon-cyan);
+            border-radius: 4px;
+            padding: 15px;
+            margin-bottom: 20px;
+            height: 120px;
+            overflow-y: auto;
+            font-size: 13px;
+            box-shadow: 0 0 var(--glow-spread) rgba(0, 245, 255, 0.3);
+        }
+
+        .terminal-log::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .terminal-log::-webkit-scrollbar-track {
+            background: var(--bg-primary);
+        }
+
+        .terminal-log::-webkit-scrollbar-thumb {
+            background: var(--neon-cyan);
+            border-radius: 4px;
+        }
+
+        .log-entry {
+            margin-bottom: 5px;
+            opacity: 0;
+            animation: fadeIn 0.3s forwards;
+        }
+
+        @keyframes fadeIn {
+            to { opacity: 1; }
+        }
+
+        .log-prompt {
+            color: var(--neon-green);
+        }
+
+        /* Game Area */
+        .game-area {
+            background: var(--bg-secondary);
+            border: 2px solid var(--neon-green);
+            border-radius: 4px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 0 var(--glow-spread) rgba(57, 255, 20, 0.3);
+        }
+
+        /* Controls */
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .control-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        select, button {
+            font-family: var(--font-mono);
+            background: var(--bg-primary);
+            color: var(--neon-green);
+            border: 2px solid var(--neon-green);
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+            text-transform: uppercase;
+        }
+
+        select:hover, button:hover {
+            background: var(--neon-green);
+            color: var(--bg-primary);
+            box-shadow: 0 0 15px var(--neon-green);
+        }
+
+        button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        button.cyan {
+            border-color: var(--neon-cyan);
+            color: var(--neon-cyan);
+        }
+
+        button.cyan:hover {
+            background: var(--neon-cyan);
+            box-shadow: 0 0 15px var(--neon-cyan);
+        }
+
+        button.red {
+            border-color: var(--neon-red);
+            color: var(--neon-red);
+        }
+
+        button.red:hover {
+            background: var(--neon-red);
+            box-shadow: 0 0 15px var(--neon-red);
+        }
+
+        /* Stats Display */
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .stat-box {
+            background: var(--bg-primary);
+            border: 2px solid var(--neon-cyan);
+            padding: 15px;
+            border-radius: 4px;
+            text-align: center;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            color: var(--neon-cyan);
+            text-shadow: 0 0 8px var(--neon-cyan);
+            font-weight: bold;
+        }
+
+        /* Hangman Indicator - Circuit Style */
+        .hangman-indicator {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 30px;
+            gap: 10px;
+        }
+
+        .circuit-node {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--text-muted);
+            border-radius: 50%;
+            position: relative;
+            transition: all 0.4s;
+        }
+
+        .circuit-node.active {
+            border-color: var(--neon-red);
+            background: var(--neon-red);
+            box-shadow: 0 0 20px var(--neon-red);
+            animation: pulse 0.5s;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+        }
+
+        .circuit-node::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 10px;
+            height: 10px;
+            background: var(--text-muted);
+            border-radius: 50%;
+            transition: all 0.4s;
+        }
+
+        .circuit-node.active::before {
+            background: var(--bg-primary);
+        }
+
+        /* Word Display */
+        .word-display {
+            font-size: 48px;
+            text-align: center;
+            letter-spacing: 12px;
+            margin: 30px 0;
+            color: var(--neon-green);
+            text-shadow: 0 0 15px var(--neon-green);
+            font-weight: bold;
+            min-height: 70px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Keyboard */
+        .keyboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(50px, 1fr));
+            gap: 8px;
+            max-width: 700px;
+            margin: 0 auto 25px;
+        }
+
+        .key-btn {
+            padding: 15px 10px;
+            font-size: 18px;
+            font-weight: bold;
+            border: 2px solid var(--neon-cyan);
+            color: var(--neon-cyan);
+            background: var(--bg-primary);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+            min-height: 55px;
+        }
+
+        .key-btn:hover:not(:disabled) {
+            background: var(--neon-cyan);
+            color: var(--bg-primary);
+            box-shadow: 0 0 15px var(--neon-cyan);
+            transform: translateY(-2px);
+        }
+
+        .key-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .key-btn.correct {
+            background: var(--neon-green);
+            border-color: var(--neon-green);
+            color: var(--bg-primary);
+        }
+
+        .key-btn.incorrect {
+            background: var(--neon-red);
+            border-color: var(--neon-red);
+            color: var(--bg-primary);
+        }
+
+        /* Guessed Letters Display */
+        .guessed-letters {
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .guessed-letters span {
+            display: inline-block;
+            padding: 5px 10px;
+            margin: 2px;
+            border-radius: 3px;
+        }
+
+        .correct-letter {
+            background: rgba(57, 255, 20, 0.2);
+            color: var(--neon-green);
+            border: 1px solid var(--neon-green);
+        }
+
+        .incorrect-letter {
+            background: rgba(255, 7, 58, 0.2);
+            color: var(--neon-red);
+            border: 1px solid var(--neon-red);
+        }
+
+        /* Modal Overlay */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 1000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            animation: fadeIn 0.3s;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: var(--bg-secondary);
+            border: 3px solid var(--neon-green);
+            border-radius: 8px;
+            padding: 40px;
+            max-width: 500px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 0 30px var(--neon-green);
+            animation: glitchIn 0.5s;
+        }
+
+        .modal.denied {
+            border-color: var(--neon-red);
+            box-shadow: 0 0 30px var(--neon-red);
+        }
+
+        @keyframes glitchIn {
+            0% { transform: scale(0.8) skew(5deg); opacity: 0; }
+            50% { transform: scale(1.05) skew(-2deg); }
+            100% { transform: scale(1) skew(0deg); opacity: 1; }
+        }
+
+        .modal-badge {
+            font-size: 36px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            text-shadow: 0 0 20px currentColor;
+            animation: neonPulse 1.5s infinite;
+        }
+
+        .modal-badge.granted {
+            color: var(--neon-green);
+        }
+
+        .modal-badge.denied {
+            color: var(--neon-red);
+        }
+
+        @keyframes neonPulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .modal-word {
+            font-size: 32px;
+            color: var(--neon-cyan);
+            margin: 20px 0;
+            text-shadow: 0 0 15px var(--neon-cyan);
+        }
+
+        .modal-stats {
+            margin: 20px 0;
+            font-size: 16px;
+            line-height: 1.8;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 25px;
+        }
+
+        /* Confetti Animation */
+        .confetti {
+            position: fixed;
+            width: 10px;
+            height: 10px;
+            background: var(--neon-green);
+            position: absolute;
+            animation: confetti-fall 3s linear;
+            box-shadow: 0 0 10px currentColor;
+        }
+
+        @keyframes confetti-fall {
+            to {
+                transform: translateY(100vh) rotate(360deg);
+                opacity: 0;
+            }
+        }
+
+        /* Settings Panel */
+        .settings-panel {
+            background: var(--bg-secondary);
+            border: 2px solid var(--neon-cyan);
+            border-radius: 4px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .setting-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: var(--bg-primary);
+            border-radius: 4px;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 60px;
+            height: 30px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: var(--text-muted);
+            transition: 0.4s;
+            border-radius: 30px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 22px;
+            width: 22px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: 0.4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: var(--neon-green);
+            box-shadow: 0 0 10px var(--neon-green);
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(30px);
+        }
+
+        /* Accessibility */
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border-width: 0;
+        }
+
+        /* Reduced Motion */
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+
+            .ascii-logo {
+                font-size: 12px;
+            }
+
+            .word-display {
+                font-size: 32px;
+                letter-spacing: 8px;
+            }
+
+            .keyboard {
+                grid-template-columns: repeat(7, 1fr);
+                gap: 5px;
+            }
+
+            .key-btn {
+                padding: 12px 5px;
+                font-size: 16px;
+                min-height: 50px;
+            }
+
+            .controls {
+                flex-direction: column;
+            }
+
+            .control-group {
+                width: 100%;
+                justify-content: center;
+            }
+
+            select, button {
+                flex: 1;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .word-display {
+                font-size: 24px;
+                letter-spacing: 4px;
+            }
+
+            .modal {
+                padding: 20px;
+            }
+
+            .modal-badge {
+                font-size: 24px;
+            }
+
+            .modal-word {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Matrix Rain Canvas -->
+    <canvas id="matrix-canvas"></canvas>
+    
+    <!-- CRT Scanlines -->
+    <div class="scanlines"></div>
+
+    <!-- Main Container -->
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="ascii-logo" aria-label="MAQSADBEK37 Hangman Lab">
+> MAQSADBEK37 — HANGMAN LAB
+[SECURITY CLEARANCE: REQUIRED]
+            </div>
+        </div>
+
+        <!-- Terminal Log -->
+        <div class="terminal-log" id="terminal-log" role="log" aria-live="polite" aria-atomic="false">
+            <div class="log-entry"><span class="log-prompt">></span> System initialized...</div>
+        </div>
+
+        <!-- Settings Panel -->
+        <div class="settings-panel">
+            <div class="setting-item">
+                <label for="matrix-toggle">Matrix Background</label>
+                <div class="toggle-switch">
+                    <input type="checkbox" id="matrix-toggle" aria-label="Toggle matrix background">
+                    <span class="slider"></span>
+                </div>
+            </div>
+            <div class="setting-item">
+                <label for="stats-toggle">Track Statistics</label>
+                <div class="toggle-switch">
+                    <input type="checkbox" id="stats-toggle" checked aria-label="Toggle statistics tracking">
+                    <span class="slider"></span>
+                </div>
+            </div>
+            <div class="setting-item">
+                <label for="practice-mode">Practice Mode (Infinite Lives)</label>
+                <div class="toggle-switch">
+                    <input type="checkbox" id="practice-mode" aria-label="Toggle practice mode">
+                    <span class="slider"></span>
+                </div>
+            </div>
+            <div class="setting-item">
+                <label for="reduced-motion">Reduce Motion</label>
+                <div class="toggle-switch">
+                    <input type="checkbox" id="reduced-motion" aria-label="Toggle reduced motion">
+                    <span class="slider"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Game Area -->
+        <div class="game-area">
+            <!-- Controls -->
+            <div class="controls">
+                <div class="control-group">
+                    <label for="difficulty-select">Difficulty:</label>
+                    <select id="difficulty-select" aria-label="Select difficulty level">
+                        <option value="random">Random</option>
+                        <option value="easy">Easy (4-6)</option>
+                        <option value="medium" selected>Medium (7-10)</option>
+                        <option value="hard">Hard (11+)</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <button id="new-game-btn" aria-label="Start new game">New Game</button>
+                    <button id="hint-btn" class="cyan" aria-label="Get hint (reduces score)">Hint (-50pts)</button>
+                    <button id="share-btn" class="red" aria-label="Share result">Share</button>
+                </div>
+            </div>
+
+            <!-- Stats -->
+            <div class="stats">
+                <div class="stat-box">
+                    <div class="stat-label">Score</div>
+                    <div class="stat-value" id="score-display">0</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Streak</div>
+                    <div class="stat-value" id="streak-display">0</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Remaining</div>
+                    <div class="stat-value" id="attempts-display">6</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Wins</div>
+                    <div class="stat-value" id="wins-display">0</div>
+                </div>
+            </div>
+
+            <!-- Hangman Indicator -->
+            <div class="hangman-indicator" role="img" aria-label="Remaining attempts indicator">
+                <div class="circuit-node" data-node="0"></div>
+                <div class="circuit-node" data-node="1"></div>
+                <div class="circuit-node" data-node="2"></div>
+                <div class="circuit-node" data-node="3"></div>
+                <div class="circuit-node" data-node="4"></div>
+                <div class="circuit-node" data-node="5"></div>
+            </div>
+
+            <!-- Word Display -->
+            <div class="word-display" id="word-display" role="status" aria-live="polite">_ _ _ _</div>
+
+            <!-- Guessed Letters -->
+            <div class="guessed-letters" id="guessed-letters"></div>
+
+            <!-- Keyboard -->
+            <div class="keyboard" id="keyboard" role="group" aria-label="Letter selection keyboard"></div>
+        </div>
+    </div>
+
+    <!-- Modal -->
+    <div class="modal-overlay" id="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <div class="modal" id="modal">
+            <div class="modal-badge" id="modal-badge"></div>
+            <div class="modal-word" id="modal-word"></div>
+            <div class="modal-stats" id="modal-stats"></div>
+            <div class="modal-actions">
+                <button id="modal-new-game">Play Again</button>
+                <button id="modal-change-difficulty" class="cyan">Change Difficulty</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Live Region for Accessibility -->
+    <div class="sr-only" role="status" aria-live="assertive" aria-atomic="true" id="a11y-announcer"></div>
+
+    <script>
+        /* ============================================
+           CUSTOMIZATION SECTION - GAME CONFIG
+           ============================================
+           
+           This section contains all configurable parameters.
+           Modify these values to customize the game behavior.
+        */
+
+        // WORD_POOL - Exactly 350 unique English hacking/cybersecurity/programming terms
+        // To add/remove words: edit this array, keeping each word in quotes and comma-separated
+        // Words are automatically filtered by difficulty based on length (Easy: 4-6, Medium: 7-10, Hard: 11+)
+        const WORD_POOL = [
+            "exploit", "payload", "cipher", "shell", "rootkit", "backdoor", "phreaking", "pentest",
+            "firewall", "malware", "virus", "trojan", "worm", "ransomware", "spyware", "adware",
+            "keylogger", "botnet", "zombie", "packet", "protocol", "encryption", "decryption", "hash",
+            "salt", "rainbow", "brute", "dictionary", "phishing", "spear", "whaling", "vishing",
+            "smishing", "pretexting", "baiting", "tailgating", "shoulder", "dumpster", "script", "injection",
+            "query", "cross", "session", "hijack", "spoofing", "sniffing", "wireshark", "tcpdump",
+            "nmap", "metasploit", "kali", "parrot", "blackarch", "tails", "whonix", "tor",
+            "onion", "darkweb", "deepweb", "anonymous", "proxy", "vpn", "tunnel", "bridge",
+            "relay", "node", "exit", "guard", "consensus", "hidden", "service", "bitcoin",
+            "ethereum", "blockchain", "crypto", "wallet", "mining", "ledger", "token", "smart",
+            "contract", "solidity", "web3", "defi", "nft", "satoshi", "algorithm", "asymmetric",
+            "symmetric", "public", "private", "certificate", "authority", "signature", "verification", "authentication",
+            "authorization", "oauth", "saml", "jwt", "bearer", "refresh", "access", "scope",
+            "claim", "identity", "federation", "signon", "multifactor", "biometric", "password", "passphrase",
+            "credential", "breach", "leak", "dump", "database", "nosql", "mongodb", "redis",
+            "postgresql", "mysql", "oracle", "sqlite", "blind", "union", "boolean", "time",
+            "error", "stacked", "prepared", "statement", "sanitize", "validate", "escape", "filter",
+            "encode", "decode", "serialize", "deserialize", "pickle", "marshal", "json", "xml",
+            "yaml", "toml", "ini", "config", "environment", "variable", "secret", "key",
+            "api", "endpoint", "rest", "graphql", "soap", "rpc", "grpc", "websocket",
+            "webhook", "callback", "async", "await", "promise", "thread", "process", "fork",
+            "spawn", "exec", "system", "command", "bash", "zsh", "powershell", "cmd",
+            "terminal", "console", "gui", "interface", "frontend", "backend", "fullstack", "devops",
+            "cicd", "jenkins", "gitlab", "github", "bitbucket", "git", "commit", "push",
+            "pull", "merge", "rebase", "cherry", "stash", "branch", "tag", "release",
+            "version", "semver", "docker", "container", "image", "registry", "kubernetes", "pod",
+            "cluster", "helm", "istio", "mesh", "microservice", "monolith", "serverless", "lambda",
+            "trigger", "event", "queue", "stream", "kafka", "rabbitmq", "buffer", "overflow",
+            "underflow", "heap", "stack", "memory", "corruption", "segfault", "nullpointer", "dangling",
+            "reference", "dereference", "pointer", "assembly", "opcode", "syscall", "interrupt", "register",
+            "cpu", "gpu", "cache", "vulnerability", "nvd", "cvss", "owasp", "sans",
+            "mitre", "attack", "defense", "blue", "red", "purple", "yellow", "white",
+            "black", "grey", "penetration", "assessment", "audit", "compliance", "gdpr", "hipaa",
+            "pci", "sox", "iso", "nist", "framework", "control", "risk", "threat",
+            "asset", "mitigation", "remediation", "patch", "update", "upgrade", "hardening", "baseline",
+            "standard", "policy", "procedure", "guideline", "best", "practice", "incident", "response",
+            "forensic", "analysis", "investigation", "evidence", "chain", "custody", "timeline", "artifact",
+            "indicator", "compromise", "siem", "soar", "edr", "xdr", "ndr", "ids",
+            "ips", "waf", "ngfw", "utm", "sandbox", "honeypot", "honeynet", "canary",
+            "trap", "decoy", "deception", "steganography", "obfuscation", "polymorphic", "metamorphic", "packer",
+            "crypter", "shellcode", "gadget", "aslr", "dep", "pie", "rop", "ret2libc",
+            "privilege", "escalation", "lateral", "movement", "persistence", "exfiltration", "collection", "reconnaissance",
+            "enumeration", "scanning", "fingerprint", "banner", "detection", "evasion", "antivirus", "antimalware",
+            "defender", "protection", "burpsuite", "sqlmap", "hydra", "hashcat"
+        ];
+
+        // DIFFICULTY SETTINGS
+        // Adjust word length ranges and attempt counts for each difficulty
+        const DIFFICULTY_CONFIG = {
+            easy: {
+                minLength: 4,
+                maxLength: 6,
+                maxAttempts: 8,
+                scoreMultiplier: 1,
+                label: 'Easy'
+            },
+            medium: {
+                minLength: 7,
+                maxLength: 10,
+                maxAttempts: 6,
+                scoreMultiplier: 2,
+                label: 'Medium'
+            },
+            hard: {
+                minLength: 11,
+                maxLength: 100,
+                maxAttempts: 5,
+                scoreMultiplier: 3,
+                label: 'Hard'
+            },
+            random: {
+                minLength: 4,
+                maxLength: 100,
+                maxAttempts: 6,
+                scoreMultiplier: 1.5,
+                label: 'Random'
+            }
+        };
+
+        // SCORING SETTINGS
+        const SCORE_CONFIG = {
+            correctGuess: 10,      // Points for each correct letter
+            wordComplete: 100,     // Bonus for completing a word
+            hintPenalty: 50,       // Points deducted for using a hint
+            streakBonus: 25        // Bonus per streak level
+        };
+
+        // UI COLOR CUSTOMIZATION
+        // Already defined in CSS :root, but can be modified via JavaScript
+        const THEME_COLORS = {
+            bgPrimary: '#0b0b0b',
+            bgSecondary: '#1a1a1a',
+            neonGreen: '#39ff14',
+            neonCyan: '#00f5ff',
+            neonRed: '#ff073a',
+            neonYellow: '#ffea00'
+        };
+
+        /* ============================================
+           END CUSTOMIZATION SECTION
+           ============================================ */
+
+        // Game State
+        let gameState = {
+            currentWord: '',
+            guessedLetters: [],
+            correctGuesses: [],
+            incorrectGuesses: [],
+            attemptsLeft: 6,
+            maxAttempts: 6,
+            score: 0,
+            streak: 0,
+            currentDifficulty: 'medium',
+            gameActive: false,
+            practiceMode: false,
+            hintsUsed: 0
+        };
+
+        // Statistics (localStorage)
+        let stats = {
+            gamesPlayed: 0,
+            wins: 0,
+            losses: 0,
+            bestStreak: 0,
+            totalScore: 0,
+            trackingEnabled: true
+        };
+
+        // DOM Elements
+        const elements = {
+            terminalLog: document.getElementById('terminal-log'),
+            wordDisplay: document.getElementById('word-display'),
+            keyboard: document.getElementById('keyboard'),
+            guessedLetters: document.getElementById('guessed-letters'),
+            scoreDisplay: document.getElementById('score-display'),
+            streakDisplay: document.getElementById('streak-display'),
+            attemptsDisplay: document.getElementById('attempts-display'),
+            winsDisplay: document.getElementById('wins-display'),
+            difficultySelect: document.getElementById('difficulty-select'),
+            newGameBtn: document.getElementById('new-game-btn'),
+            hintBtn: document.getElementById('hint-btn'),
+            shareBtn: document.getElementById('share-btn'),
+            modalOverlay: document.getElementById('modal-overlay'),
+            modal: document.getElementById('modal'),
+            modalBadge: document.getElementById('modal-badge'),
+            modalWord: document.getElementById('modal-word'),
+            modalStats: document.getElementById('modal-stats'),
+            modalNewGame: document.getElementById('modal-new-game'),
+            modalChangeDifficulty: document.getElementById('modal-change-difficulty'),
+            matrixToggle: document.getElementById('matrix-toggle'),
+            statsToggle: document.getElementById('stats-toggle'),
+            practiceToggle: document.getElementById('practice-mode'),
+            reducedMotion: document.getElementById('reduced-motion'),
+            matrixCanvas: document.getElementById('matrix-canvas'),
+            a11yAnnouncer: document.getElementById('a11y-announcer')
+        };
+
+        // Initialize Game
+        function init() {
+            loadStats();
+            createKeyboard();
+            setupEventListeners();
+            initMatrix();
+            logMessage('Word pool loaded: 350 hacker terms');
+            logMessage('Select difficulty and click "New Game" to begin');
+            updateStatsDisplay();
+        }
+
+        // Create Keyboard
+        function createKeyboard() {
+            const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+            elements.keyboard.innerHTML = '';
+            
+            letters.forEach(letter => {
+                const btn = document.createElement('button');
+                btn.className = 'key-btn';
+                btn.textContent = letter;
+                btn.dataset.letter = letter;
+                btn.setAttribute('aria-label', `Letter ${letter}`);
+                btn.addEventListener('click', () => handleGuess(letter));
+                elements.keyboard.appendChild(btn);
+            });
+        }
+
+        // Setup Event Listeners
+        function setupEventListeners() {
+            elements.newGameBtn.addEventListener('click', startNewGame);
+            elements.hintBtn.addEventListener('click', useHint);
+            elements.shareBtn.addEventListener('click', shareResult);
+            elements.modalNewGame.addEventListener('click', () => {
+                closeModal();
+                startNewGame();
+            });
+            elements.modalChangeDifficulty.addEventListener('click', () => {
+                closeModal();
+                elements.difficultySelect.focus();
+            });
+            
+            // Keyboard input
+            document.addEventListener('keydown', (e) => {
+                if (!gameState.gameActive) return;
+                
+                const key = e.key.toUpperCase();
+                if (key.match(/^[A-Z]$/) && key.length === 1) {
+                    handleGuess(key);
+                }
+            });
+
+            // Settings toggles
+            elements.matrixToggle.addEventListener('change', (e) => {
+                elements.matrixCanvas.classList.toggle('active', e.target.checked);
+                logMessage(e.target.checked ? 'Matrix mode: ENABLED' : 'Matrix mode: DISABLED');
+            });
+
+            elements.statsToggle.addEventListener('change', (e) => {
+                stats.trackingEnabled = e.target.checked;
+                saveStats();
+                logMessage(e.target.checked ? 'Stats tracking: ENABLED' : 'Stats tracking: DISABLED');
+            });
+
+            elements.practiceToggle.addEventListener('change', (e) => {
+                gameState.practiceMode = e.target.checked;
+                logMessage(e.target.checked ? 'Practice mode: ACTIVE (infinite lives)' : 'Practice mode: DISABLED');
+                if (gameState.gameActive) {
+                    updateAttemptsDisplay();
+                }
+            });
+
+            elements.reducedMotion.addEventListener('change', (e) => {
+                document.body.classList.toggle('reduce-motion', e.target.checked);
+            });
+
+            elements.difficultySelect.addEventListener('change', (e) => {
+                gameState.currentDifficulty = e.target.value;
+                logMessage(`Difficulty set to: ${DIFFICULTY_CONFIG[e.target.value].label}`);
+            });
+        }
+
+        // Start New Game
+        function startNewGame() {
+            const difficulty = gameState.currentDifficulty;
+            const config = DIFFICULTY_CONFIG[difficulty];
+            
+            // Filter words by difficulty
+            let availableWords = WORD_POOL.filter(word => 
+                word.length >= config.minLength && word.length <= config.maxLength
+            );
+
+            if (availableWords.length === 0) {
+                availableWords = WORD_POOL; // Fallback to all words
+            }
+
+            // Select random word
+            const randomWord = availableWords[Math.floor(Math.random() * availableWords.length)];
+            
+            // Reset game state
+            gameState.currentWord = randomWord.toUpperCase();
+            gameState.guessedLetters = [];
+            gameState.correctGuesses = [];
+            gameState.incorrectGuesses = [];
+            gameState.attemptsLeft = config.maxAttempts;
+            gameState.maxAttempts = config.maxAttempts;
+            gameState.gameActive = true;
+            gameState.hintsUsed = 0;
+
+            // Reset UI
+            resetKeyboard();
+            resetCircuitNodes();
+            updateWordDisplay();
+            updateGuessedLetters();
+            updateAttemptsDisplay();
+            
+            logMessage('='.repeat(40));
+            logMessage(`New game started - Difficulty: ${config.label}`);
+            logMessage(`Word length: ${gameState.currentWord.length} characters`);
+            logMessage(`Max attempts: ${gameState.maxAttempts}`);
+            logMessage('='.repeat(40));
+
+            announce(`New game started. ${config.label} difficulty. Word has ${gameState.currentWord.length} letters.`);
+        }
+
+        // Handle Letter Guess
+        function handleGuess(letter) {
+            if (!gameState.gameActive || gameState.guessedLetters.includes(letter)) {
+                return;
+            }
+
+            gameState.guessedLetters.push(letter);
+            
+            const btn = document.querySelector(`[data-letter="${letter}"]`);
+            
+            if (gameState.currentWord.includes(letter)) {
+                // Correct guess
+                gameState.correctGuesses.push(letter);
+                btn.classList.add('correct');
+                btn.disabled = true;
+                
+                const count = (gameState.currentWord.match(new RegExp(letter, 'g')) || []).length;
+                const points = SCORE_CONFIG.correctGuess * count;
+                gameState.score += points;
+                
+                logMessage(`✓ Correct! "${letter}" appears ${count} time(s) (+${points} pts)`);
+                announce(`Correct! Letter ${letter} is in the word.`);
+                
+                updateWordDisplay();
+                checkWin();
+            } else {
+                // Incorrect guess
+                gameState.incorrectGuesses.push(letter);
+                btn.classList.add('incorrect');
+                btn.disabled = true;
+                
+                if (!gameState.practiceMode) {
+                    gameState.attemptsLeft--;
+                    activateCircuitNode(gameState.maxAttempts - gameState.attemptsLeft - 1);
+                }
+                
+                logMessage(`✗ Incorrect! "${letter}" is not in the word`);
+                announce(`Incorrect. Letter ${letter} is not in the word. ${gameState.attemptsLeft} attempts remaining.`);
+                
+                updateAttemptsDisplay();
+                checkLoss();
+            }
+
+            updateGuessedLetters();
+            updateStatsDisplay();
+        }
+
+        // Use Hint
+        function useHint() {
+            if (!gameState.gameActive) return;
+
+            const unrevealedLetters = gameState.currentWord.split('').filter(letter => 
+                !gameState.correctGuesses.includes(letter) && 
+                !gameState.guessedLetters.includes(letter)
+            );
+
+            if (unrevealedLetters.length === 0) {
+                logMessage('No hints available - all letters revealed!');
+                return;
+            }
+
+            const hintLetter = unrevealedLetters[Math.floor(Math.random() * unrevealedLetters.length)];
+            
+            gameState.score = Math.max(0, gameState.score - SCORE_CONFIG.hintPenalty);
+            gameState.hintsUsed++;
+            
+            logMessage(`Hint used: Letter "${hintLetter}" revealed (-${SCORE_CONFIG.hintPenalty} pts)`);
+            announce(`Hint: The word contains the letter ${hintLetter}`);
+            
+            handleGuess(hintLetter);
+        }
+
+        // Check Win
+        function checkWin() {
+            const allLettersGuessed = gameState.currentWord.split('').every(letter => 
+                gameState.correctGuesses.includes(letter)
+            );
+
+            if (allLettersGuessed) {
+                gameState.gameActive = false;
+                
+                // Calculate bonus
+                const config = DIFFICULTY_CONFIG[gameState.currentDifficulty];
+                const wordBonus = SCORE_CONFIG.wordComplete * config.scoreMultiplier;
+                const streakBonus = SCORE_CONFIG.streakBonus * gameState.streak;
+                gameState.score += wordBonus + streakBonus;
+                
+                gameState.streak++;
+                
+                if (stats.trackingEnabled) {
+                    stats.gamesPlayed++;
+                    stats.wins++;
+                    stats.totalScore += gameState.score;
+                    stats.bestStreak = Math.max(stats.bestStreak, gameState.streak);
+                    saveStats();
+                }
+
+                logMessage('='.repeat(40));
+                logMessage('>>> ACCESS GRANTED <<<');
+                logMessage(`Word cracked: ${gameState.currentWord}`);
+                logMessage(`Score: ${gameState.score} | Streak: ${gameState.streak}`);
+                logMessage('='.repeat(40));
+
+                announce(`Access granted! You won! The word was ${gameState.currentWord}.`);
+                
+                showModal(true);
+                createConfetti();
+            }
+        }
+
+        // Check Loss
+        function checkLoss() {
+            if (gameState.attemptsLeft <= 0 && !gameState.practiceMode) {
+                gameState.gameActive = false;
+                gameState.streak = 0;
+
+                if (stats.trackingEnabled) {
+                    stats.gamesPlayed++;
+                    stats.losses++;
+                    saveStats();
+                }
+
+                logMessage('='.repeat(40));
+                logMessage('>>> ACCESS DENIED <<<');
+                logMessage(`The word was: ${gameState.currentWord}`);
+                logMessage('Security breach failed. Try again.');
+                logMessage('='.repeat(40));
+
+                announce(`Access denied. You lost. The word was ${gameState.currentWord}.`);
+
+                showModal(false);
+            }
+        }
+
+        // Update Word Display
+        function updateWordDisplay() {
+            const display = gameState.currentWord.split('').map(letter => 
+                gameState.correctGuesses.includes(letter) ? letter : '_'
+            ).join(' ');
+            
+            elements.wordDisplay.textContent = display;
+        }
+
+        // Update Guessed Letters Display
+        function updateGuessedLetters() {
+            const correct = gameState.correctGuesses.map(l => 
+                `<span class="correct-letter">${l}</span>`
+            ).join('');
+            
+            const incorrect = gameState.incorrectGuesses.map(l => 
+                `<span class="incorrect-letter">${l}</span>`
+            ).join('');
+
+            let html = '';
+            if (correct) html += `<div>Correct: ${correct}</div>`;
+            if (incorrect) html += `<div>Incorrect: ${incorrect}</div>`;
+            
+            elements.guessedLetters.innerHTML = html;
+        }
+
+        // Update Attempts Display
+        function updateAttemptsDisplay() {
+            if (gameState.practiceMode) {
+                elements.attemptsDisplay.textContent = '∞';
+            } else {
+                elements.attemptsDisplay.textContent = gameState.attemptsLeft;
+            }
+        }
+
+        // Update Stats Display
+        function updateStatsDisplay() {
+            elements.scoreDisplay.textContent = gameState.score;
+            elements.streakDisplay.textContent = gameState.streak;
+            elements.winsDisplay.textContent = stats.wins;
+        }
+
+        // Reset Keyboard
+        function resetKeyboard() {
+            document.querySelectorAll('.key-btn').forEach(btn => {
+                btn.disabled = false;
+                btn.classList.remove('correct', 'incorrect');
+            });
+        }
+
+        // Reset Circuit Nodes
+        function resetCircuitNodes() {
+            document.querySelectorAll('.circuit-node').forEach(node => {
+                node.classList.remove('active');
+            });
+        }
+
+        // Activate Circuit Node
+        function activateCircuitNode(index) {
+            const node = document.querySelector(`[data-node="${index}"]`);
+            if (node) {
+                node.classList.add('active');
+            }
+        }
+
+        // Show Modal
+        function showModal(won) {
+            elements.modal.className = 'modal';
+            
+            if (won) {
+                elements.modal.classList.remove('denied');
+                elements.modalBadge.className = 'modal-badge granted';
+                elements.modalBadge.textContent = '>>> ACCESS GRANTED <<<';
+            } else {
+                elements.modal.classList.add('denied');
+                elements.modalBadge.className = 'modal-badge denied';
+                elements.modalBadge.textContent = '>>> ACCESS DENIED <<<';
+            }
+
+            elements.modalWord.textContent = gameState.currentWord;
+            
+            const config = DIFFICULTY_CONFIG[gameState.currentDifficulty];
+            elements.modalStats.innerHTML = `
+                <div>Difficulty: ${config.label}</div>
+                <div>Score: ${gameState.score}</div>
+                <div>Streak: ${gameState.streak}</div>
+                <div>Hints Used: ${gameState.hintsUsed}</div>
+                <div>Total Wins: ${stats.wins}</div>
+            `;
+
+            elements.modalOverlay.classList.add('active');
+            elements.modalNewGame.focus();
+        }
+
+        // Close Modal
+        function closeModal() {
+            elements.modalOverlay.classList.remove('active');
+        }
+
+        // Share Result
+        function shareResult() {
+            const config = DIFFICULTY_CONFIG[gameState.currentDifficulty];
+            const status = gameState.gameActive ? 'In Progress' : 
+                          (gameState.attemptsLeft > 0 || gameState.practiceMode) ? 'Solved' : 'Failed';
+            
+            const shareText = `MAQSADBEK37 Hangman Lab
+Level: ${config.label}
+Status: ${status}
+Word: ${gameState.currentWord}
+Score: ${gameState.score}
+Streak: ${gameState.streak}
+Total Wins: ${stats.wins}`;
+
+            navigator.clipboard.writeText(shareText).then(() => {
+                logMessage('Result copied to clipboard!');
+                announce('Game result copied to clipboard');
+            }).catch(() => {
+                logMessage('Failed to copy to clipboard');
+            });
+        }
+
+        // Terminal Log Message
+        function logMessage(message) {
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `<span class="log-prompt">></span> ${message}`;
+            elements.terminalLog.appendChild(entry);
+            elements.terminalLog.scrollTop = elements.terminalLog.scrollHeight;
+        }
+
+        // Accessibility Announcer
+        function announce(message) {
+            elements.a11yAnnouncer.textContent = message;
+            setTimeout(() => {
+                elements.a11yAnnouncer.textContent = '';
+            }, 1000);
+        }
+
+        // Create Confetti
+        function createConfetti() {
+            const colors = [THEME_COLORS.neonGreen, THEME_COLORS.neonCyan, THEME_COLORS.neonYellow];
+            
+            for (let i = 0; i < 50; i++) {
+                setTimeout(() => {
+                    const confetti = document.createElement('div');
+                    confetti.className = 'confetti';
+                    confetti.style.left = Math.random() * 100 + '%';
+                    confetti.style.background = colors[Math.floor(Math.random() * colors.length)];
+                    confetti.style.animationDelay = Math.random() * 0.5 + 's';
+                    document.body.appendChild(confetti);
+                    
+                    setTimeout(() => confetti.remove(), 3000);
+                }, i * 30);
+            }
+        }
+
+        // Matrix Rain Animation
+        function initMatrix() {
+            const canvas = elements.matrixCanvas;
+            const ctx = canvas.getContext('2d');
+            
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+
+            const characters = '01アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン';
+            const fontSize = 14;
+            const columns = canvas.width / fontSize;
+            const drops = Array(Math.floor(columns)).fill(1);
+
+            function drawMatrix() {
+                ctx.fillStyle = 'rgba(11, 11, 11, 0.05)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                ctx.fillStyle = THEME_COLORS.neonGreen;
+                ctx.font = fontSize + 'px monospace';
+
+                for (let i = 0; i < drops.length; i++) {
+                    const text = characters.charAt(Math.floor(Math.random() * characters.length));
+                    ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+
+                    if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
+                        drops[i] = 0;
+                    }
+                    drops[i]++;
+                }
+            }
+
+            setInterval(drawMatrix, 50);
+
+            window.addEventListener('resize', () => {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            });
+        }
+
+        // LocalStorage Functions
+        function saveStats() {
+            if (stats.trackingEnabled) {
+                localStorage.setItem('hangmanStats', JSON.stringify(stats));
+            }
+        }
+
+        function loadStats() {
+            const saved = localStorage.getItem('hangmanStats');
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved);
+                    stats = { ...stats, ...parsed };
+                } catch (e) {
+                    console.error('Failed to load stats:', e);
+                }
+            }
+        }
+
+        // SOUND EFFECT PLACEHOLDERS
+        // To add sound effects, uncomment and implement the following:
+        
+        /*
+        const SOUNDS = {
+            correct: new Audio(), // Add correct.mp3
+            incorrect: new Audio(), // Add incorrect.mp3
+            win: new Audio(), // Add win.mp3
+            lose: new Audio() // Add lose.mp3
+        };
+
+        function playSound(soundName) {
+            if (SOUNDS[soundName]) {
+                SOUNDS[soundName].currentTime = 0;
+                SOUNDS[soundName].play().catch(e => console.log('Audio play failed:', e));
+            }
+        }
+
+        // Then call playSound('correct'), playSound('incorrect'), etc. in the appropriate functions
+        */
+
+        // Initialize on load
+        window.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

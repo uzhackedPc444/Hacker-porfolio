@@ -1,0 +1,1374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SNAKE LAB — MAQSADBEK37</title>
+    
+    <!--
+    ========================================
+    MAQSADBEK37 — SNAKE LAB
+    ========================================
+    
+    EMBEDDING INSTRUCTIONS:
+    1. Copy this entire file to your Vercel project
+    2. Link to it from your portfolio or embed in an iframe
+    3. Customize colors, speed, and grid size in the TUNABLE CONSTANTS section below
+    
+    TWEAKING THE GAME:
+    - Search for "TUNABLE CONSTANTS" in JavaScript section
+    - Adjust GRID_SIZE (default: 20) for grid cell count
+    - Adjust INITIAL_SPEED (default: 150) for starting milliseconds per move
+    - Adjust SPEED_INCREASE_PER_FOOD (default: 3) for speed boost
+    - Adjust POINTS_PER_FOOD (default: 10) for scoring
+    - Change colors in CSS :root variables section
+    
+    No external dependencies — all CSS and JS inline.
+    ========================================
+    -->
+    
+    <style>
+        /* ==================== ROOT VARIABLES ==================== */
+        :root {
+            --bg-dark: #0b0b0b;
+            --neon-green: #39ff14;
+            --neon-cyan: #00f5ff;
+            --terminal-gray: #1a1a1a;
+            --text-dim: #888;
+            --glow-green: 0 0 10px var(--neon-green), 0 0 20px var(--neon-green);
+            --glow-cyan: 0 0 10px var(--neon-cyan), 0 0 20px var(--neon-cyan);
+        }
+        
+        /* ==================== RESET & BASE ==================== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Courier New', 'Consolas', monospace;
+            background: var(--bg-dark);
+            color: var(--neon-green);
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        
+        /* ==================== ACCESSIBILITY ==================== */
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+        
+        /* Reduced motion support */
+        @media (prefers-reduced-motion: reduce) {
+            * {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+        
+        /* ==================== HEADER ==================== */
+        .header {
+            text-align: center;
+            padding: 1rem;
+            background: var(--terminal-gray);
+            border-bottom: 2px solid var(--neon-green);
+            box-shadow: var(--glow-green);
+        }
+        
+        .ascii-title {
+            font-size: clamp(0.8rem, 3vw, 1.2rem);
+            letter-spacing: 0.1em;
+            text-shadow: var(--glow-green);
+            animation: flicker 3s infinite;
+        }
+        
+        @keyframes flicker {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.95; }
+        }
+        
+        /* ==================== MAIN CONTAINER ==================== */
+        .container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 1rem;
+            gap: 1rem;
+            max-width: 1400px;
+            width: 100%;
+            margin: 0 auto;
+            overflow: auto;
+        }
+        
+        /* ==================== STATS BAR ==================== */
+        .stats-bar {
+            display: flex;
+            justify-content: space-between;
+            gap: 1rem;
+            flex-wrap: wrap;
+            padding: 0.5rem;
+            background: var(--terminal-gray);
+            border: 1px solid var(--neon-cyan);
+            border-radius: 4px;
+        }
+        
+        .stat {
+            display: flex;
+            flex-direction: column;
+            gap: 0.2rem;
+        }
+        
+        .stat-label {
+            font-size: 0.7rem;
+            color: var(--text-dim);
+            text-transform: uppercase;
+        }
+        
+        .stat-value {
+            font-size: 1.2rem;
+            color: var(--neon-green);
+            text-shadow: var(--glow-green);
+        }
+        
+        .best-record {
+            color: var(--neon-cyan);
+            text-shadow: var(--glow-cyan);
+        }
+        
+        /* ==================== GAME AREA ==================== */
+        .game-wrapper {
+            flex: 1;
+            display: flex;
+            gap: 1rem;
+            min-height: 0;
+        }
+        
+        .game-area {
+            flex: 1;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--terminal-gray);
+            border: 2px solid var(--neon-green);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        /* Matrix Rain Background */
+        #matrixCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0.3;
+            pointer-events: none;
+            z-index: 1;
+        }
+        
+        #matrixCanvas.hidden {
+            display: none;
+        }
+        
+        #gameCanvas {
+            display: block;
+            max-width: 100%;
+            max-height: 100%;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+            position: relative;
+            z-index: 2;
+        }
+        
+        /* Scanline effect */
+        .game-area::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: repeating-linear-gradient(
+                0deg,
+                rgba(0, 0, 0, 0.1),
+                rgba(0, 0, 0, 0.1) 1px,
+                transparent 1px,
+                transparent 2px
+            );
+            pointer-events: none;
+            opacity: 0.3;
+        }
+        
+        /* ==================== TERMINAL LOG ==================== */
+        .terminal-log {
+            width: 100%;
+            max-width: 300px;
+            background: var(--terminal-gray);
+            border: 1px solid var(--neon-cyan);
+            border-radius: 4px;
+            padding: 1rem;
+            overflow-y: auto;
+            max-height: 400px;
+        }
+        
+        .log-title {
+            color: var(--neon-cyan);
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+            text-shadow: var(--glow-cyan);
+        }
+        
+        .log-messages {
+            font-size: 0.75rem;
+            line-height: 1.4;
+        }
+        
+        .log-message {
+            color: var(--neon-green);
+            margin-bottom: 0.3rem;
+            opacity: 0;
+            animation: fadeIn 0.3s forwards;
+        }
+        
+        @keyframes fadeIn {
+            to { opacity: 1; }
+        }
+        
+        .log-message.error {
+            color: #ff3333;
+        }
+        
+        /* ==================== CONTROLS ==================== */
+        .controls-section {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        
+        .btn {
+            padding: 0.6rem 1.2rem;
+            background: transparent;
+            border: 2px solid var(--neon-green);
+            color: var(--neon-green);
+            font-family: inherit;
+            font-size: 0.9rem;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        
+        .btn:hover, .btn:focus {
+            background: var(--neon-green);
+            color: var(--bg-dark);
+            box-shadow: var(--glow-green);
+            outline: none;
+        }
+        
+        .btn-cyan {
+            border-color: var(--neon-cyan);
+            color: var(--neon-cyan);
+        }
+        
+        .btn-cyan:hover, .btn-cyan:focus {
+            background: var(--neon-cyan);
+            box-shadow: var(--glow-cyan);
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        /* ==================== MOBILE TOUCH CONTROLS ==================== */
+        .mobile-controls {
+            display: none;
+            position: fixed;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+        }
+        
+        .dpad {
+            position: relative;
+            width: 200px;
+            height: 200px;
+        }
+        
+        .dpad-btn {
+            position: absolute;
+            width: 60px;
+            height: 60px;
+            background: rgba(57, 255, 20, 0.2);
+            border: 2px solid var(--neon-green);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            color: var(--neon-green);
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.1s;
+            box-shadow: var(--glow-green);
+        }
+        
+        .dpad-btn:active {
+            background: rgba(57, 255, 20, 0.5);
+            transform: scale(0.95);
+        }
+        
+        .dpad-up {
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+        
+        .dpad-down {
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+        
+        .dpad-left {
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+        
+        .dpad-right {
+            right: 0;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+        
+        .dpad-center {
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 50px;
+            height: 50px;
+            opacity: 0.3;
+        }
+        
+        .mobile-action-btns {
+            position: fixed;
+            top: 50%;
+            right: 1rem;
+            transform: translateY(-50%);
+            display: none;
+            flex-direction: column;
+            gap: 1rem;
+            z-index: 100;
+        }
+        
+        .mobile-action-btns .btn {
+            padding: 0.8rem 1rem;
+            font-size: 0.8rem;
+        }
+        
+        /* ==================== OVERLAYS ==================== */
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(11, 11, 11, 0.95);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+            gap: 1rem;
+            padding: 2rem;
+            text-align: center;
+        }
+        
+        .overlay.hidden {
+            display: none;
+        }
+        
+        .overlay-title {
+            font-size: clamp(1.5rem, 5vw, 3rem);
+            text-shadow: var(--glow-green);
+            margin-bottom: 1rem;
+        }
+        
+        .overlay-message {
+            font-size: clamp(0.9rem, 2vw, 1.2rem);
+            color: var(--neon-cyan);
+            margin-bottom: 1rem;
+        }
+        
+        .controls-legend {
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            line-height: 1.6;
+        }
+        
+        .glitch {
+            animation: glitch 0.3s;
+        }
+        
+        @keyframes glitch {
+            0%, 100% { transform: translate(0); }
+            25% { transform: translate(-2px, 2px); }
+            50% { transform: translate(2px, -2px); }
+            75% { transform: translate(-2px, -2px); }
+        }
+        
+        /* ==================== TOGGLE SWITCHES ==================== */
+        .toggle-group {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+        
+        .toggle {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.8rem;
+        }
+        
+        .toggle input[type="checkbox"] {
+            appearance: none;
+            width: 40px;
+            height: 20px;
+            background: var(--terminal-gray);
+            border: 2px solid var(--neon-green);
+            border-radius: 10px;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .toggle input[type="checkbox"]::before {
+            content: '';
+            position: absolute;
+            width: 14px;
+            height: 14px;
+            background: var(--neon-green);
+            border-radius: 50%;
+            top: 1px;
+            left: 1px;
+            transition: all 0.3s;
+        }
+        
+        .toggle input[type="checkbox"]:checked {
+            background: var(--neon-green);
+        }
+        
+        .toggle input[type="checkbox"]:checked::before {
+            left: 21px;
+            background: var(--bg-dark);
+        }
+        
+        /* ==================== RESPONSIVE DESIGN ==================== */
+        @media (max-width: 768px) {
+            .container {
+                padding: 0.5rem;
+            }
+            
+            .game-wrapper {
+                flex-direction: column;
+            }
+            
+            .terminal-log {
+                max-width: 100%;
+                max-height: 150px;
+                order: -1;
+            }
+            
+            .mobile-controls,
+            .mobile-action-btns {
+                display: flex;
+            }
+            
+            .stats-bar {
+                font-size: 0.8rem;
+            }
+            
+            .stat-value {
+                font-size: 1rem;
+            }
+        }
+        
+        @media (min-width: 769px) {
+            .game-wrapper {
+                flex-direction: row;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Live region for screen reader announcements -->
+    <div class="sr-only" role="status" aria-live="polite" aria-atomic="true" id="announcer"></div>
+    
+    <!-- Header -->
+    <header class="header">
+        <h1 class="ascii-title">&gt; MAQSADBEK37 — SNAKE LAB</h1>
+    </header>
+    
+    <!-- Main Container -->
+    <main class="container">
+        <!-- Stats Bar -->
+        <div class="stats-bar">
+            <div class="stat">
+                <span class="stat-label">Score</span>
+                <span class="stat-value" id="scoreDisplay">0</span>
+            </div>
+            <div class="stat">
+                <span class="stat-label">Best</span>
+                <span class="stat-value best-record" id="bestDisplay">0</span>
+            </div>
+            <div class="stat">
+                <span class="stat-label">Speed</span>
+                <span class="stat-value" id="speedDisplay">1.0x</span>
+            </div>
+            <div class="stat">
+                <span class="stat-label">Food</span>
+                <span class="stat-value" id="foodDisplay">0</span>
+            </div>
+            <div class="stat">
+                <span class="stat-label">Time</span>
+                <span class="stat-value" id="timeDisplay">0:00</span>
+            </div>
+        </div>
+        
+        <!-- Controls & Options -->
+        <div class="controls-section">
+            <button class="btn" id="playBtn" aria-label="Start game">Play</button>
+            <button class="btn btn-cyan" id="pauseBtn" aria-label="Pause game" disabled>Pause</button>
+            <button class="btn" id="restartBtn" aria-label="Restart game">Restart</button>
+            
+            <div class="toggle-group">
+                <label class="toggle">
+                    <input type="checkbox" id="gridToggle" aria-label="Toggle grid visibility">
+                    <span>Grid</span>
+                </label>
+                <label class="toggle">
+                    <input type="checkbox" id="matrixRainToggle" aria-label="Toggle Matrix rain effect">
+                    <span>Matrix Rain</span>
+                </label>
+                <label class="toggle">
+                    <input type="checkbox" id="soundToggle" aria-label="Toggle sound effects">
+                    <span>Sound</span>
+                </label>
+                <label class="toggle">
+                    <input type="checkbox" id="reducedMotionToggle" aria-label="Toggle reduced motion">
+                    <span>Reduced Motion</span>
+                </label>
+            </div>
+        </div>
+        
+        <!-- Game Area & Terminal -->
+        <div class="game-wrapper">
+            <div class="game-area">
+                <!-- Matrix Rain Background (off by default) -->
+                <canvas id="matrixCanvas" class="hidden" aria-hidden="true"></canvas>
+                
+                <canvas id="gameCanvas" width="600" height="600" aria-label="Snake game canvas"></canvas>
+                
+                <!-- Start Overlay -->
+                <div class="overlay" id="startOverlay">
+                    <div class="overlay-title">SNAKE LAB</div>
+                    <div class="overlay-message">INITIALIZE SYSTEM</div>
+                    <div class="controls-legend">
+                        <strong>CONTROLS:</strong><br>
+                        Desktop: Arrow Keys / WASD<br>
+                        Space = Pause | R = Restart<br>
+                        Mobile: Touch buttons or swipe
+                    </div>
+                    <button class="btn" id="startBtn" aria-label="Start game">START</button>
+                </div>
+                
+                <!-- Pause Overlay -->
+                <div class="overlay hidden" id="pauseOverlay">
+                    <div class="overlay-title">PAUSED</div>
+                    <div class="overlay-message">Press SPACE or tap Pause to resume</div>
+                </div>
+                
+                <!-- Game Over Overlay -->
+                <div class="overlay hidden" id="gameOverOverlay">
+                    <div class="overlay-title glitch">ACCESS DENIED</div>
+                    <div class="overlay-message">GAME OVER</div>
+                    <div class="overlay-message" id="finalScore">Score: 0</div>
+                    <button class="btn" id="playAgainBtn" aria-label="Play again">PLAY AGAIN</button>
+                </div>
+            </div>
+            
+            <!-- Terminal Log -->
+            <aside class="terminal-log">
+                <div class="log-title">&gt; SYSTEM LOG</div>
+                <div class="log-messages" id="logMessages" role="log" aria-live="polite"></div>
+            </aside>
+        </div>
+    </main>
+    
+    <!-- Mobile Touch Controls -->
+    <div class="mobile-controls">
+        <div class="dpad">
+            <button class="dpad-btn dpad-up" id="dpadUp" aria-label="Move up">▲</button>
+            <button class="dpad-btn dpad-down" id="dpadDown" aria-label="Move down">▼</button>
+            <button class="dpad-btn dpad-left" id="dpadLeft" aria-label="Move left">◄</button>
+            <button class="dpad-btn dpad-right" id="dpadRight" aria-label="Move right">►</button>
+            <div class="dpad-btn dpad-center"></div>
+        </div>
+    </div>
+    
+    <div class="mobile-action-btns">
+        <button class="btn btn-cyan" id="mobilePauseBtn" aria-label="Pause game">Pause</button>
+        <button class="btn" id="mobileRestartBtn" aria-label="Restart game">Restart</button>
+    </div>
+    
+    <script>
+        // ==================== TUNABLE CONSTANTS ====================
+        // Adjust these values to customize gameplay
+        const CONFIG = {
+            GRID_SIZE: 20,                    // Number of cells in grid (20x20)
+            CELL_SIZE: 30,                    // Pixel size of each cell (auto-calculated)
+            INITIAL_SPEED: 150,               // Starting milliseconds per move (lower = faster)
+            SPEED_INCREASE_PER_FOOD: 3,       // Speed boost in ms per food eaten
+            MIN_SPEED: 50,                    // Maximum speed cap (fastest possible)
+            POINTS_PER_FOOD: 10,              // Score points awarded per food
+            INITIAL_DIRECTION: 'right',       // Starting direction
+            ENABLE_SOUND: false,              // Sound placeholder (set to true when adding audio)
+        };
+        
+        // ==================== GAME STATE ====================
+        let canvas, ctx;
+        let snake = [];
+        let food = null;
+        let direction = CONFIG.INITIAL_DIRECTION;
+        let nextDirection = CONFIG.INITIAL_DIRECTION;
+        let score = 0;
+        let foodEaten = 0;
+        let bestScore = 0;
+        let gameState = 'start'; // 'start', 'playing', 'paused', 'gameover'
+        let lastUpdateTime = 0;
+        let gameStartTime = 0;
+        let currentSpeed = CONFIG.INITIAL_SPEED;
+        let showGrid = false;
+        let reducedMotion = false;
+        let matrixRainEnabled = false;
+        let soundEnabled = false;
+        let gameLoopId = null;
+        
+        // Touch swipe tracking
+        let touchStartX = 0;
+        let touchStartY = 0;
+        
+        // Matrix Rain
+        let matrixCanvas, matrixCtx;
+        let matrixColumns = [];
+        let matrixChars = '01';
+        let matrixAnimationId = null;
+        
+        // ==================== DOM ELEMENTS ====================
+        const elements = {
+            canvas: null,
+            scoreDisplay: null,
+            bestDisplay: null,
+            speedDisplay: null,
+            foodDisplay: null,
+            timeDisplay: null,
+            logMessages: null,
+            announcer: null,
+            startOverlay: null,
+            pauseOverlay: null,
+            gameOverOverlay: null,
+            playBtn: null,
+            pauseBtn: null,
+            restartBtn: null,
+            startBtn: null,
+            playAgainBtn: null,
+            gridToggle: null,
+            matrixRainToggle: null,
+            soundToggle: null,
+            reducedMotionToggle: null,
+            finalScore: null,
+            matrixCanvas: null,
+            // Mobile controls
+            dpadUp: null,
+            dpadDown: null,
+            dpadLeft: null,
+            dpadRight: null,
+            mobilePauseBtn: null,
+            mobileRestartBtn: null,
+        };
+        
+        // ==================== INITIALIZATION ====================
+        function init() {
+            // Cache DOM elements
+            elements.canvas = document.getElementById('gameCanvas');
+            elements.scoreDisplay = document.getElementById('scoreDisplay');
+            elements.bestDisplay = document.getElementById('bestDisplay');
+            elements.speedDisplay = document.getElementById('speedDisplay');
+            elements.foodDisplay = document.getElementById('foodDisplay');
+            elements.timeDisplay = document.getElementById('timeDisplay');
+            elements.logMessages = document.getElementById('logMessages');
+            elements.announcer = document.getElementById('announcer');
+            elements.startOverlay = document.getElementById('startOverlay');
+            elements.pauseOverlay = document.getElementById('pauseOverlay');
+            elements.gameOverOverlay = document.getElementById('gameOverOverlay');
+            elements.playBtn = document.getElementById('playBtn');
+            elements.pauseBtn = document.getElementById('pauseBtn');
+            elements.restartBtn = document.getElementById('restartBtn');
+            elements.startBtn = document.getElementById('startBtn');
+            elements.playAgainBtn = document.getElementById('playAgainBtn');
+            elements.gridToggle = document.getElementById('gridToggle');
+            elements.matrixRainToggle = document.getElementById('matrixRainToggle');
+            elements.soundToggle = document.getElementById('soundToggle');
+            elements.reducedMotionToggle = document.getElementById('reducedMotionToggle');
+            elements.finalScore = document.getElementById('finalScore');
+            elements.matrixCanvas = document.getElementById('matrixCanvas');
+            elements.dpadUp = document.getElementById('dpadUp');
+            elements.dpadDown = document.getElementById('dpadDown');
+            elements.dpadLeft = document.getElementById('dpadLeft');
+            elements.dpadRight = document.getElementById('dpadRight');
+            elements.mobilePauseBtn = document.getElementById('mobilePauseBtn');
+            elements.mobileRestartBtn = document.getElementById('mobileRestartBtn');
+            
+            canvas = elements.canvas;
+            ctx = canvas.getContext('2d');
+            
+            // Set up Matrix Rain canvas
+            matrixCanvas = elements.matrixCanvas;
+            matrixCtx = matrixCanvas.getContext('2d');
+            
+            // Set canvas sizes
+            resizeCanvas();
+            
+            // Load best score from localStorage
+            loadBestScore();
+            
+            // Setup event listeners
+            setupEventListeners();
+            
+            // Initial log
+            addLog('System initialized');
+            addLog('Awaiting start command...');
+        }
+        
+        // ==================== CANVAS SIZING ====================
+        function resizeCanvas() {
+            const size = CONFIG.GRID_SIZE * CONFIG.CELL_SIZE;
+            canvas.width = size;
+            canvas.height = size;
+            
+            // Resize Matrix canvas to match game area
+            if (matrixCanvas) {
+                const rect = elements.canvas.parentElement.getBoundingClientRect();
+                matrixCanvas.width = rect.width;
+                matrixCanvas.height = rect.height;
+                
+                // Reinitialize matrix columns
+                const fontSize = 14;
+                matrixColumns = [];
+                for (let i = 0; i < matrixCanvas.width / fontSize; i++) {
+                    matrixColumns[i] = Math.random() * matrixCanvas.height / fontSize;
+                }
+            }
+        }
+        
+        // ==================== LOCAL STORAGE ====================
+        // Load best score from localStorage
+        function loadBestScore() {
+            const saved = localStorage.getItem('snakeLab_bestScore');
+            bestScore = saved ? parseInt(saved, 10) : 0;
+            elements.bestDisplay.textContent = bestScore;
+        }
+        
+        // Save best score to localStorage
+        function saveBestScore() {
+            localStorage.setItem('snakeLab_bestScore', bestScore);
+            addLog(`New best record: ${bestScore}`, 'success');
+            announce(`New best score: ${bestScore}`);
+        }
+        
+        // ==================== EVENT LISTENERS ====================
+        function setupEventListeners() {
+            // Button controls
+            elements.startBtn.addEventListener('click', startGame);
+            elements.playBtn.addEventListener('click', startGame);
+            elements.playAgainBtn.addEventListener('click', restartGame);
+            elements.pauseBtn.addEventListener('click', togglePause);
+            elements.restartBtn.addEventListener('click', restartGame);
+            elements.mobilePauseBtn.addEventListener('click', togglePause);
+            elements.mobileRestartBtn.addEventListener('click', restartGame);
+            
+            // Keyboard controls
+            document.addEventListener('keydown', handleKeyboard);
+            
+            // Mobile D-pad
+            elements.dpadUp.addEventListener('click', () => changeDirection('up'));
+            elements.dpadDown.addEventListener('click', () => changeDirection('down'));
+            elements.dpadLeft.addEventListener('click', () => changeDirection('left'));
+            elements.dpadRight.addEventListener('click', () => changeDirection('right'));
+            
+            // Touch swipe gestures
+            canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+            canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+            
+            // Toggles
+            elements.gridToggle.addEventListener('change', (e) => {
+                showGrid = e.target.checked;
+                addLog(`Grid ${showGrid ? 'enabled' : 'disabled'}`);
+            });
+            
+            elements.matrixRainToggle.addEventListener('change', (e) => {
+                matrixRainEnabled = e.target.checked;
+                if (matrixRainEnabled) {
+                    elements.matrixCanvas.classList.remove('hidden');
+                    startMatrixRain();
+                    addLog('Matrix rain enabled');
+                } else {
+                    elements.matrixCanvas.classList.add('hidden');
+                    stopMatrixRain();
+                    addLog('Matrix rain disabled');
+                }
+            });
+            
+            elements.soundToggle.addEventListener('change', (e) => {
+                soundEnabled = e.target.checked;
+                CONFIG.ENABLE_SOUND = soundEnabled;
+                addLog(`Sound ${soundEnabled ? 'enabled' : 'disabled'}`);
+            });
+            
+            elements.reducedMotionToggle.addEventListener('change', (e) => {
+                reducedMotion = e.target.checked;
+                addLog(`Reduced motion ${reducedMotion ? 'enabled' : 'disabled'}`);
+            });
+            
+            // Window resize
+            window.addEventListener('resize', resizeCanvas);
+        }
+        
+        // ==================== KEYBOARD CONTROLS ====================
+        // Handle keyboard input for desktop controls
+        function handleKeyboard(e) {
+            if (gameState === 'start') return;
+            
+            // Prevent default for game keys
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'w', 'a', 's', 'd', ' ', 'r'].includes(e.key.toLowerCase())) {
+                e.preventDefault();
+            }
+            
+            // Direction controls (arrows and WASD)
+            switch(e.key.toLowerCase()) {
+                case 'arrowup':
+                case 'w':
+                    changeDirection('up');
+                    break;
+                case 'arrowdown':
+                case 's':
+                    changeDirection('down');
+                    break;
+                case 'arrowleft':
+                case 'a':
+                    changeDirection('left');
+                    break;
+                case 'arrowright':
+                case 'd':
+                    changeDirection('right');
+                    break;
+                case ' ':
+                    togglePause();
+                    break;
+                case 'r':
+                    if (gameState === 'gameover') {
+                        restartGame();
+                    }
+                    break;
+            }
+        }
+        
+        // ==================== TOUCH CONTROLS ====================
+        // Handle touch start for swipe gestures
+        function handleTouchStart(e) {
+            e.preventDefault();
+            const touch = e.touches[0];
+            touchStartX = touch.clientX;
+            touchStartY = touch.clientY;
+        }
+        
+        // Handle touch move for swipe detection
+        function handleTouchMove(e) {
+            e.preventDefault();
+            if (!touchStartX || !touchStartY) return;
+            
+            const touch = e.touches[0];
+            const diffX = touch.clientX - touchStartX;
+            const diffY = touch.clientY - touchStartY;
+            
+            // Determine swipe direction (minimum 30px swipe)
+            if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 30) {
+                // Horizontal swipe
+                changeDirection(diffX > 0 ? 'right' : 'left');
+            } else if (Math.abs(diffY) > 30) {
+                // Vertical swipe
+                changeDirection(diffY > 0 ? 'down' : 'up');
+            }
+            
+            // Reset
+            touchStartX = 0;
+            touchStartY = 0;
+        }
+        
+        // ==================== DIRECTION CONTROL ====================
+        // Change snake direction with reverse prevention
+        function changeDirection(newDirection) {
+            if (gameState !== 'playing') return;
+            
+            // Prevent reversing directly into opposite direction
+            const opposites = {
+                'up': 'down',
+                'down': 'up',
+                'left': 'right',
+                'right': 'left'
+            };
+            
+            if (opposites[newDirection] !== direction) {
+                nextDirection = newDirection;
+            }
+        }
+        
+        // ==================== GAME CONTROL ====================
+        // Start the game
+        function startGame() {
+            if (gameState === 'playing') return;
+            
+            // Initialize snake in center
+            const center = Math.floor(CONFIG.GRID_SIZE / 2);
+            snake = [
+                { x: center, y: center },
+                { x: center - 1, y: center },
+                { x: center - 2, y: center }
+            ];
+            
+            // Reset game state
+            direction = CONFIG.INITIAL_DIRECTION;
+            nextDirection = CONFIG.INITIAL_DIRECTION;
+            score = 0;
+            foodEaten = 0;
+            currentSpeed = CONFIG.INITIAL_SPEED;
+            gameStartTime = Date.now();
+            
+            // Spawn first food
+            spawnFood();
+            
+            // Update UI
+            updateStats();
+            elements.startOverlay.classList.add('hidden');
+            elements.gameOverOverlay.classList.add('hidden');
+            elements.pauseBtn.disabled = false;
+            elements.playBtn.disabled = true;
+            
+            gameState = 'playing';
+            
+            addLog('> Game started');
+            announce('Game started');
+            
+            // Start game loop
+            lastUpdateTime = performance.now();
+            gameLoopId = requestAnimationFrame(gameLoop);
+        }
+        
+        // Pause/Resume game
+        function togglePause() {
+            if (gameState === 'playing') {
+                gameState = 'paused';
+                elements.pauseOverlay.classList.remove('hidden');
+                elements.pauseBtn.textContent = 'Resume';
+                elements.mobilePauseBtn.textContent = 'Resume';
+                addLog('> Game paused');
+                announce('Game paused');
+            } else if (gameState === 'paused') {
+                gameState = 'playing';
+                elements.pauseOverlay.classList.add('hidden');
+                elements.pauseBtn.textContent = 'Pause';
+                elements.mobilePauseBtn.textContent = 'Pause';
+                lastUpdateTime = performance.now();
+                addLog('> Game resumed');
+                announce('Game resumed');
+                gameLoopId = requestAnimationFrame(gameLoop);
+            }
+        }
+        
+        // Restart the game
+        function restartGame() {
+            // Clean up existing game loop
+            if (gameLoopId) {
+                cancelAnimationFrame(gameLoopId);
+                gameLoopId = null;
+            }
+            
+            gameState = 'start';
+            elements.pauseBtn.disabled = true;
+            elements.pauseBtn.textContent = 'Pause';
+            elements.mobilePauseBtn.textContent = 'Pause';
+            elements.playBtn.disabled = false;
+            elements.pauseOverlay.classList.add('hidden');
+            
+            addLog('> System reset');
+            
+            // Start new game immediately
+            startGame();
+        }
+        
+        // ==================== GAME LOOP ====================
+        // Main game loop using requestAnimationFrame with delta time
+        function gameLoop(currentTime) {
+            if (gameState !== 'playing') return;
+            
+            // Calculate delta time
+            const deltaTime = currentTime - lastUpdateTime;
+            
+            // Update game state based on current speed
+            if (deltaTime >= currentSpeed) {
+                lastUpdateTime = currentTime;
+                update();
+                render();
+                updateTimer();
+            }
+            
+            // Continue loop
+            gameLoopId = requestAnimationFrame(gameLoop);
+        }
+        
+        // ==================== GAME UPDATE ====================
+        // Update game state (movement, collision, eating)
+        function update() {
+            // Apply queued direction change
+            direction = nextDirection;
+            
+            // Calculate new head position
+            const head = { ...snake[0] };
+            
+            switch(direction) {
+                case 'up':
+                    head.y -= 1;
+                    break;
+                case 'down':
+                    head.y += 1;
+                    break;
+                case 'left':
+                    head.x -= 1;
+                    break;
+                case 'right':
+                    head.x += 1;
+                    break;
+            }
+            
+            // Check wall collision
+            if (head.x < 0 || head.x >= CONFIG.GRID_SIZE || 
+                head.y < 0 || head.y >= CONFIG.GRID_SIZE) {
+                gameOver();
+                return;
+            }
+            
+            // Check self collision
+            if (snake.some(segment => segment.x === head.x && segment.y === head.y)) {
+                gameOver();
+                return;
+            }
+            
+            // Add new head
+            snake.unshift(head);
+            
+            // Check food collision
+            if (head.x === food.x && head.y === food.y) {
+                eatFood();
+            } else {
+                // Remove tail if no food eaten
+                snake.pop();
+            }
+        }
+        
+        // ==================== FOOD MANAGEMENT ====================
+        // Spawn food at random unoccupied position
+        function spawnFood() {
+            let validPosition = false;
+            let newFood;
+            
+            // Keep trying until we find an empty cell
+            while (!validPosition) {
+                newFood = {
+                    x: Math.floor(Math.random() * CONFIG.GRID_SIZE),
+                    y: Math.floor(Math.random() * CONFIG.GRID_SIZE)
+                };
+                
+                // Check if position is not occupied by snake
+                validPosition = !snake.some(segment => 
+                    segment.x === newFood.x && segment.y === newFood.y
+                );
+            }
+            
+            food = newFood;
+        }
+        
+        // Handle food consumption
+        function eatFood() {
+            // Increase score
+            score += CONFIG.POINTS_PER_FOOD;
+            foodEaten++;
+            
+            // Increase speed (decrease interval)
+            currentSpeed = Math.max(
+                CONFIG.MIN_SPEED,
+                currentSpeed - CONFIG.SPEED_INCREASE_PER_FOOD
+            );
+            
+            // Update best score if exceeded
+            if (score > bestScore) {
+                bestScore = score;
+                saveBestScore();
+            }
+            
+            // Spawn new food
+            spawnFood();
+            
+            // Update UI
+            updateStats();
+            
+            // Log and announce
+            addLog(`> Food eaten. Score +${CONFIG.POINTS_PER_FOOD}`);
+            announce(`Food eaten. Score: ${score}`);
+            
+            // Glitch effect on canvas (if not reduced motion)
+            if (!reducedMotion) {
+                canvas.classList.add('glitch');
+                setTimeout(() => canvas.classList.remove('glitch'), 300);
+            }
+            
+            // Sound placeholder
+            if (CONFIG.ENABLE_SOUND) {
+                // playSound('eat'); // Uncomment when adding audio files
+            }
+        }
+        
+        // ==================== GAME OVER ====================
+        function gameOver() {
+            gameState = 'gameover';
+            
+            // Cancel game loop
+            if (gameLoopId) {
+                cancelAnimationFrame(gameLoopId);
+                gameLoopId = null;
+            }
+            
+            // Update UI
+            elements.finalScore.textContent = `Score: ${score}`;
+            elements.gameOverOverlay.classList.remove('hidden');
+            elements.pauseBtn.disabled = true;
+            elements.playBtn.disabled = false;
+            
+            // Log
+            addLog(`> Collision detected`, 'error');
+            addLog(`> Final score: ${score}`, 'error');
+            announce(`Game over. Final score: ${score}`);
+            
+            // Sound placeholder
+            if (CONFIG.ENABLE_SOUND) {
+                // playSound('gameover'); // Uncomment when adding audio files
+            }
+        }
+        
+        // ==================== RENDERING ====================
+        // Render game state to canvas
+        function render() {
+            // Clear canvas
+            ctx.fillStyle = '#0b0b0b';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw grid (if enabled)
+            if (showGrid) {
+                ctx.strokeStyle = 'rgba(57, 255, 20, 0.1)';
+                ctx.lineWidth = 1;
+                
+                for (let i = 0; i <= CONFIG.GRID_SIZE; i++) {
+                    const pos = i * CONFIG.CELL_SIZE;
+                    ctx.beginPath();
+                    ctx.moveTo(pos, 0);
+                    ctx.lineTo(pos, canvas.height);
+                    ctx.stroke();
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(0, pos);
+                    ctx.lineTo(canvas.width, pos);
+                    ctx.stroke();
+                }
+            }
+            
+            // Draw food with glow
+            if (food) {
+                ctx.fillStyle = '#00f5ff';
+                ctx.shadowBlur = reducedMotion ? 0 : 20;
+                ctx.shadowColor = '#00f5ff';
+                ctx.fillRect(
+                    food.x * CONFIG.CELL_SIZE + 2,
+                    food.y * CONFIG.CELL_SIZE + 2,
+                    CONFIG.CELL_SIZE - 4,
+                    CONFIG.CELL_SIZE - 4
+                );
+                ctx.shadowBlur = 0;
+            }
+            
+            // Draw snake with glow
+            snake.forEach((segment, index) => {
+                // Head is brighter
+                const isHead = index === 0;
+                ctx.fillStyle = isHead ? '#39ff14' : '#2acc0f';
+                ctx.shadowBlur = reducedMotion ? 0 : (isHead ? 15 : 10);
+                ctx.shadowColor = '#39ff14';
+                
+                ctx.fillRect(
+                    segment.x * CONFIG.CELL_SIZE + 1,
+                    segment.y * CONFIG.CELL_SIZE + 1,
+                    CONFIG.CELL_SIZE - 2,
+                    CONFIG.CELL_SIZE - 2
+                );
+            });
+            
+            ctx.shadowBlur = 0;
+        }
+        
+        // ==================== UI UPDATES ====================
+        // Update stats display
+        function updateStats() {
+            elements.scoreDisplay.textContent = score;
+            elements.bestDisplay.textContent = bestScore;
+            elements.foodDisplay.textContent = foodEaten;
+            
+            const speedMultiplier = (CONFIG.INITIAL_SPEED / currentSpeed).toFixed(1);
+            elements.speedDisplay.textContent = `${speedMultiplier}x`;
+        }
+        
+        // Update game timer
+        function updateTimer() {
+            const elapsed = Math.floor((Date.now() - gameStartTime) / 1000);
+            const minutes = Math.floor(elapsed / 60);
+            const seconds = elapsed % 60;
+            elements.timeDisplay.textContent = 
+                `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        }
+        
+        // ==================== TERMINAL LOG ====================
+        // Add message to terminal log
+        function addLog(message, type = 'info') {
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-message ${type}`;
+            logEntry.textContent = message;
+            
+            elements.logMessages.appendChild(logEntry);
+            
+            // Auto-scroll to bottom
+            elements.logMessages.scrollTop = elements.logMessages.scrollHeight;
+            
+            // Limit log entries (keep last 50)
+            while (elements.logMessages.children.length > 50) {
+                elements.logMessages.removeChild(elements.logMessages.firstChild);
+            }
+        }
+        
+        // ==================== ACCESSIBILITY ====================
+        // Announce to screen readers
+        function announce(message) {
+            elements.announcer.textContent = message;
+        }
+        
+        // ==================== SOUND PLACEHOLDERS ====================
+        // Placeholder for sound effects (add audio files later)
+        function playSound(soundType) {
+            // Example implementation when adding audio:
+            // const audio = new Audio(`sounds/${soundType}.mp3`);
+            // audio.play();
+            if (CONFIG.ENABLE_SOUND) {
+                console.log(`Sound: ${soundType}`);
+            }
+        }
+        
+        // ==================== MATRIX RAIN EFFECT ====================
+        // Start Matrix Rain animation
+        function startMatrixRain() {
+            if (matrixAnimationId) return; // Already running
+            
+            resizeCanvas(); // Ensure columns are initialized
+            matrixAnimationId = requestAnimationFrame(animateMatrixRain);
+        }
+        
+        // Stop Matrix Rain animation
+        function stopMatrixRain() {
+            if (matrixAnimationId) {
+                cancelAnimationFrame(matrixAnimationId);
+                matrixAnimationId = null;
+            }
+            // Clear the canvas
+            if (matrixCtx) {
+                matrixCtx.clearRect(0, 0, matrixCanvas.width, matrixCanvas.height);
+            }
+        }
+        
+        // Animate Matrix Rain (falling binary digits)
+        function animateMatrixRain() {
+            if (!matrixRainEnabled) return;
+            
+            const fontSize = 14;
+            
+            // Fade effect for trailing characters
+            matrixCtx.fillStyle = 'rgba(11, 11, 11, 0.05)';
+            matrixCtx.fillRect(0, 0, matrixCanvas.width, matrixCanvas.height);
+            
+            // Draw characters
+            matrixCtx.fillStyle = '#39ff14';
+            matrixCtx.font = `${fontSize}px monospace`;
+            
+            for (let i = 0; i < matrixColumns.length; i++) {
+                const char = matrixChars[Math.floor(Math.random() * matrixChars.length)];
+                const x = i * fontSize;
+                const y = matrixColumns[i] * fontSize;
+                
+                matrixCtx.fillText(char, x, y);
+                
+                // Reset column randomly
+                if (y > matrixCanvas.height && Math.random() > 0.975) {
+                    matrixColumns[i] = 0;
+                }
+                
+                matrixColumns[i]++;
+            }
+            
+            matrixAnimationId = requestAnimationFrame(animateMatrixRain);
+        }
+        
+        // ==================== START APPLICATION ====================
+        // Initialize when DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else {
+            init();
+        }
+    </script>
+</body>
+</html>
