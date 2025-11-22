@@ -1,0 +1,1019 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MAQSADBEK - Glitch QR Generator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #000;
+            color: #0f0;
+            font-family: 'Courier New', monospace;
+            overflow-x: hidden;
+            position: relative;
+            min-height: 100vh;
+        }
+
+        #matrix-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            opacity: 0.15;
+        }
+
+        .scanlines {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 999;
+            background: linear-gradient(
+                transparent 50%, 
+                rgba(0, 255, 0, 0.02) 50%
+            );
+            background-size: 100% 4px;
+            animation: scanline 8s linear infinite;
+        }
+
+        @keyframes scanline {
+            0% { background-position: 0 0; }
+            100% { background-position: 0 100%; }
+        }
+
+        .flicker {
+            animation: flicker 0.15s infinite;
+        }
+
+        @keyframes flicker {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.97; }
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin: 40px 0;
+            position: relative;
+        }
+
+        .logo-ascii {
+            font-family: 'Courier New', monospace;
+            font-size: 8px;
+            line-height: 8px;
+            color: #0f0;
+            text-shadow: 
+                0 0 10px #0f0,
+                0 0 20px #0f0,
+                0 0 30px #0f0;
+            white-space: pre;
+            animation: glitch 3s infinite;
+            letter-spacing: 0;
+            font-weight: bold;
+            overflow-x: auto;
+        }
+
+        @keyframes glitch {
+            0%, 90%, 100% {
+                transform: translate(0);
+                text-shadow: 
+                    0 0 10px #0f0,
+                    0 0 20px #0f0,
+                    0 0 30px #0f0;
+            }
+            92% {
+                transform: translate(-2px, 2px);
+                text-shadow: 
+                    2px 0 #f00,
+                    -2px 0 #0ff,
+                    0 0 20px #0f0;
+            }
+            94% {
+                transform: translate(2px, -2px);
+                text-shadow: 
+                    -2px 0 #f00,
+                    2px 0 #0ff,
+                    0 0 20px #0f0;
+            }
+            96% {
+                transform: translate(-2px, 2px);
+                text-shadow: 
+                    2px 2px #f00,
+                    -2px -2px #0ff,
+                    0 0 20px #0f0;
+            }
+        }
+
+        .subtitle {
+            font-size: 18px;
+            margin-top: 20px;
+            text-shadow: 0 0 10px #0f0;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .input-section {
+            background: rgba(0, 20, 0, 0.8);
+            border: 2px solid #0f0;
+            padding: 30px;
+            margin: 30px 0;
+            box-shadow: 
+                0 0 20px rgba(0, 255, 0, 0.3),
+                inset 0 0 20px rgba(0, 255, 0, 0.1);
+            position: relative;
+        }
+
+        .input-section::before {
+            content: '> QR_GENERATOR.EXE';
+            position: absolute;
+            top: -12px;
+            left: 20px;
+            background: #000;
+            padding: 0 10px;
+            font-size: 12px;
+            text-shadow: 0 0 5px #0f0;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 10px;
+            font-size: 14px;
+            text-shadow: 0 0 5px #0f0;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 15px;
+            background: #000;
+            border: 2px solid #0f0;
+            color: #0f0;
+            font-family: 'Courier New', monospace;
+            font-size: 16px;
+            outline: none;
+            box-shadow: 
+                0 0 10px rgba(0, 255, 0, 0.3),
+                inset 0 0 10px rgba(0, 255, 0, 0.1);
+            animation: cursor-blink 1s infinite;
+        }
+
+        input[type="text"]:focus {
+            box-shadow: 
+                0 0 20px rgba(0, 255, 0, 0.6),
+                inset 0 0 20px rgba(0, 255, 0, 0.2);
+        }
+
+        @keyframes cursor-blink {
+            0%, 49% { border-right: 3px solid #0f0; }
+            50%, 100% { border-right: 3px solid transparent; }
+        }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            flex: 1;
+            min-width: 120px;
+            padding: 15px 30px;
+            background: #000;
+            border: 2px solid #0f0;
+            color: #0f0;
+            font-family: 'Courier New', monospace;
+            font-size: 16px;
+            cursor: pointer;
+            text-transform: uppercase;
+            font-weight: bold;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s;
+            text-shadow: 0 0 5px #0f0;
+        }
+
+        button:hover {
+            background: #0f0;
+            color: #000;
+            box-shadow: 
+                0 0 20px #0f0,
+                0 0 40px #0f0;
+            animation: glitch-btn 0.3s infinite;
+        }
+
+        @keyframes glitch-btn {
+            0%, 100% { transform: translate(0); }
+            25% { transform: translate(-2px, 2px); }
+            50% { transform: translate(2px, -2px); }
+            75% { transform: translate(-2px, -2px); }
+        }
+
+        button.clear-btn {
+            border-color: #f00;
+            color: #f00;
+            text-shadow: 0 0 5px #f00;
+        }
+
+        button.clear-btn:hover {
+            background: #f00;
+            color: #000;
+            box-shadow: 
+                0 0 20px #f00,
+                0 0 40px #f00;
+        }
+
+        .qr-output {
+            text-align: center;
+            margin: 40px 0;
+            display: none;
+        }
+
+        .qr-output.show {
+            display: block;
+        }
+
+        .qr-frame {
+            display: inline-block;
+            padding: 20px;
+            background: rgba(0, 20, 0, 0.9);
+            border: 3px solid #0f0;
+            position: relative;
+            box-shadow: 
+                0 0 30px rgba(0, 255, 0, 0.5),
+                inset 0 0 30px rgba(0, 255, 0, 0.1);
+            animation: frame-glitch 5s infinite;
+        }
+
+        @keyframes frame-glitch {
+            0%, 95%, 100% {
+                transform: translate(0);
+                filter: none;
+            }
+            96% {
+                transform: translate(-3px, 3px);
+                filter: hue-rotate(90deg);
+            }
+            97% {
+                transform: translate(3px, -3px);
+                filter: hue-rotate(-90deg);
+            }
+            98% {
+                transform: translate(-3px, -3px);
+                filter: hue-rotate(180deg);
+            }
+        }
+
+        .qr-frame::before,
+        .qr-frame::after {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #0f0;
+        }
+
+        .qr-frame::before {
+            top: -3px;
+            left: -3px;
+            border-right: none;
+            border-bottom: none;
+        }
+
+        .qr-frame::after {
+            bottom: -3px;
+            right: -3px;
+            border-left: none;
+            border-top: none;
+        }
+
+        #qr-canvas {
+            display: block;
+            image-rendering: pixelated;
+            animation: qr-flicker 0.3s infinite;
+        }
+
+        @keyframes qr-flicker {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.98; }
+        }
+
+        .download-section {
+            text-align: center;
+            margin-top: 30px;
+        }
+
+        .download-title {
+            font-size: 18px;
+            margin-bottom: 20px;
+            text-shadow: 0 0 10px #0f0;
+        }
+
+        .download-btn {
+            margin: 0 10px;
+            padding: 15px 40px;
+            background: #000;
+            border: 2px solid #0ff;
+            color: #0ff;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            cursor: pointer;
+            text-transform: uppercase;
+            font-weight: bold;
+            position: relative;
+            text-shadow: 0 0 5px #0ff;
+            transition: all 0.3s;
+        }
+
+        .download-btn:hover {
+            background: #0ff;
+            color: #000;
+            box-shadow: 
+                0 0 20px #0ff,
+                0 0 40px #0ff,
+                0 0 60px #0ff;
+            transform: scale(1.05);
+        }
+
+        .download-btn::before {
+            content: '▼';
+            margin-right: 8px;
+        }
+
+        .footer {
+            text-align: center;
+            margin: 60px 0 20px;
+            font-size: 12px;
+            opacity: 0.7;
+            text-shadow: 0 0 5px #0f0;
+        }
+
+        @media (max-width: 768px) {
+            .logo-ascii {
+                font-size: 4px;
+                line-height: 4px;
+            }
+
+            .subtitle {
+                font-size: 14px;
+            }
+
+            .input-section {
+                padding: 20px;
+            }
+
+            button {
+                font-size: 14px;
+                padding: 12px 20px;
+            }
+
+            .download-btn {
+                display: block;
+                margin: 10px auto;
+                width: 90%;
+            }
+
+            #qr-canvas {
+                max-width: 90%;
+                height: auto;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .logo-ascii {
+                font-size: 3px;
+                line-height: 3px;
+            }
+
+            .container {
+                padding: 10px;
+            }
+
+            .button-group {
+                flex-direction: column;
+            }
+
+            button {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="matrix-canvas"></canvas>
+    <div class="scanlines flicker"></div>
+    
+    <div class="container">
+        <div class="header">
+            <pre class="logo-ascii">███    ███   █████   ██████   ███████   █████  ██████  ██████  ███████ ██   ██
+████  ████  ██   ██ ██    ██ ██       ██   ██ ██   ██ ██   ██ ██      ██  ██ 
+██ ████ ██  ███████ ██    ██ ███████  ███████ ██   ██ ██████  █████   █████  
+██  ██  ██  ██   ██ ██    ██      ██  ██   ██ ██   ██ ██   ██ ██      ██  ██ 
+██      ██  ██   ██  ██████  ███████  ██   ██ ██████  ██████  ███████ ██   ██</pre>
+            <div class="subtitle">&gt; GLITCH QR CODE LABORATORY &lt;</div>
+        </div>
+
+        <div class="input-section">
+            <label>&gt; ENTER TEXT OR URL:</label>
+            <input type="text" id="qr-input" placeholder="https://maqsadbek37.vercel.app" autocomplete="off">
+            
+            <div class="button-group">
+                <button id="generate-btn">[GENERATE QR]</button>
+                <button id="clear-btn" class="clear-btn">[CLEAR]</button>
+            </div>
+        </div>
+
+        <div class="qr-output" id="qr-output">
+            <div class="qr-frame">
+                <canvas id="qr-canvas"></canvas>
+            </div>
+            
+            <div class="download-section">
+                <div class="download-title">&gt; DOWNLOAD OPTIONS &lt;</div>
+                <button class="download-btn" id="download-png">PNG FORMAT</button>
+                <button class="download-btn" id="download-jpg">JPG FORMAT</button>
+            </div>
+        </div>
+
+        <div class="footer">
+            &gt; MAQSADBEK37.VERCEL.APP | CYBERPUNK QR GENERATOR v1.0 | SYSTEM ACTIVE &lt;
+        </div>
+    </div>
+
+    <script>
+        const matrixCanvas = document.getElementById('matrix-canvas');
+        const matrixCtx = matrixCanvas.getContext('2d');
+        matrixCanvas.width = window.innerWidth;
+        matrixCanvas.height = window.innerHeight;
+
+        const chars = 'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン01';
+        const charArray = chars.split('');
+        const fontSize = 14;
+        const columns = matrixCanvas.width / fontSize;
+        const drops = Array(Math.floor(columns)).fill(1);
+
+        function drawMatrix() {
+            matrixCtx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+            matrixCtx.fillRect(0, 0, matrixCanvas.width, matrixCanvas.height);
+            matrixCtx.fillStyle = '#0f0';
+            matrixCtx.font = fontSize + 'px monospace';
+
+            for (let i = 0; i < drops.length; i++) {
+                const text = charArray[Math.floor(Math.random() * charArray.length)];
+                matrixCtx.fillText(text, i * fontSize, drops[i] * fontSize);
+
+                if (drops[i] * fontSize > matrixCanvas.height && Math.random() > 0.975) {
+                    drops[i] = 0;
+                }
+                drops[i]++;
+            }
+        }
+
+        setInterval(drawMatrix, 50);
+
+        window.addEventListener('resize', () => {
+            matrixCanvas.width = window.innerWidth;
+            matrixCanvas.height = window.innerHeight;
+        });
+
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        
+        function playBeep() {
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.frequency.value = 800;
+            oscillator.type = 'square';
+            
+            gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+            
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.1);
+        }
+
+        class QRCode {
+            constructor(data) {
+                this.data = data;
+                this.version = 1;
+                this.size = 21;
+                this.ecLevel = 'L';
+                this.modules = [];
+                
+                this.GF256_EXP = [];
+                this.GF256_LOG = [];
+                this.initGF256();
+            }
+
+            initGF256() {
+                let x = 1;
+                for (let i = 0; i < 255; i++) {
+                    this.GF256_EXP[i] = x;
+                    this.GF256_LOG[x] = i;
+                    x <<= 1;
+                    if (x & 0x100) x ^= 0x11D;
+                }
+                for (let i = 255; i < 512; i++) {
+                    this.GF256_EXP[i] = this.GF256_EXP[i - 255];
+                }
+            }
+
+            gfMul(a, b) {
+                if (a === 0 || b === 0) return 0;
+                return this.GF256_EXP[this.GF256_LOG[a] + this.GF256_LOG[b]];
+            }
+
+            encode() {
+                const mode = this.getMode(this.data);
+                const maxLength = mode === 'numeric' ? 41 : mode === 'alphanumeric' ? 25 : 17;
+                
+                if (this.data.length > maxLength) {
+                    throw new Error(`Input too long for Version 1-L QR Code (max ${maxLength} characters for ${mode} mode)`);
+                }
+
+                this.modules = Array(this.size).fill(null).map(() => Array(this.size).fill(null));
+                
+                this.addFinderPatterns();
+                this.addSeparators();
+                this.addTimingPatterns();
+                this.reserveFormatAreas();
+                
+                const dataBytes = this.encodeData(mode);
+                const eccBytes = this.generateECC(dataBytes, 7);
+                const fullData = dataBytes.concat(eccBytes);
+                const bitString = fullData.map(b => b.toString(2).padStart(8, '0')).join('');
+                
+                this.placeData(bitString);
+                
+                const bestMask = this.selectBestMask();
+                this.applyMask(bestMask);
+                this.addFormatInfo(bestMask);
+                
+                return this.modules;
+            }
+
+            getMode(data) {
+                if (/^[0-9]+$/.test(data)) return 'numeric';
+                if (/^[0-9A-Z $%*+\-./:]+$/.test(data)) return 'alphanumeric';
+                return 'byte';
+            }
+
+            encodeData(mode) {
+                let bits = '';
+                const data = this.data;
+                const dataCapacity = 19;
+                const maxBits = dataCapacity * 8;
+                
+                if (mode === 'numeric') {
+                    bits = '0001';
+                    bits += data.length.toString(2).padStart(10, '0');
+                    for (let i = 0; i < data.length; i += 3) {
+                        const chunk = data.substr(i, Math.min(3, data.length - i));
+                        const num = parseInt(chunk, 10);
+                        const len = chunk.length === 3 ? 10 : chunk.length === 2 ? 7 : 4;
+                        bits += num.toString(2).padStart(len, '0');
+                    }
+                } else if (mode === 'alphanumeric') {
+                    const alphanumeric = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:';
+                    bits = '0010';
+                    bits += data.length.toString(2).padStart(9, '0');
+                    for (let i = 0; i < data.length; i += 2) {
+                        if (i + 1 < data.length) {
+                            const val = alphanumeric.indexOf(data[i]) * 45 + alphanumeric.indexOf(data[i + 1]);
+                            bits += val.toString(2).padStart(11, '0');
+                        } else {
+                            bits += alphanumeric.indexOf(data[i]).toString(2).padStart(6, '0');
+                        }
+                    }
+                } else {
+                    bits = '0100';
+                    bits += data.length.toString(2).padStart(8, '0');
+                    for (let i = 0; i < data.length; i++) {
+                        bits += data.charCodeAt(i).toString(2).padStart(8, '0');
+                    }
+                }
+                
+                const remainingBits = maxBits - bits.length;
+                if (remainingBits >= 4) {
+                    bits += '0000';
+                } else if (remainingBits > 0) {
+                    bits += '0'.repeat(remainingBits);
+                }
+                
+                while (bits.length % 8 !== 0) {
+                    bits += '0';
+                }
+                
+                const bytes = [];
+                for (let i = 0; i < bits.length; i += 8) {
+                    bytes.push(parseInt(bits.substr(i, 8), 2));
+                }
+                
+                const pad = [236, 17];
+                let padIndex = 0;
+                while (bytes.length < dataCapacity) {
+                    bytes.push(pad[padIndex % 2]);
+                    padIndex++;
+                }
+                
+                return bytes.slice(0, dataCapacity);
+            }
+
+            generateECC(dataBytes, eccCount) {
+                const generator = this.getGeneratorPoly(eccCount);
+                const msgPoly = dataBytes.slice();
+                
+                for (let i = 0; i < eccCount; i++) {
+                    msgPoly.push(0);
+                }
+                
+                for (let i = 0; i < dataBytes.length; i++) {
+                    const coef = msgPoly[i];
+                    if (coef !== 0) {
+                        for (let j = 0; j <= eccCount; j++) {
+                            msgPoly[i + j] ^= this.gfMul(generator[j], coef);
+                        }
+                    }
+                }
+                
+                return msgPoly.slice(dataBytes.length);
+            }
+
+            getGeneratorPoly(degree) {
+                let poly = [1];
+                for (let i = 0; i < degree; i++) {
+                    const newPoly = Array(poly.length + 1).fill(0);
+                    for (let j = 0; j < poly.length; j++) {
+                        newPoly[j] ^= poly[j];
+                        newPoly[j + 1] ^= this.gfMul(poly[j], this.GF256_EXP[i]);
+                    }
+                    poly = newPoly;
+                }
+                return poly;
+            }
+
+            addFinderPatterns() {
+                const positions = [[0, 0], [this.size - 7, 0], [0, this.size - 7]];
+                
+                positions.forEach(([row, col]) => {
+                    for (let r = 0; r < 7; r++) {
+                        for (let c = 0; c < 7; c++) {
+                            const dark = (r === 0 || r === 6 || c === 0 || c === 6 || 
+                                         (r >= 2 && r <= 4 && c >= 2 && c <= 4));
+                            this.modules[row + r][col + c] = dark;
+                        }
+                    }
+                });
+            }
+
+            addSeparators() {
+                for (let i = 0; i < 8; i++) {
+                    this.modules[7][i] = false;
+                    this.modules[i][7] = false;
+                    this.modules[7][this.size - 8 + i] = false;
+                    this.modules[this.size - 8 + i][7] = false;
+                    this.modules[this.size - 8][i] = false;
+                    this.modules[i][this.size - 8] = false;
+                }
+            }
+
+            addTimingPatterns() {
+                for (let i = 8; i < this.size - 8; i++) {
+                    this.modules[6][i] = i % 2 === 0;
+                    this.modules[i][6] = i % 2 === 0;
+                }
+            }
+
+            reserveFormatAreas() {
+                for (let i = 0; i < 6; i++) {
+                    this.modules[8][i] = false;
+                }
+                this.modules[8][7] = false;
+                this.modules[8][8] = false;
+                this.modules[7][8] = false;
+                for (let i = 9; i < 15; i++) {
+                    this.modules[14 - i][8] = false;
+                }
+                
+                for (let i = 0; i < 7; i++) {
+                    this.modules[this.size - 1 - i][8] = false;
+                }
+                for (let i = 0; i < 8; i++) {
+                    this.modules[8][this.size - 1 - i] = false;
+                }
+                
+                this.modules[this.size - 8][8] = true;
+            }
+
+            placeData(bitString) {
+                let bitIndex = 0;
+                let direction = -1;
+                let row = this.size - 1;
+
+                for (let col = this.size - 1; col > 0; col -= 2) {
+                    if (col === 6) col--;
+
+                    while (true) {
+                        for (let c = 0; c < 2; c++) {
+                            const currentCol = col - c;
+                            
+                            if (this.modules[row][currentCol] === null) {
+                                let dark = false;
+                                if (bitIndex < bitString.length) {
+                                    dark = bitString[bitIndex] === '1';
+                                    bitIndex++;
+                                }
+                                this.modules[row][currentCol] = dark;
+                            }
+                        }
+
+                        row += direction;
+                        if (row < 0 || row >= this.size) {
+                            row -= direction;
+                            direction = -direction;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            selectBestMask() {
+                let bestMask = 0;
+                let minPenalty = Infinity;
+                
+                for (let mask = 0; mask < 8; mask++) {
+                    this.applyMask(mask);
+                    const penalty = this.calculatePenalty();
+                    this.applyMask(mask);
+                    
+                    if (penalty < minPenalty) {
+                        minPenalty = penalty;
+                        bestMask = mask;
+                    }
+                }
+                
+                return bestMask;
+            }
+
+            applyMask(maskPattern) {
+                for (let row = 0; row < this.size; row++) {
+                    for (let col = 0; col < this.size; col++) {
+                        if (this.isDataModule(row, col) && this.shouldMask(row, col, maskPattern)) {
+                            this.modules[row][col] = !this.modules[row][col];
+                        }
+                    }
+                }
+            }
+
+            isDataModule(row, col) {
+                if (row < 9 && col < 9) return false;
+                if (row < 9 && col >= this.size - 8) return false;
+                if (row >= this.size - 8 && col < 9) return false;
+                if (row === 6 || col === 6) return false;
+                return true;
+            }
+
+            shouldMask(row, col, pattern) {
+                switch (pattern) {
+                    case 0: return (row + col) % 2 === 0;
+                    case 1: return row % 2 === 0;
+                    case 2: return col % 3 === 0;
+                    case 3: return (row + col) % 3 === 0;
+                    case 4: return (Math.floor(row / 2) + Math.floor(col / 3)) % 2 === 0;
+                    case 5: return (((row * col) % 2) + ((row * col) % 3)) % 2 === 0;
+                    case 6: return (((row * col) % 2) + ((row + col) % 3)) % 2 === 0;
+                    case 7: return (((row + col) % 2) + ((row * col) % 3)) % 2 === 0;
+                    default: return false;
+                }
+            }
+
+            calculatePenalty() {
+                let penalty = 0;
+                
+                for (let row = 0; row < this.size; row++) {
+                    let runColor = this.modules[row][0];
+                    let runLength = 1;
+                    for (let col = 1; col < this.size; col++) {
+                        if (this.modules[row][col] === runColor) {
+                            runLength++;
+                        } else {
+                            if (runLength >= 5) penalty += (runLength - 2);
+                            runColor = this.modules[row][col];
+                            runLength = 1;
+                        }
+                    }
+                    if (runLength >= 5) penalty += (runLength - 2);
+                }
+                
+                for (let col = 0; col < this.size; col++) {
+                    let runColor = this.modules[0][col];
+                    let runLength = 1;
+                    for (let row = 1; row < this.size; row++) {
+                        if (this.modules[row][col] === runColor) {
+                            runLength++;
+                        } else {
+                            if (runLength >= 5) penalty += (runLength - 2);
+                            runColor = this.modules[row][col];
+                            runLength = 1;
+                        }
+                    }
+                    if (runLength >= 5) penalty += (runLength - 2);
+                }
+                
+                for (let row = 0; row < this.size - 1; row++) {
+                    for (let col = 0; col < this.size - 1; col++) {
+                        const value = this.modules[row][col];
+                        if (value === this.modules[row + 1][col] && 
+                            value === this.modules[row][col + 1] && 
+                            value === this.modules[row + 1][col + 1]) {
+                            penalty += 3;
+                        }
+                    }
+                }
+                
+                for (let row = 0; row < this.size; row++) {
+                    for (let col = 0; col < this.size - 10; col++) {
+                        const pattern1 = [true, false, true, true, true, false, true, false, false, false, false];
+                        const pattern2 = [false, false, false, false, true, false, true, true, true, false, true];
+                        let match1 = true;
+                        let match2 = true;
+                        for (let i = 0; i < 11; i++) {
+                            if (this.modules[row][col + i] !== pattern1[i]) match1 = false;
+                            if (this.modules[row][col + i] !== pattern2[i]) match2 = false;
+                        }
+                        if (match1 || match2) penalty += 40;
+                    }
+                }
+                
+                for (let col = 0; col < this.size; col++) {
+                    for (let row = 0; row < this.size - 10; row++) {
+                        const pattern1 = [true, false, true, true, true, false, true, false, false, false, false];
+                        const pattern2 = [false, false, false, false, true, false, true, true, true, false, true];
+                        let match1 = true;
+                        let match2 = true;
+                        for (let i = 0; i < 11; i++) {
+                            if (this.modules[row + i][col] !== pattern1[i]) match1 = false;
+                            if (this.modules[row + i][col] !== pattern2[i]) match2 = false;
+                        }
+                        if (match1 || match2) penalty += 40;
+                    }
+                }
+                
+                let darkCount = 0;
+                for (let row = 0; row < this.size; row++) {
+                    for (let col = 0; col < this.size; col++) {
+                        if (this.modules[row][col]) darkCount++;
+                    }
+                }
+                const totalModules = this.size * this.size;
+                const darkPercent = (darkCount * 100) / totalModules;
+                const deviation = Math.abs(darkPercent - 50);
+                penalty += Math.floor(deviation / 5) * 10;
+                
+                return penalty;
+            }
+
+            addFormatInfo(maskPattern) {
+                const ecBits = 1;
+                const data = (ecBits << 3) | maskPattern;
+                let bits = data << 10;
+                
+                for (let i = 0; i < 5; i++) {
+                    if ((bits >>> (14 - i)) & 1) {
+                        bits ^= 0x537 << (4 - i);
+                    }
+                }
+                
+                const formatBits = ((data << 10) | bits) ^ 0x5412;
+                
+                for (let i = 0; i < 6; i++) {
+                    this.modules[8][i] = (formatBits >>> (14 - i)) & 1;
+                }
+                this.modules[8][7] = (formatBits >>> 8) & 1;
+                this.modules[8][8] = (formatBits >>> 7) & 1;
+                this.modules[7][8] = (formatBits >>> 6) & 1;
+                for (let i = 9; i < 15; i++) {
+                    this.modules[14 - i][8] = (formatBits >>> (14 - i)) & 1;
+                }
+                
+                for (let i = 0; i < 7; i++) {
+                    this.modules[this.size - 1 - i][8] = (formatBits >>> i) & 1;
+                }
+                for (let i = 0; i < 8; i++) {
+                    this.modules[8][this.size - 1 - i] = (formatBits >>> (7 + i)) & 1;
+                }
+                
+                this.modules[this.size - 8][8] = true;
+            }
+        }
+
+        function generateQR() {
+            const input = document.getElementById('qr-input').value.trim();
+            if (!input) {
+                alert('> ERROR: Please enter text or URL');
+                return;
+            }
+
+            playBeep();
+
+            try {
+                const qr = new QRCode(input);
+                const modules = qr.encode();
+                
+                const canvas = document.getElementById('qr-canvas');
+                const scale = 8;
+                canvas.width = modules.length * scale;
+                canvas.height = modules.length * scale;
+                
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#000';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                ctx.fillStyle = '#0f0';
+                for (let row = 0; row < modules.length; row++) {
+                    for (let col = 0; col < modules.length; col++) {
+                        if (modules[row][col]) {
+                            ctx.fillRect(col * scale, row * scale, scale, scale);
+                        }
+                    }
+                }
+                
+                document.getElementById('qr-output').classList.add('show');
+            } catch (error) {
+                alert('> ERROR: ' + error.message);
+            }
+        }
+
+        function clearInput() {
+            playBeep();
+            document.getElementById('qr-input').value = '';
+            document.getElementById('qr-output').classList.remove('show');
+        }
+
+        function downloadCanvas(format) {
+            playBeep();
+            const canvas = document.getElementById('qr-canvas');
+            const link = document.createElement('a');
+            
+            if (format === 'png') {
+                link.download = 'maqsadbek_qr_code.png';
+                link.href = canvas.toDataURL('image/png');
+            } else if (format === 'jpg') {
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = canvas.width;
+                tempCanvas.height = canvas.height;
+                const tempCtx = tempCanvas.getContext('2d');
+                
+                tempCtx.fillStyle = '#FFFFFF';
+                tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+                tempCtx.drawImage(canvas, 0, 0);
+                
+                link.download = 'maqsadbek_qr_code.jpg';
+                link.href = tempCanvas.toDataURL('image/jpeg', 0.95);
+            }
+            
+            link.click();
+        }
+
+        document.getElementById('generate-btn').addEventListener('click', generateQR);
+        document.getElementById('clear-btn').addEventListener('click', clearInput);
+        document.getElementById('download-png').addEventListener('click', () => downloadCanvas('png'));
+        document.getElementById('download-jpg').addEventListener('click', () => downloadCanvas('jpg'));
+        
+        document.getElementById('qr-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                generateQR();
+            }
+        });
+
+        document.addEventListener('DOMContentLoaded', () => {
+            setTimeout(() => {
+                document.getElementById('qr-input').focus();
+            }, 500);
+        });
+    </script>
+</body>
+</html>

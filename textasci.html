@@ -1,0 +1,1238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MAQSADBEK - ASCII Art Generator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --neon-green: #39ff14;
+            --neon-cyan: #00f5ff;
+            --bg-black: #0b0b0b;
+            --terminal-border: #39ff14;
+            --glow-intensity: 0.8;
+        }
+
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            background: var(--bg-black);
+            color: var(--neon-green);
+            overflow-x: hidden;
+            position: relative;
+            min-height: 100vh;
+        }
+
+        body.high-contrast {
+            --neon-green: #ffffff;
+            --neon-cyan: #ffffff;
+        }
+
+        body.reduced-motion * {
+            animation: none !important;
+            transition: none !important;
+        }
+
+        #matrix-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            opacity: 0;
+            transition: opacity 0.5s;
+            pointer-events: none;
+        }
+
+        #matrix-canvas.active {
+            opacity: 0.15;
+        }
+
+        .scanlines {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: repeating-linear-gradient(
+                0deg,
+                rgba(0, 0, 0, 0.15),
+                rgba(0, 0, 0, 0.15) 1px,
+                transparent 1px,
+                transparent 2px
+            );
+            pointer-events: none;
+            z-index: 999;
+            opacity: 0.5;
+        }
+
+        .flicker-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(57, 255, 20, 0.02);
+            pointer-events: none;
+            z-index: 998;
+            animation: flicker 0.15s infinite alternate;
+        }
+
+        @keyframes flicker {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.95; }
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        #banner {
+            text-align: center;
+            margin: 30px 0 40px 0;
+            font-size: clamp(8px, 1.5vw, 16px);
+            line-height: 1.1;
+            color: var(--neon-cyan);
+            text-shadow: 
+                0 0 10px var(--neon-cyan),
+                0 0 20px var(--neon-cyan),
+                0 0 30px var(--neon-cyan);
+            animation: banner-glow 3s ease-in-out infinite;
+            white-space: pre;
+            overflow-x: auto;
+            padding: 10px;
+        }
+
+        @keyframes banner-glow {
+            0%, 100% { 
+                text-shadow: 
+                    0 0 10px var(--neon-cyan),
+                    0 0 20px var(--neon-cyan),
+                    0 0 30px var(--neon-cyan);
+                filter: brightness(1);
+            }
+            50% { 
+                text-shadow: 
+                    0 0 15px var(--neon-cyan),
+                    0 0 30px var(--neon-cyan),
+                    0 0 45px var(--neon-cyan);
+                filter: brightness(1.2);
+            }
+        }
+
+        .banner-glitch {
+            animation: glitch 0.3s cubic-bezier(.25, .46, .45, .94) infinite;
+        }
+
+        @keyframes glitch {
+            0% { transform: translate(0); }
+            20% { transform: translate(-2px, 2px); }
+            40% { transform: translate(-2px, -2px); }
+            60% { transform: translate(2px, 2px); }
+            80% { transform: translate(2px, -2px); }
+            100% { transform: translate(0); }
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            font-size: 2rem;
+            color: var(--neon-cyan);
+            text-shadow: 0 0 10px var(--neon-cyan);
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            font-size: 0.9rem;
+            color: var(--neon-green);
+            opacity: 0.7;
+        }
+
+        .controls-panel {
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid var(--terminal-border);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 
+                0 0 20px rgba(57, 255, 20, 0.3),
+                inset 0 0 20px rgba(57, 255, 20, 0.1);
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: var(--neon-cyan);
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        input[type="text"],
+        textarea,
+        select {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            border: 1px solid var(--neon-green);
+            color: var(--neon-green);
+            padding: 10px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 1rem;
+            border-radius: 4px;
+            outline: none;
+            transition: all 0.3s;
+        }
+
+        input[type="text"]:focus,
+        textarea:focus,
+        select:focus {
+            border-color: var(--neon-cyan);
+            box-shadow: 0 0 10px rgba(0, 245, 255, 0.5);
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .button-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        button {
+            background: rgba(57, 255, 20, 0.1);
+            border: 2px solid var(--neon-green);
+            color: var(--neon-green);
+            padding: 10px 20px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.9rem;
+            cursor: pointer;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        button:hover {
+            background: rgba(57, 255, 20, 0.2);
+            box-shadow: 0 0 15px rgba(57, 255, 20, 0.6);
+            transform: translateY(-2px);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .toggle-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 50px;
+            height: 24px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(255, 255, 255, 0.1);
+            border: 1px solid var(--neon-green);
+            transition: 0.4s;
+            border-radius: 24px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 3px;
+            bottom: 3px;
+            background-color: var(--neon-green);
+            transition: 0.4s;
+            border-radius: 50%;
+            box-shadow: 0 0 5px var(--neon-green);
+        }
+
+        input:checked + .slider {
+            background-color: rgba(57, 255, 20, 0.3);
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+
+        .slider-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        input[type="range"] {
+            flex: 1;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid var(--neon-green);
+            border-radius: 3px;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            background: var(--neon-green);
+            cursor: pointer;
+            border-radius: 50%;
+            box-shadow: 0 0 5px var(--neon-green);
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            background: var(--neon-green);
+            cursor: pointer;
+            border-radius: 50%;
+            box-shadow: 0 0 5px var(--neon-green);
+        }
+
+        .output-panel {
+            background: rgba(0, 0, 0, 0.95);
+            border: 2px solid var(--neon-cyan);
+            border-radius: 8px;
+            padding: 20px;
+            min-height: 300px;
+            margin-bottom: 20px;
+            box-shadow: 
+                0 0 20px rgba(0, 245, 255, 0.3),
+                inset 0 0 20px rgba(0, 245, 255, 0.1);
+            position: relative;
+        }
+
+        .output-header {
+            color: var(--neon-cyan);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 15px;
+            font-size: 0.9rem;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--neon-cyan);
+        }
+
+        #ascii-output {
+            font-family: 'Courier New', Courier, monospace;
+            color: var(--neon-green);
+            white-space: pre;
+            overflow-x: auto;
+            overflow-y: auto;
+            max-height: 500px;
+            line-height: 1.2;
+            font-size: 0.8rem;
+            opacity: 0;
+            animation: fadeIn 0.5s forwards;
+        }
+
+        @keyframes fadeIn {
+            to { opacity: 1; }
+        }
+
+        #ascii-output.cyber-mode {
+            text-shadow: 
+                0 0 5px var(--neon-green),
+                0 0 10px var(--neon-green);
+        }
+
+        .output-panel.generating {
+            animation: pulse 0.5s ease-in-out;
+        }
+
+        @keyframes pulse {
+            0%, 100% { border-color: var(--neon-cyan); }
+            50% { border-color: var(--neon-green); }
+        }
+
+        .terminal-log {
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid rgba(57, 255, 20, 0.3);
+            border-radius: 4px;
+            padding: 10px;
+            margin-top: 20px;
+            font-size: 0.75rem;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+
+        .log-entry {
+            color: var(--neon-green);
+            opacity: 0.7;
+            margin: 2px 0;
+        }
+
+        .log-entry::before {
+            content: '> ';
+            color: var(--neon-cyan);
+        }
+
+        .caret {
+            display: inline-block;
+            width: 8px;
+            height: 14px;
+            background: var(--neon-green);
+            animation: blink 1s infinite;
+            margin-left: 2px;
+        }
+
+        @keyframes blink {
+            0%, 49% { opacity: 1; }
+            50%, 100% { opacity: 0; }
+        }
+
+        .size-controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .size-btn {
+            flex: 1;
+            min-width: 80px;
+        }
+
+        .size-btn.active {
+            background: rgba(57, 255, 20, 0.3);
+            box-shadow: 0 0 10px rgba(57, 255, 20, 0.6);
+        }
+
+        @media (max-width: 768px) {
+            #banner {
+                font-size: clamp(6px, 2vw, 12px);
+            }
+
+            .container {
+                padding: 10px;
+            }
+
+            h1 {
+                font-size: 1.5rem;
+            }
+
+            .button-group {
+                flex-direction: column;
+            }
+
+            button {
+                width: 100%;
+            }
+
+            .size-controls {
+                flex-direction: column;
+            }
+
+            #ascii-output {
+                font-size: 0.6rem;
+            }
+        }
+
+        .accessibility-controls {
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid rgba(57, 255, 20, 0.3);
+            border-radius: 4px;
+            padding: 10px;
+            margin-top: 20px;
+            font-size: 0.8rem;
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.95);
+            border: 2px solid var(--neon-green);
+            color: var(--neon-green);
+            padding: 15px 20px;
+            border-radius: 4px;
+            z-index: 1000;
+            opacity: 0;
+            transform: translateX(400px);
+            transition: all 0.3s;
+            box-shadow: 0 0 20px rgba(57, 255, 20, 0.5);
+        }
+
+        .notification.show {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    </style>
+</head>
+<body>
+    <canvas id="matrix-canvas"></canvas>
+    <div class="scanlines"></div>
+    <div class="flicker-overlay"></div>
+
+    <div class="container">
+        <div id="banner"></div>
+
+        <div class="header">
+            <h1>ASCII ART GENERATOR</h1>
+            <p class="subtitle">Transform Text Into Terminal Art</p>
+        </div>
+
+        <div class="controls-panel">
+            <div class="control-group">
+                <label for="text-input" aria-label="Input Text">Input Text</label>
+                <textarea id="text-input" placeholder="Type your text here..." aria-label="Text to convert to ASCII art">HELLO</textarea>
+            </div>
+
+            <div class="control-group">
+                <label for="font-select" aria-label="ASCII Font">ASCII Font</label>
+                <select id="font-select" aria-label="Select ASCII art font">
+                    <option value="block">Block</option>
+                    <option value="shadow">Shadow</option>
+                    <option value="cyber">Cyber</option>
+                    <option value="script">Script</option>
+                    <option value="thin">Thin</option>
+                    <option value="pixel">Pixel</option>
+                    <option value="slant">Slant</option>
+                    <option value="standard">Standard</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label>ASCII Size</label>
+                <div class="size-controls">
+                    <button class="size-btn" data-size="small">Small</button>
+                    <button class="size-btn active" data-size="medium">Medium</button>
+                    <button class="size-btn" data-size="large">Large</button>
+                </div>
+            </div>
+
+            <div class="button-group">
+                <button id="copy-btn" aria-label="Copy ASCII art to clipboard">Copy ASCII</button>
+                <button id="download-btn" aria-label="Download ASCII art as text file">Download .txt</button>
+                <button id="clear-btn" aria-label="Clear all">Clear</button>
+            </div>
+
+            <div class="control-group">
+                <div class="toggle-group">
+                    <label style="margin: 0;">Matrix Rain</label>
+                    <label class="toggle-switch" aria-label="Toggle Matrix rain effect">
+                        <input type="checkbox" id="matrix-toggle">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <div class="toggle-group">
+                    <label style="margin: 0;">Cyber Mode</label>
+                    <label class="toggle-switch" aria-label="Toggle Cyber mode glow">
+                        <input type="checkbox" id="cyber-toggle">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label for="glitch-slider">Glitch Intensity</label>
+                <div class="slider-control">
+                    <input type="range" id="glitch-slider" min="0" max="10" value="3" aria-label="Adjust glitch effect intensity">
+                    <span id="glitch-value">3</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="output-panel" id="output-panel">
+            <div class="output-header">ASCII Output</div>
+            <div id="ascii-output">Ready to generate ASCII art...</div>
+        </div>
+
+        <div class="terminal-log" id="terminal-log" aria-live="polite"></div>
+
+        <div class="accessibility-controls">
+            <div class="toggle-group">
+                <label style="margin: 0;">High Contrast</label>
+                <label class="toggle-switch" aria-label="Toggle high contrast mode">
+                    <input type="checkbox" id="contrast-toggle">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="toggle-group" style="margin-top: 10px;">
+                <label style="margin: 0;">Reduce Motion</label>
+                <label class="toggle-switch" aria-label="Toggle reduced motion mode">
+                    <input type="checkbox" id="motion-toggle">
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <div class="notification" id="notification"></div>
+
+    <script>
+        const ASCII_FONTS = {
+            block: {
+                height: 5,
+                chars: {
+                    'A': ['  █████  ', ' ██   ██ ', '███████ ', '██   ██ ', '██   ██ '],
+                    'B': ['██████  ', '██   ██ ', '██████  ', '██   ██ ', '██████  '],
+                    'C': [' ██████ ', '██      ', '██      ', '██      ', ' ██████ '],
+                    'D': ['██████  ', '██   ██ ', '██   ██ ', '██   ██ ', '██████  '],
+                    'E': ['███████ ', '██      ', '█████   ', '██      ', '███████ '],
+                    'F': ['███████ ', '██      ', '█████   ', '██      ', '██      '],
+                    'G': [' ██████ ', '██      ', '██  ███ ', '██   ██ ', ' ██████ '],
+                    'H': ['██   ██ ', '██   ██ ', '███████ ', '██   ██ ', '██   ██ '],
+                    'I': ['██ ', '██ ', '██ ', '██ ', '██ '],
+                    'J': ['     ██ ', '     ██ ', '     ██ ', '██   ██ ', ' █████  '],
+                    'K': ['██   ██ ', '██  ██  ', '█████   ', '██  ██  ', '██   ██ '],
+                    'L': ['██      ', '██      ', '██      ', '██      ', '███████ '],
+                    'M': ['███    ███ ', '████  ████ ', '██ ████ ██ ', '██  ██  ██ ', '██      ██ '],
+                    'N': ['███    ██ ', '████   ██ ', '██ ██  ██ ', '██  ██ ██ ', '██   ████ '],
+                    'O': [' ██████  ', '██    ██ ', '██    ██ ', '██    ██ ', ' ██████  '],
+                    'P': ['██████  ', '██   ██ ', '██████  ', '██      ', '██      '],
+                    'Q': [' ██████  ', '██    ██ ', '██    ██ ', '██ ▄▄ ██ ', ' ██████  '],
+                    'R': ['██████  ', '██   ██ ', '██████  ', '██   ██ ', '██   ██ '],
+                    'S': [' ██████ ', '██      ', ' █████ ', '     ██ ', '██████  '],
+                    'T': ['████████ ', '   ██    ', '   ██    ', '   ██    ', '   ██    '],
+                    'U': ['██    ██ ', '██    ██ ', '██    ██ ', '██    ██ ', ' ██████  '],
+                    'V': ['██    ██ ', '██    ██ ', '██    ██ ', ' ██  ██  ', '  ████   '],
+                    'W': ['██     ██ ', '██     ██ ', '██  █  ██ ', '██ ███ ██ ', ' ███ ███  '],
+                    'X': ['██   ██ ', ' ██ ██  ', '  ███   ', ' ██ ██  ', '██   ██ '],
+                    'Y': ['██    ██ ', ' ██  ██  ', '  ████   ', '   ██    ', '   ██    '],
+                    'Z': ['███████ ', '   ███  ', '  ███   ', ' ███    ', '███████ '],
+                    '0': [' ██████  ', '██  ████ ', '██ ██ ██ ', '████  ██ ', ' ██████  '],
+                    '1': [' ██ ', '███ ', ' ██ ', ' ██ ', ' ██ '],
+                    '2': ['██████  ', '    ██  ', '  ███   ', ' ██     ', '███████ '],
+                    '3': ['██████  ', '    ██  ', '  ████  ', '    ██  ', '██████  '],
+                    '4': ['██   ██ ', '██   ██ ', '███████ ', '     ██ ', '     ██ '],
+                    '5': ['███████ ', '██      ', '██████  ', '     ██ ', '██████  '],
+                    '6': [' ██████  ', '██      ', '██████  ', '██   ██ ', ' ██████  '],
+                    '7': ['███████ ', '    ██  ', '   ██   ', '  ██    ', ' ██     '],
+                    '8': [' ██████  ', '██    ██ ', ' ██████  ', '██    ██ ', ' ██████  '],
+                    '9': [' ██████  ', '██   ██ ', ' ██████  ', '     ██ ', ' ██████  '],
+                    ' ': ['   ', '   ', '   ', '   ', '   '],
+                    '!': ['██ ', '██ ', '██ ', '   ', '██ '],
+                    '?': [' ████  ', '    ██ ', '  ███  ', '       ', '  ██   '],
+                    '.': ['   ', '   ', '   ', '   ', '██ '],
+                    ',': ['   ', '   ', '   ', ' ██ ', '██  '],
+                    '-': ['      ', '      ', '█████ ', '      ', '      '],
+                    '_': ['       ', '       ', '       ', '       ', '██████ ']
+                }
+            },
+            shadow: {
+                height: 6,
+                chars: {
+                    'A': ['   ▄████████ ', '  ███    ███ ', '  ███    ███ ', '  ███    ███ ', '▀███████████ ', '  ███    ███ '],
+                    'B': ['▀█████████▄  ', '  ███    ███ ', '  ███    ███ ', '▄███████████ ', '▀█████████▀  ', '  ███        '],
+                    'C': [' ▄████████  ', '███    ███  ', '███        ', '███        ', '███    ███  ', ' ▀██████▀   '],
+                    'D': ['▀█████████▄  ', '  ███    ███ ', '  ███    ███ ', '  ███    ███ ', '▄█████████▀  ', '             '],
+                    'E': ['▀████████████▄ ', '  ███    ███  ', '  ███▌        ', '  ████████▀   ', '  ███    ███  ', '▄████████████▀'],
+                    'F': ['▀████████████▄ ', '  ███    ███  ', '  ███▌        ', '  ████████▀   ', '  ███         ', '▄███▀         '],
+                    'G': [' ▄████████  ', '███    ███  ', '███         ', '███    ███  ', '███    ███  ', ' ▀██████▀   '],
+                    'H': ['  ███    ███ ', '  ███    ███ ', '  ███▀▀▀███  ', '  ███    ███ ', '  ███    ███ ', '▄████▀  ▀███▄'],
+                    'I': ['███ ', '███ ', '███ ', '███ ', '███ ', '███▀'],
+                    'J': ['       ███ ', '       ███ ', '       ███ ', ' ▄█    ███ ', '███    ███ ', ' ▀██████▀  '],
+                    'K': ['  ███    ███ ', '  ███   ███  ', '  ███████    ', '  ███  ███   ', '  ███   ███  ', '▄████▀  ▀███▄'],
+                    'L': ['  ███       ', '  ███       ', '  ███       ', '  ███       ', '  ███       ', '▄████▀████▀ '],
+                    'M': ['  ███▄▄▄███  ', '  ███▀▀▀███  ', '  ███   ███  ', '  ███   ███  ', '  ███   ███  ', '▄████▀ ▀████▄'],
+                    'N': ['  ███▄▄▄███ ', '  ███▀▀▀███ ', '  ███   ███ ', '  ███   ███ ', '  ███   ███ ', '▄████▀ ▄███▀ '],
+                    'O': [' ▄██████▄  ', '███    ███ ', '███    ███ ', '███    ███ ', '███    ███ ', ' ▀██████▀  '],
+                    'P': ['▀████████▄  ', '  ███   ███ ', '  ███▄▄██▀  ', '  ███▀▀▀    ', '  ███       ', '▄████▀      '],
+                    'Q': [' ▄██████▄   ', '███    ███  ', '███    ███  ', '███    ███▄ ', '███    ███  ', ' ▀██████▀   '],
+                    'R': ['▀████████▄  ', '  ███   ███ ', '  ███████▀  ', '  ███  ██▄  ', '  ███   ███ ', '▄████▀ ▀███▄'],
+                    'S': [' ▄████████ ', '███    ███ ', '███        ', ' ▀███████  ', '      ███  ', '▀██████▀   '],
+                    'T': ['▀█████████▄ ', '  ███    ██ ', '  ███       ', '  ███       ', '  ███       ', '▄████▀      '],
+                    'U': ['  ███    ███ ', '  ███    ███ ', '  ███    ███ ', '  ███    ███ ', '  ███    ███ ', '  ▀██████▀   '],
+                    'V': ['  ███    ███ ', '  ███    ███ ', '  ███    ███ ', '  ███  ▄███  ', '   ███ ███   ', '    ▀███▀    '],
+                    'W': ['  ███    ███ ', '  ███    ███ ', '  ███    ███ ', '  ███  █ ███ ', '  ███ ███ ███', '   ▀███▀ ▀██ '],
+                    'X': ['  ███   ███ ', '   ███ ███  ', '    █████   ', '   ███ ███  ', '  ███   ███ ', '▄████▀ ▀████▄'],
+                    'Y': ['  ███    ███ ', '   ███  ███  ', '    ███████  ', '     ███     ', '     ███     ', '    ▄███▀    '],
+                    'Z': ['▀███████████ ', '     ▄███▀   ', '   ▄███▀     ', ' ▄███▀       ', '███████████▀ ', '             '],
+                    ' ': ['    ', '    ', '    ', '    ', '    ', '    '],
+                    '0': ['  ▄█████▄  ', ' ███   ███ ', ' ███ ▄ ███ ', ' ███   ███ ', '  ▀█████▀  ', '            '],
+                    '1': [' ▄█ ', '███ ', ' ██ ', ' ██ ', ' ██ ', '▄██▄'],
+                    '2': ['▀███████▄ ', '    ▄███▀ ', '  ▄███▀   ', ' ███▀     ', '███████████'],
+                    '3': ['▀███████▄ ', '    ▄███▀ ', '  ▄███    ', '    ▄███▀ ', '▀███████▀ '],
+                    '4': [' ███   ██ ', ' ███   ██ ', '▀███████████', '      ██ ', '      ██ '],
+                    '5': ['███████████', '███       ', '███████▄  ', '     ▀███ ', '▀███████▀ '],
+                    '6': ['  ▀███████▄ ', ' ███       ', ' ███████▄  ', ' ███   ███ ', '  ▀██████▀  '],
+                    '7': ['███████████', '     ▄███▀ ', '   ▄███▀   ', '  ███▀     ', ' ███       '],
+                    '8': ['  ▀███████▄ ', ' ███    ███', '  ▀███████▄', ' ███    ███', '  ▀███████▀'],
+                    '9': ['  ▀███████▄ ', ' ███    ███', '  ▀███████▄', '       ███ ', '  ▀███████▀'],
+                    '!': ['███ ', '███ ', '███ ', '    ', '███ ', '▀██▀'],
+                    '?': [' ▀███▀ ', '   ███ ', '  ███  ', '       ', '  ██   ', '  ▀▀   '],
+                    '.': ['   ', '   ', '   ', '   ', '██ ', '▀▀ '],
+                    ',': ['   ', '   ', '   ', ' ██ ', ' ██ ', '██  ']
+                }
+            },
+            cyber: {
+                height: 5,
+                chars: {
+                    'A': ['░█████╗░', '██╔══██╗', '███████║', '██╔══██║', '██║░░██║'],
+                    'B': ['██████╗░', '██╔══██╗', '██████╦╝', '██╔══██╗', '██████╦╝'],
+                    'C': ['░█████╗░', '██╔══██╗', '██║░░╚═╝', '██║░░██╗', '╚█████╔╝'],
+                    'D': ['██████╗░', '██╔══██╗', '██║░░██║', '██║░░██║', '██████╔╝'],
+                    'E': ['███████╗', '██╔════╝', '█████╗░░', '██╔══╝░░', '███████╗'],
+                    'F': ['███████╗', '██╔════╝', '█████╗░░', '██╔══╝░░', '██║░░░░░'],
+                    'G': ['░██████╗░', '██╔════╝░', '██║░░██╗░', '██║░░╚██╗', '╚██████╔╝'],
+                    'H': ['██╗░░██╗', '██║░░██║', '███████║', '██╔══██║', '██║░░██║'],
+                    'I': ['██╗', '██║', '██║', '██║', '██║'],
+                    'J': ['░░░░░██╗', '░░░░░██║', '░░░░░██║', '██╗░░██║', '╚█████╔╝'],
+                    'K': ['██╗░░██╗', '██║░██╔╝', '█████═╝░', '██╔═██╗░', '██║░╚██╗'],
+                    'L': ['██╗░░░░░', '██║░░░░░', '██║░░░░░', '██║░░░░░', '███████╗'],
+                    'M': ['███╗░░░███╗', '████╗░████║', '██╔████╔██║', '██║╚██╔╝██║', '██║░╚═╝░██║'],
+                    'N': ['███╗░░██╗', '████╗░██║', '██╔██╗██║', '██║╚████║', '██║░╚███║'],
+                    'O': ['░█████╗░', '██╔══██╗', '██║░░██║', '██║░░██║', '╚█████╔╝'],
+                    'P': ['██████╗░', '██╔══██╗', '██████╔╝', '██╔═══╝░', '██║░░░░░'],
+                    'Q': ['░██████╗░', '██╔═══██╗', '██║██╗██║', '╚██████╔╝', '░╚═██╔═╝░'],
+                    'R': ['██████╗░', '██╔══██╗', '██████╔╝', '██╔══██╗', '██║░░██║'],
+                    'S': ['░██████╗', '██╔════╝', '╚█████╗░', '░╚═══██╗', '██████╔╝'],
+                    'T': ['████████╗', '╚══██╔══╝', '░░░██║░░░', '░░░██║░░░', '░░░██║░░░'],
+                    'U': ['██╗░░░██╗', '██║░░░██║', '██║░░░██║', '██║░░░██║', '╚██████╔╝'],
+                    'V': ['██╗░░░██╗', '██║░░░██║', '╚██╗░██╔╝', '░╚████╔╝░', '░░╚██╔╝░░'],
+                    'W': ['░██╗░░░░░░░██╗', '░██║░░██╗░░██║', '░╚██╗████╗██╔╝', '░░████╔═████║░', '░░╚██╔╝░╚██╔╝░'],
+                    'X': ['██╗░░██╗', '╚██╗██╔╝', '░╚███╔╝░', '░██╔██╗░', '██╔╝╚██╗'],
+                    'Y': ['██╗░░░██╗', '╚██╗░██╔╝', '░╚████╔╝░', '░░╚██╔╝░░', '░░░██║░░░'],
+                    'Z': ['███████╗', '╚════██║', '░░░░██╔╝', '░░░██╔╝░', '░░██╔╝░░'],
+                    ' ': ['░░░', '░░░', '░░░', '░░░', '░░░'],
+                    '0': ['░█████╗░', '██╔══██╗', '██║░░██║', '██║░░██║', '╚█████╔╝'],
+                    '1': ['░░███╗░░', '░████║░░', '██╔██║░░', '╚═╝██║░░', '███████╗'],
+                    '2': ['██████╗░', '╚════██╗', '░░███╔═╝', '██╔═══╝░', '███████╗'],
+                    '3': ['██████╗░', '╚════██╗', '░█████╔╝', '░╚═══██╗', '██████╔╝'],
+                    '4': ['░░██╗██╗', '░██╔╝██║', '██╔╝░██║', '███████║', '╚════██║'],
+                    '5': ['███████╗', '██╔════╝', '██████╗░', '╚════██╗', '██████╔╝'],
+                    '6': ['░█████╗░', '██╔═══╝░', '██████╗░', '██╔══██╗', '╚█████╔╝'],
+                    '7': ['███████╗', '╚════██║', '░░░░██╔╝', '░░░██╔╝░', '░░██╔╝░░'],
+                    '8': ['░█████╗░', '██╔══██╗', '╚█████╔╝', '██╔══██╗', '╚█████╔╝'],
+                    '9': ['░█████╗░', '██╔══██╗', '╚█████╔╝', '░╚═══██╗', '░█████╔╝'],
+                    '!': ['██╗', '██║', '██║', '╚═╝', '██╗'],
+                    '?': ['██████╗', '╚════██╗', '░░░░██╔╝', '░░░░╚═╝░', '░░░░██╗░']
+                }
+            },
+            script: {
+                height: 4,
+                chars: {
+                    'A': [' __.  ', '/  |  ', '|  |  ', '|__|  '],
+                    'B': [' ____ ', '|  _ \\', '| |_) |', '|____/'],
+                    'C': [' ____ ', '/ ___|', '| |   ', '|_|   '],
+                    'D': [' ____ ', '|  _ \\', '| | | |', '|_| |_|'],
+                    'E': [' ____ ', '| ___|', '|  _| ', '|_|   '],
+                    'F': [' ____ ', '| ___|', '|  _| ', '|_|   '],
+                    'G': [' ____ ', '/ ___|', '| |  _', '|___|_'],
+                    'H': ['_   _ ', '| | | |', '| |_| |', '|_____|'],
+                    'I': ['___', '| |', '| |', '|_|'],
+                    'J': ['   _', '  | |', '  | |', '|___|'],
+                    'K': ['_  __', '| |/ /', '|   < ', '|_|\\_\\'],
+                    'L': ['_    ', '| |   ', '| |__ ', '|____|'],
+                    'M': ['__  __ ', '|  \\/  |', '| |\\/| |', '|_|  |_|'],
+                    'N': ['_   _ ', '| \\ | |', '|  \\| |', '|_| \\_|'],
+                    'O': [' ___  ', '/ _ \\ ', '| | | |', '|_| |_|'],
+                    'P': [' ____ ', '|  _ \\', '| |_) |', '|____/ '],
+                    'Q': [' ___  ', '/ _ \\ ', '| | | |', '|_|\\_\\_'],
+                    'R': [' ____ ', '|  _ \\', '| |_) |', '|____/'],
+                    'S': [' ____ ', '/ ___|', '\\___ \\', '|____/'],
+                    'T': ['_____ ', '|_   _|', '  | |  ', '  |_|  '],
+                    'U': ['_   _ ', '| | | |', '| |_| |', ' \\___/ '],
+                    'V': ['_   _ ', '| | | |', '| | | |', ' \\_/  '],
+                    'W': ['_     _ ', '| |   | |', '| | _ | |', '|_| |_|_|'],
+                    'X': ['__  __', '\\ \\/ /', ' >  < ', '/_/\\_\\'],
+                    'Y': ['_   _', '| | | |', ' \\_/ ', '  |  '],
+                    'Z': ['_____', '  / /', ' / / ', '/___/'],
+                    ' ': ['   ', '   ', '   ', '   '],
+                    '0': [' ___  ', '/ _ \\ ', '| | | |', '|_|_|_|'],
+                    '1': [' _ ', '/ |', '| |', '|_|'],
+                    '2': [' ___ ', '|_  )', ' / / ', '/___|'],
+                    '3': [' ____', '|__ /', ' |_ \\', '|___/'],
+                    '4': ['_  _ ', '| || |', '|_  _|', '  |_| '],
+                    '5': [' ____', '| ___/', '|___ \\', '|____/'],
+                    '6': [' ___ ', '/ _ \\', '| (_) |', ' \\___/ '],
+                    '7': ['____ ', '|__  )', '  / / ', ' /_/  '],
+                    '8': [' ___ ', '( _ )', '/ _ \\', '\\___/'],
+                    '9': [' ___ ', '/ _ \\', '\\__, /', ' /_/  '],
+                    '!': ['_ ', '| |', '|_|', '(_)'],
+                    '?': ['___ ', '|__ \\', '  /_/', ' (_) ']
+                }
+            },
+            thin: {
+                height: 5,
+                chars: {
+                    'A': [' ▄▀█ ', '█▀█ ', '█▀█ ', '█░█ ', '▀░▀ '],
+                    'B': ['█▄▄ ', '█▄█ ', '█▄█ ', '█▄█ ', '▀▀▀ '],
+                    'C': ['█▀▀ ', '█░░ ', '█░░ ', '█▄▄ ', '▀▀▀ '],
+                    'D': ['█▀▄ ', '█░█ ', '█▄▀ ', '█░█ ', '▀▀▀ '],
+                    'E': ['█▀▀ ', '█▀▀ ', '█▀░ ', '█▄▄ ', '▀▀▀ '],
+                    'F': ['█▀▀ ', '█▀▀ ', '█▀░ ', '█░░ ', '▀░░ '],
+                    'G': ['█▀▀ ', '█░█ ', '█▄█ ', '█▄█ ', '▀▀▀ '],
+                    'H': ['█░█ ', '█▀█ ', '█▀█ ', '█░█ ', '▀░▀ '],
+                    'I': ['█ ', '█ ', '█ ', '█ ', '▀ '],
+                    'J': ['░█ ', '░█ ', '░█ ', '█▄ ', '▀▀ '],
+                    'K': ['█░█ ', '█▀▄ ', '█░█ ', '█░█ ', '▀░▀ '],
+                    'L': ['█░░ ', '█░░ ', '█░░ ', '█▄▄ ', '▀▀▀ '],
+                    'M': ['█▀▄▀█ ', '█░▀░█ ', '█░░░█ ', '█░░░█ ', '▀░░░▀ '],
+                    'N': ['█▄░█ ', '█░▀█ ', '█░░█ ', '█░░█ ', '▀░░▀ '],
+                    'O': ['█▀█ ', '█░█ ', '█░█ ', '█▄█ ', '▀▀▀ '],
+                    'P': ['█▀█ ', '█▀▀ ', '█░░ ', '█░░ ', '▀░░ '],
+                    'Q': ['█▀█ ', '█░█ ', '█▀█ ', '▀▀█ ', '░░▀ '],
+                    'R': ['█▀█ ', '█▀▄ ', '█░█ ', '█░█ ', '▀░▀ '],
+                    'S': ['█▀ ', '▀▄ ', '░▄ ', '▄█ ', '▀▀ '],
+                    'T': ['▀█▀ ', '░█░ ', '░█░ ', '░█░ ', '░▀░ '],
+                    'U': ['█░█ ', '█░█ ', '█░█ ', '█▄█ ', '▀▀▀ '],
+                    'V': ['█░█ ', '█░█ ', '▀▄▀ ', '░▀░ ', '░░░ '],
+                    'W': ['█░█░█ ', '█▄█▄█ ', '█░▀░█ ', '▀░░░▀ ', '░░░░░ '],
+                    'X': ['▀▄▀ ', '░█░ ', '▄▀▄ ', '█░█ ', '▀░▀ '],
+                    'Y': ['█░█ ', '▀▄▀ ', '░█░ ', '░█░ ', '░▀░ '],
+                    'Z': ['▀█ ', '▄▀ ', '█░ ', '█▄ ', '▀▀ '],
+                    ' ': ['  ', '  ', '  ', '  ', '  '],
+                    '0': ['█▀█ ', '█▄█ ', '█░█ ', '█▄█ ', '▀▀▀ '],
+                    '1': ['▄█ ', '░█ ', '░█ ', '░█ ', '░▀ '],
+                    '2': ['▀█ ', '▄▀ ', '█░ ', '█▄ ', '▀▀ '],
+                    '3': ['▀▀█ ', '░▄▀ ', '░▀▄ ', '▀▀█ ', '░░▀ '],
+                    '4': ['░█ ', '▄█ ', '▀▀ ', '░█ ', '░▀ '],
+                    '5': ['█▀ ', '▀▄ ', '░▄ ', '▄█ ', '▀▀ '],
+                    '6': ['▄▀█ ', '█▀▄ ', '█▄█ ', '█▄█ ', '▀▀▀ '],
+                    '7': ['▀▀█ ', '░▄▀ ', '▄▀░ ', '█░░ ', '▀░░ '],
+                    '8': ['▄▀█ ', '█▀█ ', '█▄█ ', '█▄█ ', '▀▀▀ '],
+                    '9': ['▄▀█ ', '█▄█ ', '░▀█ ', '▄▄█ ', '▀▀▀ '],
+                    '!': ['█ ', '█ ', '░ ', '▄ ', '▀ '],
+                    '?': ['▀█ ', '▄▀ ', '░░ ', '▄░ ', '▀░ ']
+                }
+            },
+            pixel: {
+                height: 5,
+                chars: {
+                    'A': ['▄▀▀▄ ', '█▄▄█ ', '█  █ ', '█  █ ', '▀  ▀ '],
+                    'B': ['█▀▀▄ ', '█▄▄▀ ', '█  █ ', '█▄▄▀ ', '▀▀▀  '],
+                    'C': ['▄▀▀▀ ', '█    ', '█    ', '▀▄▄▄ ', '     '],
+                    'D': ['█▀▀▄ ', '█  █ ', '█  █ ', '█▄▄▀ ', '▀▀▀  '],
+                    'E': ['█▀▀▀ ', '█▀▀  ', '█    ', '█▄▄▄ ', '▀▀▀▀ '],
+                    'F': ['█▀▀▀ ', '█▀▀  ', '█    ', '█    ', '▀    '],
+                    'G': ['▄▀▀▀ ', '█  ▄ ', '█  █ ', '▀▄▄▀ ', '     '],
+                    'H': ['█  █ ', '█▄▄█ ', '█  █ ', '█  █ ', '▀  ▀ '],
+                    'I': ['█ ', '█ ', '█ ', '█ ', '▀ '],
+                    'J': ['  █ ', '  █ ', '  █ ', '▄▄▀ ', '▀▀  '],
+                    'K': ['█ █ ', '██  ', '█▀▄ ', '█ █ ', '▀ ▀ '],
+                    'L': ['█    ', '█    ', '█    ', '█▄▄▄ ', '▀▀▀▀ '],
+                    'M': ['█▄ ▄█ ', '█ █ █ ', '█   █ ', '█   █ ', '▀   ▀ '],
+                    'N': ['█▄ █ ', '█ ██ ', '█  █ ', '█  █ ', '▀  ▀ '],
+                    'O': ['▄▀▀▄ ', '█  █ ', '█  █ ', '▀▄▄▀ ', '     '],
+                    'P': ['█▀▀▄ ', '█▄▄▀ ', '█    ', '█    ', '▀    '],
+                    'Q': ['▄▀▀▄  ', '█  █  ', '█ ▄█  ', '▀▄▄█▄ ', '      '],
+                    'R': ['█▀▀▄ ', '█▄▄▀ ', '█ █  ', '█  █ ', '▀  ▀ '],
+                    'S': ['▄▀▀▀ ', '▀▀▀▄ ', '▄▄▄▀ ', '▀▄▄▄ ', '     '],
+                    'T': ['▀█▀ ', ' █  ', ' █  ', ' █  ', ' ▀  '],
+                    'U': ['█  █ ', '█  █ ', '█  █ ', '▀▄▄▀ ', '     '],
+                    'V': ['█  █ ', '█  █ ', '▀▄▄▀ ', ' ▀▀  ', '     '],
+                    'W': ['█   █ ', '█ █ █ ', '█ █ █ ', '▀▄▀▄▀ ', '      '],
+                    'X': ['█ █ ', ' █  ', ' █  ', '█ █ ', '▀ ▀ '],
+                    'Y': ['█ █ ', '▀▄▀ ', ' █  ', ' █  ', ' ▀  '],
+                    'Z': ['▀▀▀█ ', '  █  ', ' █   ', '█▄▄▄ ', '▀▀▀▀ '],
+                    ' ': ['  ', '  ', '  ', '  ', '  '],
+                    '0': ['▄▀▀▄ ', '█ █ █', '█  █ ', '▀▄▄▀ ', '     '],
+                    '1': ['▄█ ', ' █ ', ' █ ', ' █ ', ' ▀ '],
+                    '2': ['▀▀▄ ', '▄▄▀ ', '█   ', '█▄▄ ', '▀▀▀ '],
+                    '3': ['▀▀▄ ', ' ▄▀ ', ' ▀▄ ', '▄▄▀ ', '▀▀  '],
+                    '4': ['▄ ▄ ', '█ █ ', '▀▀█ ', '  █ ', '  ▀ '],
+                    '5': ['█▀▀ ', '▀▀▄ ', '▄▄▀ ', '▀▄▄ ', '    '],
+                    '6': ['▄▀▀ ', '█▀▄ ', '█ █ ', '▀▄▀ ', '    '],
+                    '7': ['▀▀█ ', '  █ ', ' █  ', ' █  ', ' ▀  '],
+                    '8': ['▄▀▄ ', '▀▄▀ ', '▄▀▄ ', '▀▄▀ ', '    '],
+                    '9': ['▄▀▄ ', '▀▄█ ', ' ▄▀ ', '▄▄▀ ', '▀▀  '],
+                    '!': ['█ ', '█ ', '  ', '█ ', '▀ '],
+                    '?': ['▀▄ ', ' █ ', '   ', ' █ ', ' ▀ ']
+                }
+            },
+            slant: {
+                height: 6,
+                chars: {
+                    'A': ['   ___   ', '  /   |  ', ' / /| |  ', '/ ___ |  ', '/_/  |_|  ', '          '],
+                    'B': ['    ____  ', '   / __ ) ', '  / __  | ', ' / /_/ /  ', '/_____/   ', '          '],
+                    'C': ['   ______', '  / ____/', ' / /     ', '/ /___   ', '\\____/   ', '         '],
+                    'D': ['    ____  ', '   / __ \\ ', '  / / / / ', ' / /_/ /  ', '/_____/   ', '          '],
+                    'E': ['   ______', '  / ____/', ' / __/   ', '/ /___   ', '\\____/   ', '         '],
+                    'F': ['   ______', '  / ____/', ' / /_    ', '/ __/    ', '/_/      ', '         '],
+                    'G': ['   ______', '  / ____/', ' / / __  ', '/ /_/ /  ', '\\____/   ', '         '],
+                    'H': ['    __  __', '   / / / /', '  / /_/ / ', ' / __  /  ', '/_/ /_/   ', '          '],
+                    'I': ['   ____', '  /  _/', ' / /   ', '/_/    ', '       ', '       '],
+                    'J': ['       __', '      / /', ' __  / / ', '/  |/ /  ', '|___/    ', '         '],
+                    'K': ['   __ __', '  / //_/', ' / ,<   ', '/ /| |  ', '/_/ |_|  ', '         '],
+                    'L': ['    __ ', '   / / ', '  / /  ', ' / /___', '/_____/', '       '],
+                    'M': ['   __  ___', '  /  |/  /', ' / /|_/ / ', '/ /  / /  ', '/_/  /_/   ', '          '],
+                    'N': ['   _   __', '  / | / /', ' /  |/ / ', '/ /|  /  ', '/_/ |_/   ', '          '],
+                    'O': ['   ____ ', '  / __ \\', ' / / / /', '/ /_/ / ', '\\____/  ', '        '],
+                    'P': ['    ____ ', '   / __ \\', '  / /_/ /', ' / ____/ ', '/_/      ', '         '],
+                    'Q': ['   ____ ', '  / __ \\', ' / / / /', '/ /_/ \\_ ', '\\___\\_\\/', '        '],
+                    'R': ['    ____ ', '   / __ \\', '  / /_/ /', ' / _, _/ ', '/_/ |_|  ', '         '],
+                    'S': ['   _____', '  / ___/', '  \\__ \\ ', ' ___/ / ', '/____/  ', '        '],
+                    'T': ['   ______', '  /_  __/', '   / /   ', '  / /    ', ' /_/     ', '         '],
+                    'U': ['   __  __', '  / / / /', ' / / / / ', '/ /_/ /  ', '\\____/   ', '         '],
+                    'V': ['  _    __', ' | |  / /', ' | | / / ', ' | |/ /  ', ' |___/   ', '         '],
+                    'W': ['   _       __', '  | |     / /', ' | | /| / / ', ' | |/ |/ /  ', ' |__/|__/   ', '            '],
+                    'X': ['   _  __', '  | |/ /', ' |   / ', ' /   |  ', '/_/|_|  ', '        '],
+                    'Y': ['  __  __', ' / / / /', '/ /_/ / ', '\\__, /  ', ' /_/    ', '        '],
+                    'Z': ['   ____', '  /_  /', '  / / / ', ' / /_/  ', '/___/   ', '        '],
+                    ' ': ['   ', '   ', '   ', '   ', '   ', '   '],
+                    '0': ['   ____ ', '  / __ \\', ' / / / /', '/ /_/ / ', '\\____/  ', '        '],
+                    '1': ['  ___', ' <  /', ' / / ', '/_/  ', '     ', '     '],
+                    '2': ['   ___ ', '  |__ \\', '  __/ /', ' / __/ ', '/____/ ', '       '],
+                    '3': ['   ____', '  |_  /', '  _  / ', ' /  /  ', '/_/    ', '       '],
+                    '4': ['   __ __', '  / // /', ' / // /_', '/__  __/', '  /_/   ', '        '],
+                    '5': ['   ______', '  / ____/', ' /___ \\  ', ' ____/ / ', '/_____/  ', '         '],
+                    '6': ['   _____ ', '  / ___/ ', ' / __ \\  ', '/ /_/ /  ', '\\____/   ', '         '],
+                    '7': ['   ____', '  /_  /', '  / /  ', ' /_/   ', '       ', '       '],
+                    '8': ['   ____ ', '  ( __ )', ' / __  |', '/ /_/ / ', '\\____/  ', '        '],
+                    '9': ['   ____ ', '  / __ \\', ' / /_/ /', ' \\__, / ', '/____/  ', '        '],
+                    '!': ['  __', ' / /', '/ / ', '\\_\\ ', '( ) ', '|/  '],
+                    '?': ['   ___ ', '  /__ \\', '  / _/ ', ' /_/   ', '(_)    ', '       ']
+                }
+            },
+            standard: {
+                height: 6,
+                chars: {
+                    'A': ['     _    ', '    / \\   ', '   / _ \\  ', '  / ___ \\ ', ' /_/   \\_\\', '          '],
+                    'B': ['  ____  ', ' | __ ) ', ' |  _ \\ ', ' | |_) |', ' |____/ ', '        '],
+                    'C': ['   ____ ', '  / ___|', ' | |    ', ' | |___ ', '  \\____|', '        '],
+                    'D': ['  ____  ', ' |  _ \\ ', ' | | | |', ' | |_| |', ' |____/ ', '        '],
+                    'E': ['  _____ ', ' | ____|', ' |  _|  ', ' | |___ ', ' |_____|', '        '],
+                    'F': ['  _____ ', ' |  ___|', ' | |_   ', ' |  _|  ', ' |_|    ', '        '],
+                    'G': ['   ____ ', '  / ___|', ' | |  _ ', ' | |_| |', '  \\____|', '        '],
+                    'H': ['  _   _ ', ' | | | |', ' | |_| |', ' |  _  |', ' |_| |_|', '        '],
+                    'I': ['  ___ ', ' |_ _|', '  | | ', '  | | ', ' |___|', '      '],
+                    'J': ['      _ ', '     | |', '  _  | |', ' | |_| |', '  \\___/ ', '        '],
+                    'K': ['  _  __', ' | |/ /', ' | \' / ', ' | . \\ ', ' |_|\\_\\', '       '],
+                    'L': ['  _     ', ' | |    ', ' | |    ', ' | |___ ', ' |_____|', '        '],
+                    'M': ['  __  __ ', ' |  \\/  |', ' | |\\/| |', ' | |  | |', ' |_|  |_|', '         '],
+                    'N': ['  _   _ ', ' | \\ | |', ' |  \\| |', ' | |\\  |', ' |_| \\_|', '        '],
+                    'O': ['   ___  ', '  / _ \\ ', ' | | | |', ' | |_| |', '  \\___/ ', '        '],
+                    'P': ['  ____  ', ' |  _ \\ ', ' | |_) |', ' |  __/ ', ' |_|    ', '        '],
+                    'Q': ['   ___  ', '  / _ \\ ', ' | | | |', ' | |_| |', '  \\__\\_\\', '        '],
+                    'R': ('  ____  ', ' |  _ \\ ', ' | |_) |', ' |  _ < ', ' |_| \\_\\', '        '),
+                    'S': ('  ____  ', ' / ___| ', ' \\___ \\ ', '  ___) |', ' |____/ ', '        '),
+                    'T': ('  _____ ', ' |_   _|', '   | |  ', '   | |  ', '   |_|  ', '        '),
+                    'U': ('  _   _ ', ' | | | |', ' | | | |', ' | |_| |', '  \\___/ ', '        '),
+                    'V': ('  __     __', ' \\ \\   / /', '  \\ \\ / / ', '   \\ V /  ', '    \\_/   ', '          '),
+                    'W': ('  _        __', ' | |      / /', ' | | /\\  / / ', ' | |/  \\/ /  ', ' |__/\\__/   ', '            '),
+                    'X': ('  __  __', ' \\ \\/ /', '  \\  / ', '  /  \\ ', ' /_/\\_\\', '       '),
+                    'Y': ('  __   __', ' \\ \\ / /', '  \\ V / ', '   | |  ', '   |_|  ', '        '),
+                    'Z': ('  _____', ' |__  /', '   / / ', '  / /_ ', ' /____|', '       '),
+                    ' ': ('    ', '    ', '    ', '    ', '    ', '    '),
+                    '0': ('   ___  ', '  / _ \\ ', ' | | | |', ' | |_| |', '  \\___/ ', '        '),
+                    '1': ('  _ ', ' / |', ' | |', ' | |', ' |_|', '    '),
+                    '2': ('  ____  ', ' |___ \\ ', '   __) |', '  / __/ ', ' |_____|', '        '),
+                    '3': ('  _____ ', ' |___ / ', '   |_ \\ ', '  ___) |', ' |____/ ', '        '),
+                    '4': ('  _  _   ', ' | || |  ', ' | || |_ ', ' |__   _|', '    |_|  ', '         '),
+                    '5': ('  ____  ', ' | ___| ', ' |___ \\ ', '  ___) |', ' |____/ ', '        '),
+                    '6': ('   __   ', '  / /_  ', ' | \'_ \\ ', ' | (_) |', '  \\___/ ', '        '),
+                    '7': ('  _____ ', ' |___  |', '    / / ', '   / /  ', '  /_/   ', '        '),
+                    '8': ('   ___  ', '  ( _ ) ', '  / _ \\ ', ' | (_) |', '  \\___/ ', '        '),
+                    '9': ('   ___  ', '  / _ \\ ', ' | (_) |', '  \\__, |', '    /_/ ', '        '),
+                    '!': ('  _ ', ' | |', ' | |', ' |_|', ' (_)', '    '),
+                    '?': ('  ___ ', ' |__ \\', '   / /', '  |_| ', '  (_) ', '      ')
+                }
+            }
+        };
+
+        const MAQSADBEK_BANNER = `
+███╗   ███╗ █████╗  ██████╗ ███████╗ █████╗ ██████╗ ██████╗ ███████╗██╗  ██╗
+████╗ ████║██╔══██╗██╔═══██╗██╔════╝██╔══██╗██╔══██╗██╔══██╗██╔════╝██║ ██╔╝
+██╔████╔██║███████║██║   ██║███████╗███████║██║  ██║██████╔╝█████╗  █████╔╝ 
+██║╚██╔╝██║██╔══██║██║▄▄ ██║╚════██║██╔══██║██║  ██║██╔══██╗██╔══╝  ██╔═██╗ 
+██║ ╚═╝ ██║██║  ██║╚██████╔╝███████║██║  ██║██████╔╝██████╔╝███████╗██║  ██╗
+╚═╝     ╚═╝╚═╝  ╚═╝ ╚══▀▀═╝ ╚══════╝╚═╝  ╚═╝╚═════╝ ╚═════╝ ╚══════╝╚═╝  ╚═╝`;
+
+        const elements = {
+            banner: document.getElementById('banner'),
+            textInput: document.getElementById('text-input'),
+            fontSelect: document.getElementById('font-select'),
+            asciiOutput: document.getElementById('ascii-output'),
+            outputPanel: document.getElementById('output-panel'),
+            copyBtn: document.getElementById('copy-btn'),
+            downloadBtn: document.getElementById('download-btn'),
+            clearBtn: document.getElementById('clear-btn'),
+            matrixToggle: document.getElementById('matrix-toggle'),
+            cyberToggle: document.getElementById('cyber-toggle'),
+            glitchSlider: document.getElementById('glitch-slider'),
+            glitchValue: document.getElementById('glitch-value'),
+            contrastToggle: document.getElementById('contrast-toggle'),
+            motionToggle: document.getElementById('motion-toggle'),
+            terminalLog: document.getElementById('terminal-log'),
+            notification: document.getElementById('notification'),
+            matrixCanvas: document.getElementById('matrix-canvas')
+        };
+
+        let currentSize = 'medium';
+        let glitchInterval = null;
+
+        function initBanner() {
+            elements.banner.textContent = MAQSADBEK_BANNER;
+            startBannerGlitch();
+        }
+
+        function startBannerGlitch() {
+            const intensity = parseInt(elements.glitchSlider.value);
+            if (glitchInterval) clearInterval(glitchInterval);
+            
+            if (intensity > 0) {
+                const interval = Math.max(100, 1000 - intensity * 80);
+                glitchInterval = setInterval(() => {
+                    if (Math.random() < intensity / 10) {
+                        elements.banner.classList.add('banner-glitch');
+                        setTimeout(() => {
+                            elements.banner.classList.remove('banner-glitch');
+                        }, 100);
+                    }
+                }, interval);
+            }
+        }
+
+        function textToAscii(text, font, size) {
+            if (!text) return '';
+            
+            const fontData = ASCII_FONTS[font];
+            if (!fontData) return text;
+
+            const upperText = text.toUpperCase();
+            const lines = Array(fontData.height).fill('');
+            
+            for (let char of upperText) {
+                const charData = fontData.chars[char] || fontData.chars[' '];
+                for (let i = 0; i < fontData.height; i++) {
+                    lines[i] += charData[i];
+                }
+            }
+
+            let result = lines.join('\n');
+
+            if (size === 'small') {
+                result = result.split('\n').map(line => 
+                    line.split('').filter((_, i) => i % 2 === 0).join('')
+                ).filter((_, i) => i % 2 === 0).join('\n');
+            } else if (size === 'large') {
+                result = lines.map(line => line + line).join('\n') + '\n' + 
+                         lines.map(line => line + line).join('\n');
+            }
+
+            return result;
+        }
+
+        function generateAscii() {
+            const text = elements.textInput.value;
+            const font = elements.fontSelect.value;
+            
+            addLog('Generating ASCII...');
+            elements.outputPanel.classList.add('generating');
+            
+            setTimeout(() => {
+                addLog(`Applying font: ${font}`);
+                const ascii = textToAscii(text, font, currentSize);
+                
+                setTimeout(() => {
+                    addLog('Rendering output...');
+                    elements.asciiOutput.textContent = ascii || 'Ready to generate ASCII art...';
+                    elements.asciiOutput.style.opacity = '0';
+                    setTimeout(() => {
+                        elements.asciiOutput.style.opacity = '1';
+                    }, 50);
+                    elements.outputPanel.classList.remove('generating');
+                    addLog('Complete!');
+                }, 200);
+            }, 150);
+        }
+
+        function addLog(message) {
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.textContent = message;
+            elements.terminalLog.appendChild(entry);
+            elements.terminalLog.scrollTop = elements.terminalLog.scrollHeight;
+            
+            if (elements.terminalLog.children.length > 20) {
+                elements.terminalLog.removeChild(elements.terminalLog.firstChild);
+            }
+        }
+
+        function showNotification(message) {
+            elements.notification.textContent = message;
+            elements.notification.classList.add('show');
+            setTimeout(() => {
+                elements.notification.classList.remove('show');
+            }, 2000);
+        }
+
+        function copyToClipboard() {
+            const text = elements.asciiOutput.textContent;
+            if (text && text !== 'Ready to generate ASCII art...') {
+                navigator.clipboard.writeText(text).then(() => {
+                    showNotification('Copied to clipboard!');
+                    addLog('ASCII copied to clipboard');
+                }).catch(() => {
+                    showNotification('Failed to copy');
+                });
+            }
+        }
+
+        function downloadAsText() {
+            const text = elements.asciiOutput.textContent;
+            if (text && text !== 'Ready to generate ASCII art...') {
+                const blob = new Blob([text], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'ascii-art.txt';
+                a.click();
+                URL.revokeObjectURL(url);
+                showNotification('Downloaded!');
+                addLog('ASCII downloaded as .txt');
+            }
+        }
+
+        function clearAll() {
+            elements.textInput.value = '';
+            elements.asciiOutput.textContent = 'Ready to generate ASCII art...';
+            addLog('Cleared all');
+        }
+
+        function initMatrix() {
+            const canvas = elements.matrixCanvas;
+            const ctx = canvas.getContext('2d');
+            
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+
+            const chars = '01アイウエオカキクケコサシスセソタチツテト';
+            const fontSize = 14;
+            const columns = canvas.width / fontSize;
+            const drops = Array(Math.floor(columns)).fill(1);
+
+            function drawMatrix() {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                ctx.fillStyle = '#39ff14';
+                ctx.font = fontSize + 'px monospace';
+
+                for (let i = 0; i < drops.length; i++) {
+                    const char = chars[Math.floor(Math.random() * chars.length)];
+                    ctx.fillText(char, i * fontSize, drops[i] * fontSize);
+
+                    if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
+                        drops[i] = 0;
+                    }
+                    drops[i]++;
+                }
+            }
+
+            let matrixInterval;
+            elements.matrixToggle.addEventListener('change', (e) => {
+                if (e.target.checked) {
+                    canvas.classList.add('active');
+                    matrixInterval = setInterval(drawMatrix, 50);
+                    addLog('Matrix rain activated');
+                } else {
+                    canvas.classList.remove('active');
+                    clearInterval(matrixInterval);
+                    addLog('Matrix rain deactivated');
+                }
+            });
+
+            window.addEventListener('resize', () => {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            });
+        }
+
+        elements.textInput.addEventListener('input', generateAscii);
+        elements.fontSelect.addEventListener('change', generateAscii);
+        elements.copyBtn.addEventListener('click', copyToClipboard);
+        elements.downloadBtn.addEventListener('click', downloadAsText);
+        elements.clearBtn.addEventListener('click', clearAll);
+
+        elements.cyberToggle.addEventListener('change', (e) => {
+            if (e.target.checked) {
+                elements.asciiOutput.classList.add('cyber-mode');
+                addLog('Cyber mode enabled');
+            } else {
+                elements.asciiOutput.classList.remove('cyber-mode');
+                addLog('Cyber mode disabled');
+            }
+        });
+
+        elements.glitchSlider.addEventListener('input', (e) => {
+            elements.glitchValue.textContent = e.target.value;
+            startBannerGlitch();
+        });
+
+        elements.contrastToggle.addEventListener('change', (e) => {
+            if (e.target.checked) {
+                document.body.classList.add('high-contrast');
+                addLog('High contrast mode enabled');
+            } else {
+                document.body.classList.remove('high-contrast');
+                addLog('High contrast mode disabled');
+            }
+        });
+
+        elements.motionToggle.addEventListener('change', (e) => {
+            if (e.target.checked) {
+                document.body.classList.add('reduced-motion');
+                addLog('Reduced motion enabled');
+            } else {
+                document.body.classList.remove('reduced-motion');
+                addLog('Reduced motion disabled');
+            }
+        });
+
+        document.querySelectorAll('.size-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                currentSize = e.target.dataset.size;
+                generateAscii();
+                addLog(`Size changed to ${currentSize}`);
+            });
+        });
+
+        initBanner();
+        initMatrix();
+        generateAscii();
+        addLog('System initialized');
+        addLog('Ready to generate ASCII art');
+    </script>
+</body>
+</html>
