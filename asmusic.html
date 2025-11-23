@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ASCII Music Maker - MAQSADBEK</title>
+<style>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background: #0a0a0a;
+  color: #39ff14;
+  font-family: 'Courier New', monospace;
+  overflow-x: hidden;
+  position: relative;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0.15),
+    rgba(0, 0, 0, 0.15) 1px,
+    transparent 1px,
+    transparent 2px
+  );
+  pointer-events: none;
+  z-index: 1000;
+  animation: scanline 8s linear infinite;
+}
+
+@keyframes scanline {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(100%); }
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+  position: relative;
+  z-index: 1;
+}
+
+.banner {
+  text-align: center;
+  font-size: 48px;
+  font-weight: bold;
+  margin: 30px 0;
+  text-shadow: 0 0 10px #39ff14, 0 0 20px #39ff14, 0 0 30px #39ff14;
+  animation: glitch 3s infinite, flicker 0.15s infinite;
+  letter-spacing: 8px;
+}
+
+@keyframes glitch {
+  0%, 100% { transform: translate(0); }
+  20% { transform: translate(-2px, 2px); }
+  40% { transform: translate(-2px, -2px); }
+  60% { transform: translate(2px, 2px); }
+  80% { transform: translate(2px, -2px); }
+}
+
+@keyframes flicker {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.95; }
+}
+
+.section {
+  border: 2px solid #39ff14;
+  padding: 20px;
+  margin: 20px 0;
+  background: rgba(57, 255, 20, 0.05);
+  box-shadow: 0 0 20px rgba(57, 255, 20, 0.2);
+  position: relative;
+}
+
+.section-title {
+  font-size: 18px;
+  margin-bottom: 15px;
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  text-shadow: 0 0 5px #39ff14;
+}
+
+#textInput {
+  width: 100%;
+  background: #000;
+  color: #39ff14;
+  border: 2px solid #39ff14;
+  padding: 15px;
+  font-family: 'Courier New', monospace;
+  font-size: 18px;
+  outline: none;
+  box-shadow: inset 0 0 10px rgba(57, 255, 20, 0.3);
+  resize: vertical;
+  min-height: 100px;
+}
+
+#textInput:focus {
+  box-shadow: inset 0 0 20px rgba(57, 255, 20, 0.5), 0 0 10px #39ff14;
+}
+
+.visualizer {
+  background: #000;
+  padding: 20px;
+  font-size: 14px;
+  line-height: 1.2;
+  min-height: 150px;
+  overflow: hidden;
+  text-align: center;
+  border: 2px solid #39ff14;
+  margin: 10px 0;
+  position: relative;
+}
+
+.explosion {
+  position: fixed;
+  font-size: 24px;
+  font-weight: bold;
+  pointer-events: none;
+  z-index: 999;
+  animation: explode 0.5s ease-out forwards;
+  text-shadow: 0 0 10px #39ff14;
+}
+
+@keyframes explode {
+  0% { transform: scale(0) rotate(0deg); opacity: 1; }
+  100% { transform: scale(2) rotate(360deg); opacity: 0; }
+}
+
+.log-container {
+  max-height: 300px;
+  overflow-y: auto;
+  background: #000;
+  padding: 15px;
+  border: 2px solid #39ff14;
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+.log-entry {
+  margin: 5px 0;
+  text-shadow: 0 0 3px #39ff14;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 20px 0;
+}
+
+.btn {
+  background: #000;
+  color: #39ff14;
+  border: 2px solid #39ff14;
+  padding: 12px 24px;
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: all 0.3s;
+  box-shadow: 0 0 10px rgba(57, 255, 20, 0.3);
+  flex: 1;
+  min-width: 150px;
+}
+
+.btn:hover {
+  background: #39ff14;
+  color: #000;
+  box-shadow: 0 0 20px rgba(57, 255, 20, 0.8);
+  transform: translateY(-2px);
+}
+
+.btn:active {
+  transform: translateY(0);
+}
+
+.toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.toggle-label input {
+  cursor: pointer;
+}
+
+#matrixCanvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  opacity: 0.3;
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .banner {
+    font-size: 28px;
+    letter-spacing: 4px;
+  }
+  
+  .controls {
+    flex-direction: column;
+  }
+  
+  .btn {
+    min-width: 100%;
+    padding: 16px;
+    font-size: 16px;
+  }
+  
+  #textInput {
+    font-size: 16px;
+  }
+  
+  .visualizer {
+    font-size: 12px;
+  }
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #000;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #39ff14;
+  box-shadow: 0 0 10px #39ff14;
+}
+</style>
+</head>
+<body>
+<canvas id="matrixCanvas"></canvas>
+
+<div class="container">
+  <div class="banner">MAQSADBEK</div>
+  
+  <div class="section">
+    <div class="section-title">→ Input Terminal</div>
+    <textarea id="textInput" placeholder="Type here to create music... Each character generates a unique tone!"></textarea>
+  </div>
+  
+  <div class="section">
+    <div class="section-title">→ ASCII Waveform Visualizer</div>
+    <div class="visualizer" id="visualizer">
+      <pre id="waveform">~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~</pre>
+    </div>
+    <label class="toggle-label">
+      <input type="checkbox" id="matrixToggle"> Enable Matrix Rain Mode
+    </label>
+  </div>
+  
+  <div class="section">
+    <div class="section-title">→ Control Panel</div>
+    <div class="controls">
+      <button class="btn" id="playBtn">▶ Play Sequence</button>
+      <button class="btn" id="pauseBtn">⏸ Pause</button>
+      <button class="btn" id="clearBtn">✖ Clear All</button>
+      <button class="btn" id="downloadBtn">⬇ Download (.txt)</button>
+      <button class="btn" id="exportBtn">🎵 Export Audio (.wav)</button>
+    </div>
+  </div>
+  
+  <div class="section">
+    <div class="section-title">→ Music Timeline Log</div>
+    <div class="log-container" id="logContainer"></div>
+  </div>
+</div>
+
+<script>
+const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+const musicLog = [];
+let isPlaying = false;
+let playbackIndex = 0;
+let playbackInterval = null;
+let wavePhase = 0;
+let currentAmplitude = 0;
+
+const textInput = document.getElementById('textInput');
+const logContainer = document.getElementById('logContainer');
+const waveform = document.getElementById('waveform');
+const matrixCanvas = document.getElementById('matrixCanvas');
+const matrixToggle = document.getElementById('matrixToggle');
+
+function getFrequency(char) {
+  const code = char.charCodeAt(0);
+  
+  if (char === ' ') {
+    return 0;
+  }
+  
+  if (/[a-zA-Z]/.test(char)) {
+    return 220 + (code % 26) * 40;
+  }
+  
+  if (/[0-9]/.test(char)) {
+    return 800 + (code % 10) * 100;
+  }
+  
+  return 300 + (code % 50) * 30;
+}
+
+function getToneType(char) {
+  if (char === ' ') return 'silence';
+  if (/[a-zA-Z]/.test(char)) return 'melodic';
+  if (/[0-9]/.test(char)) return 'percussive';
+  return 'glitch';
+}
+
+function playNote(char, duration = 0.2) {
+  const frequency = getFrequency(char);
+  
+  if (frequency === 0) {
+    currentAmplitude = 0;
+    return;
+  }
+  
+  const oscillator = audioContext.createOscillator();
+  const gainNode = audioContext.createGain();
+  const toneType = getToneType(char);
+  
+  if (toneType === 'melodic') {
+    oscillator.type = 'sine';
+  } else if (toneType === 'percussive') {
+    oscillator.type = 'square';
+  } else {
+    oscillator.type = 'sawtooth';
+  }
+  
+  oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
+  
+  gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+  gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
+  
+  oscillator.connect(gainNode);
+  gainNode.connect(audioContext.destination);
+  
+  oscillator.start(audioContext.currentTime);
+  oscillator.stop(audioContext.currentTime + duration);
+  
+  currentAmplitude = 0.8;
+  setTimeout(() => { currentAmplitude = 0; }, duration * 1000);
+}
+
+function createExplosion(x, y) {
+  const explosion = document.createElement('div');
+  explosion.className = 'explosion';
+  explosion.textContent = ['*@#%', '<<<>>>', '###', '***', '@@@', '%%%'][Math.floor(Math.random() * 6)];
+  explosion.style.left = x + 'px';
+  explosion.style.top = y + 'px';
+  document.body.appendChild(explosion);
+  
+  setTimeout(() => explosion.remove(), 500);
+}
+
+function addToLog(char) {
+  const frequency = getFrequency(char);
+  const toneType = getToneType(char);
+  const timestamp = new Date().toLocaleTimeString();
+  const code = char.charCodeAt(0);
+  
+  const entry = {
+    char,
+    frequency,
+    toneType,
+    timestamp,
+    code
+  };
+  
+  musicLog.push(entry);
+  
+  if (musicLog.length > 500) {
+    musicLog.shift();
+  }
+  
+  updateLogDisplay();
+}
+
+function updateLogDisplay() {
+  logContainer.innerHTML = musicLog.map(entry => {
+    const displayChar = entry.char === ' ' ? 'SPACE' : entry.char;
+    return `<div class="log-entry">[${entry.timestamp}] [${displayChar}] → ${entry.frequency}hz (${entry.toneType}) ASCII:${entry.code}</div>`;
+  }).reverse().join('');
+}
+
+textInput.addEventListener('input', function(e) {
+  const lastChar = e.data;
+  
+  if (lastChar && lastChar.length === 1) {
+    playNote(lastChar);
+    addToLog(lastChar);
+    
+    const rect = textInput.getBoundingClientRect();
+    const x = rect.left + Math.random() * rect.width;
+    const y = rect.top + Math.random() * rect.height;
+    createExplosion(x, y);
+  }
+});
+
+textInput.addEventListener('keydown', function(e) {
+  if (e.key === 'Backspace' || e.key === 'Delete') {
+    const char = e.key;
+    playNote('x', 0.1);
+  }
+});
+
+function animateWaveform() {
+  wavePhase += 0.1;
+  const width = 50;
+  let wave = '';
+  
+  for (let i = 0; i < width; i++) {
+    const amplitude = currentAmplitude * 5;
+    const value = Math.sin((i / 5) + wavePhase) * amplitude;
+    
+    if (value > 2) wave += '/\\';
+    else if (value > 1) wave += '/';
+    else if (value < -2) wave += '\\/';
+    else if (value < -1) wave += '\\';
+    else wave += '~';
+  }
+  
+  waveform.textContent = wave;
+  requestAnimationFrame(animateWaveform);
+}
+
+document.getElementById('playBtn').addEventListener('click', function() {
+  if (isPlaying) return;
+  
+  const text = textInput.value;
+  if (!text) return;
+  
+  isPlaying = true;
+  playbackIndex = 0;
+  
+  playbackInterval = setInterval(() => {
+    if (playbackIndex >= text.length) {
+      stopPlayback();
+      return;
+    }
+    
+    const char = text[playbackIndex];
+    playNote(char);
+    
+    const rect = textInput.getBoundingClientRect();
+    const x = rect.left + Math.random() * rect.width;
+    const y = rect.top + Math.random() * rect.height;
+    createExplosion(x, y);
+    
+    playbackIndex++;
+  }, 150);
+});
+
+document.getElementById('pauseBtn').addEventListener('click', function() {
+  stopPlayback();
+});
+
+function stopPlayback() {
+  isPlaying = false;
+  if (playbackInterval) {
+    clearInterval(playbackInterval);
+    playbackInterval = null;
+  }
+}
+
+document.getElementById('clearBtn').addEventListener('click', function() {
+  textInput.value = '';
+  musicLog.length = 0;
+  updateLogDisplay();
+  stopPlayback();
+});
+
+document.getElementById('downloadBtn').addEventListener('click', function() {
+  const text = textInput.value;
+  const logText = musicLog.map(entry => {
+    const displayChar = entry.char === ' ' ? 'SPACE' : entry.char;
+    return `[${entry.timestamp}] [${displayChar}] → ${entry.frequency}hz (${entry.toneType}) ASCII:${entry.code}`;
+  }).join('\n');
+  
+  const content = `ASCII MUSIC MAKER - MAQSADBEK\n${'='.repeat(50)}\n\nComposition:\n${text}\n\n${'='.repeat(50)}\n\nMusic Timeline Log:\n${logText}`;
+  
+  const blob = new Blob([content], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'ascii-music-' + Date.now() + '.txt';
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+document.getElementById('exportBtn').addEventListener('click', async function() {
+  const text = textInput.value;
+  if (!text) return;
+  
+  const offlineContext = new OfflineAudioContext(1, 44100 * (text.length * 0.2 + 1), 44100);
+  let currentTime = 0;
+  
+  for (let char of text) {
+    const frequency = getFrequency(char);
+    
+    if (frequency > 0) {
+      const oscillator = offlineContext.createOscillator();
+      const gainNode = offlineContext.createGain();
+      const toneType = getToneType(char);
+      
+      if (toneType === 'melodic') {
+        oscillator.type = 'sine';
+      } else if (toneType === 'percussive') {
+        oscillator.type = 'square';
+      } else {
+        oscillator.type = 'sawtooth';
+      }
+      
+      oscillator.frequency.setValueAtTime(frequency, currentTime);
+      gainNode.gain.setValueAtTime(0.3, currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, currentTime + 0.2);
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(offlineContext.destination);
+      
+      oscillator.start(currentTime);
+      oscillator.stop(currentTime + 0.2);
+    }
+    
+    currentTime += 0.15;
+  }
+  
+  const buffer = await offlineContext.startRendering();
+  const wav = audioBufferToWav(buffer);
+  const blob = new Blob([wav], { type: 'audio/wav' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'ascii-music-' + Date.now() + '.wav';
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+function audioBufferToWav(buffer) {
+  const length = buffer.length * buffer.numberOfChannels * 2 + 44;
+  const arrayBuffer = new ArrayBuffer(length);
+  const view = new DataView(arrayBuffer);
+  const channels = [];
+  let offset = 0;
+  let pos = 0;
+  
+  function setUint16(data) {
+    view.setUint16(pos, data, true);
+    pos += 2;
+  }
+  
+  function setUint32(data) {
+    view.setUint32(pos, data, true);
+    pos += 4;
+  }
+  
+  setUint32(0x46464952);
+  setUint32(length - 8);
+  setUint32(0x45564157);
+  setUint32(0x20746d66);
+  setUint32(16);
+  setUint16(1);
+  setUint16(buffer.numberOfChannels);
+  setUint32(buffer.sampleRate);
+  setUint32(buffer.sampleRate * 2 * buffer.numberOfChannels);
+  setUint16(buffer.numberOfChannels * 2);
+  setUint16(16);
+  setUint32(0x61746164);
+  setUint32(length - pos - 4);
+  
+  for (let i = 0; i < buffer.numberOfChannels; i++) {
+    channels.push(buffer.getChannelData(i));
+  }
+  
+  while (pos < length) {
+    for (let i = 0; i < buffer.numberOfChannels; i++) {
+      const sample = Math.max(-1, Math.min(1, channels[i][offset]));
+      view.setInt16(pos, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+      pos += 2;
+    }
+    offset++;
+  }
+  
+  return arrayBuffer;
+}
+
+matrixToggle.addEventListener('change', function() {
+  if (this.checked) {
+    matrixCanvas.style.display = 'block';
+    startMatrixRain();
+  } else {
+    matrixCanvas.style.display = 'none';
+    stopMatrixRain();
+  }
+});
+
+let matrixAnimationId = null;
+const matrixCtx = matrixCanvas.getContext('2d');
+
+function initMatrix() {
+  matrixCanvas.width = window.innerWidth;
+  matrixCanvas.height = window.innerHeight;
+}
+
+const matrixChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%^&*()_+-=[]{}|;:,.<>?/~';
+const fontSize = 14;
+let columns = 0;
+let drops = [];
+
+function startMatrixRain() {
+  initMatrix();
+  columns = Math.floor(matrixCanvas.width / fontSize);
+  drops = Array(columns).fill(1);
+  
+  function draw() {
+    matrixCtx.fillStyle = 'rgba(10, 10, 10, 0.05)';
+    matrixCtx.fillRect(0, 0, matrixCanvas.width, matrixCanvas.height);
+    
+    matrixCtx.fillStyle = '#39ff14';
+    matrixCtx.font = fontSize + 'px Courier New';
+    
+    for (let i = 0; i < drops.length; i++) {
+      const text = matrixChars.charAt(Math.floor(Math.random() * matrixChars.length));
+      matrixCtx.fillText(text, i * fontSize, drops[i] * fontSize);
+      
+      if (drops[i] * fontSize > matrixCanvas.height && Math.random() > 0.975) {
+        drops[i] = 0;
+      }
+      
+      drops[i]++;
+    }
+    
+    matrixAnimationId = requestAnimationFrame(draw);
+  }
+  
+  draw();
+}
+
+function stopMatrixRain() {
+  if (matrixAnimationId) {
+    cancelAnimationFrame(matrixAnimationId);
+    matrixAnimationId = null;
+    matrixCtx.clearRect(0, 0, matrixCanvas.width, matrixCanvas.height);
+  }
+}
+
+window.addEventListener('resize', () => {
+  if (matrixToggle.checked) {
+    initMatrix();
+  }
+});
+
+animateWaveform();
+</script>
+</body>
+</html>
