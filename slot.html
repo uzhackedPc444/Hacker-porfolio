@@ -1,0 +1,1128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MAQSADBEK - Cyberpunk Slot Machine</title>
+    
+    <!--
+    ╔═══════════════════════════════════════════════════════════════════════════════╗
+    ║                    CYBERPUNK SLOT MACHINE - DEVELOPER NOTES                   ║
+    ╚═══════════════════════════════════════════════════════════════════════════════╝
+    
+    REEL LOGIC:
+    - Each reel is an array of symbols that scrolls vertically
+    - Animation uses CSS transform translateY with looping
+    - Random speeds (2-4 seconds) create variety
+    - Sequential stopping: reel1 stops first, then reel2, then reel3
+    - Smooth deceleration using cubic-bezier easing
+    
+    SYMBOL ARRAY:
+    const symbols = ['0xA', '0xF', 'HASH', 'MAQ', 'CRT', '$$$', 'NEON', 'ROOT', 'SYS'];
+    - 9 unique hacker-themed symbols
+    - Each reel randomly selects from this array
+    - Symbols repeat in the reel for continuous scrolling effect
+    
+    RANDOM SELECTION:
+    - Math.random() used to select final symbol for each reel
+    - Each reel gets independent random value
+    - Weighted randomization can be added by duplicating symbols in array
+    
+    WIN LOGIC:
+    1. Three of a kind (3-match) = JACKPOT (50-100 credits)
+    2. Two of a kind (2-in-a-row) = PARTIAL MATCH (10-30 credits)
+    3. Special combos: 'MAQ MAQ MAQ' = MAQSADBEK BONUS (200 credits)
+    4. All other results = ACCESS DENIED (no credits)
+    
+    CREDIT SAVING:
+    - localStorage.getItem('cyberCredits') retrieves saved credits
+    - localStorage.setItem('cyberCredits', value) saves credits
+    - localStorage.getItem('soundEnabled') saves sound preference
+    - "Save Credits" toggle enables/disables localStorage persistence
+    - Default starting credits: 100
+    - Spin cost: 5 credits
+    
+    NEON EFFECT CUSTOMIZATION:
+    - Modify --neon-green and --neon-cyan CSS variables for color changes
+    - text-shadow layers create the glow (inner glow + outer glow)
+    - box-shadow creates border glow
+    - filter: drop-shadow() adds extra depth
+    - Animation keyframes control pulse and flicker effects
+    
+    PERFORMANCE TIPS:
+    - Use transform and opacity for animations (GPU accelerated)
+    - will-change property hints browser for optimization
+    - RequestAnimationFrame for smooth updates
+    - Debounce rapid button clicks
+    
+    ═══════════════════════════════════════════════════════════════════════════════
+    -->
+    
+    <style>
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /*                          CSS VARIABLES                               */
+        /* ═══════════════════════════════════════════════════════════════════ */
+        :root {
+            --neon-green: #39ff14;
+            --neon-cyan: #00f5ff;
+            --dark-bg: #0b0b0b;
+            --terminal-green: #00ff00;
+            --error-red: #ff0040;
+            --warning-yellow: #ffff00;
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /*                          GLOBAL STYLES                               */
+        /* ═══════════════════════════════════════════════════════════════════ */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Courier New', 'Consolas', monospace;
+            background-color: var(--dark-bg);
+            color: var(--neon-green);
+            overflow-x: hidden;
+            position: relative;
+            min-height: 100vh;
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /*                        SCANLINE OVERLAY                              */
+        /* ═══════════════════════════════════════════════════════════════════ */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: repeating-linear-gradient(
+                0deg,
+                rgba(0, 0, 0, 0.15),
+                rgba(0, 0, 0, 0.15) 1px,
+                transparent 1px,
+                transparent 2px
+            );
+            pointer-events: none;
+            z-index: 9999;
+            animation: scanlines 8s linear infinite;
+        }
+        
+        @keyframes scanlines {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(10px); }
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /*                        CRT FLICKER EFFECT                            */
+        /* ═══════════════════════════════════════════════════════════════════ */
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(18, 16, 16, 0.1);
+            pointer-events: none;
+            z-index: 9998;
+            animation: flicker 0.15s infinite;
+        }
+        
+        @keyframes flicker {
+            0% { opacity: 0.97; }
+            50% { opacity: 1; }
+            100% { opacity: 0.94; }
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /*                      BACKGROUND WATERMARK                            */
+        /* ═══════════════════════════════════════════════════════════════════ */
+        .watermark {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 15vw;
+            font-weight: bold;
+            color: rgba(57, 255, 20, 0.03);
+            z-index: 0;
+            pointer-events: none;
+            white-space: nowrap;
+            letter-spacing: 0.1em;
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /*                      MATRIX RAIN BACKGROUND                          */
+        /* ═══════════════════════════════════════════════════════════════════ */
+        #matrix-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 1;
+            opacity: 0.15;
+            pointer-events: none;
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /*                          MAIN CONTAINER                              */
+        /* ═══════════════════════════════════════════════════════════════════ */
+        .container {
+            position: relative;
+            z-index: 10;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /*                          ASCII BANNER                                */
+        /* ═══════════════════════════════════════════════════════════════════ */
+        .ascii-banner {
+            text-align: center;
+            font-size: clamp(2rem, 8vw, 6rem);
+            font-weight: bold;
+            color: var(--neon-green);
+            text-shadow: 
+                0 0 10px var(--neon-green),
+                0 0 20px var(--neon-green),
+                0 0 30px var(--neon-green),
+                0 0 40px var(--neon-green);
+            margin: 20px 0 40px 0;
+            letter-spacing: 0.1em;
+            animation: glitch 3s infinite, neon-pulse 2s ease-in-out infinite;
+            position: relative;
+        }
+        
+        @keyframes glitch {
+            0%, 90%, 100% { 
+                transform: translate(0); 
+                text-shadow: 
+                    0 0 10px var(--neon-green),
+                    0 0 20px var(--neon-green),
+                    0 0 30px var(--neon-green),
+                    0 0 40px var(--neon-green);
+            }
+            91% { 
+                transform: translate(-2px, 2px); 
+                text-shadow: 
+                    2px 0 var(--neon-cyan),
+                    -2px 0 var(--error-red);
+            }
+            92% { 
+                transform: translate(2px, -2px); 
+            }
+            93% { 
+                transform: translate(-2px, -2px); 
+            }
+        }
+        
+        @keyframes neon-pulse {
+            0%, 100% {
+                text-shadow: 
+                    0 0 10px var(--neon-green),
+                    0 0 20px var(--neon-green),
+                    0 0 30px var(--neon-green),
+                    0 0 40px var(--neon-green);
+            }
+            50% {
+                text-shadow: 
+                    0 0 5px var(--neon-green),
+                    0 0 10px var(--neon-green),
+                    0 0 15px var(--neon-green),
+                    0 0 20px var(--neon-green),
+                    0 0 35px var(--neon-green);
+            }
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /*                          SLOT MACHINE                                */
+        /* ═══════════════════════════════════════════════════════════════════ */
+        .slot-machine {
+            background: rgba(0, 0, 0, 0.8);
+            border: 3px solid var(--neon-cyan);
+            border-radius: 15px;
+            padding: 40px 30px;
+            box-shadow: 
+                0 0 20px var(--neon-cyan),
+                inset 0 0 20px rgba(0, 245, 255, 0.1);
+            margin-bottom: 30px;
+            animation: border-pulse 2s ease-in-out infinite;
+        }
+        
+        @keyframes border-pulse {
+            0%, 100% {
+                box-shadow: 
+                    0 0 20px var(--neon-cyan),
+                    inset 0 0 20px rgba(0, 245, 255, 0.1);
+            }
+            50% {
+                box-shadow: 
+                    0 0 30px var(--neon-cyan),
+                    0 0 40px var(--neon-cyan),
+                    inset 0 0 30px rgba(0, 245, 255, 0.2);
+            }
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /*                          CREDIT DISPLAY                              */
+        /* ═══════════════════════════════════════════════════════════════════ */
+        .credits-display {
+            text-align: center;
+            font-size: 1.5rem;
+            margin-bottom: 30px;
+            color: var(--warning-yellow);
+            text-shadow: 0 0 10px var(--warning-yellow);
+        }
+        
+        .credits-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: var(--neon-green);
+            text-shadow: 0 0 15px var(--neon-green);
+            animation: flicker-text 4s infinite;
+        }
+        
+        @keyframes flicker-text {
+            0%, 98%, 100% { opacity: 1; }
+            99% { opacity: 0.8; }
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /*                            REELS CONTAINER                           */
+        /* ═══════════════════════════════════════════════════════════════════ */
+        .reels {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .reel {
+            width: 150px;
+            height: 200px;
+            background: rgba(0, 0, 0, 0.9);
+            border: 2px solid var(--neon-green);
+            border-radius: 10px;
+            overflow: hidden;
+            position: relative;
+            box-shadow: 
+                0 0 15px var(--neon-green),
+                inset 0 0 15px rgba(57, 255, 20, 0.2);
+        }
+        
+        .reel::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(
+                to bottom,
+                rgba(57, 255, 20, 0.3) 0%,
+                transparent 30%,
+                transparent 70%,
+                rgba(57, 255, 20, 0.3) 100%
+            );
+            pointer-events: none;
+            z-index: 10;
+        }
+        
+        .reel-symbols {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            transition: transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+        
+        .reel-symbols.spinning {
+            transition: none;
+            animation: spin-reel 1s linear infinite;
+        }
+        
+        @keyframes spin-reel {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(-900px); }
+        }
+        
+        .symbol {
+            height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--neon-cyan);
+            text-shadow: 0 0 10px var(--neon-cyan);
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /*                            SPIN BUTTON                               */
+        /* ═══════════════════════════════════════════════════════════════════ */
+        .spin-button {
+            display: block;
+            width: 100%;
+            max-width: 300px;
+            margin: 0 auto 20px auto;
+            padding: 20px 40px;
+            font-size: 2rem;
+            font-weight: bold;
+            font-family: 'Courier New', monospace;
+            color: var(--dark-bg);
+            background: var(--neon-green);
+            border: 3px solid var(--neon-green);
+            border-radius: 10px;
+            cursor: pointer;
+            box-shadow: 
+                0 0 20px var(--neon-green),
+                0 0 30px var(--neon-green),
+                inset 0 0 10px rgba(255, 255, 255, 0.5);
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            animation: button-glow 2s ease-in-out infinite;
+        }
+        
+        @keyframes button-glow {
+            0%, 100% {
+                box-shadow: 
+                    0 0 20px var(--neon-green),
+                    0 0 30px var(--neon-green),
+                    inset 0 0 10px rgba(255, 255, 255, 0.5);
+            }
+            50% {
+                box-shadow: 
+                    0 0 30px var(--neon-green),
+                    0 0 50px var(--neon-green),
+                    0 0 70px var(--neon-green),
+                    inset 0 0 15px rgba(255, 255, 255, 0.7);
+            }
+        }
+        
+        .spin-button:hover:not(:disabled) {
+            background: var(--neon-cyan);
+            border-color: var(--neon-cyan);
+            box-shadow: 
+                0 0 30px var(--neon-cyan),
+                0 0 50px var(--neon-cyan),
+                0 0 70px var(--neon-cyan);
+            transform: scale(1.05);
+        }
+        
+        .spin-button:active:not(:disabled) {
+            transform: scale(0.95);
+        }
+        
+        .spin-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            animation: none;
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /*                          STATUS MESSAGE                              */
+        /* ═══════════════════════════════════════════════════════════════════ */
+        .status-message {
+            text-align: center;
+            font-size: 1.2rem;
+            min-height: 40px;
+            margin-bottom: 20px;
+            color: var(--neon-cyan);
+            text-shadow: 0 0 10px var(--neon-cyan);
+        }
+        
+        .status-message.analyzing {
+            animation: analyzing 1s ease-in-out infinite;
+        }
+        
+        @keyframes analyzing {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /*                        OUTCOME MESSAGE BOX                           */
+        /* ═══════════════════════════════════════════════════════════════════ */
+        .outcome-box {
+            background: rgba(0, 0, 0, 0.95);
+            border: 2px solid var(--neon-green);
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px auto;
+            max-width: 500px;
+            text-align: center;
+            font-size: 1.5rem;
+            box-shadow: 
+                0 0 20px var(--neon-green),
+                inset 0 0 10px rgba(57, 255, 20, 0.1);
+            animation: outcome-appear 0.5s ease-out;
+            display: none;
+        }
+        
+        .outcome-box.show {
+            display: block;
+        }
+        
+        .outcome-box.jackpot {
+            border-color: var(--warning-yellow);
+            color: var(--warning-yellow);
+            box-shadow: 
+                0 0 30px var(--warning-yellow),
+                inset 0 0 20px rgba(255, 255, 0, 0.2);
+            animation: outcome-appear 0.5s ease-out, jackpot-flash 1s ease-in-out infinite;
+        }
+        
+        .outcome-box.win {
+            border-color: var(--neon-green);
+            color: var(--neon-green);
+        }
+        
+        .outcome-box.lose {
+            border-color: var(--error-red);
+            color: var(--error-red);
+            box-shadow: 
+                0 0 20px var(--error-red),
+                inset 0 0 10px rgba(255, 0, 64, 0.1);
+        }
+        
+        @keyframes outcome-appear {
+            0% {
+                opacity: 0;
+                transform: scale(0.8);
+            }
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+        
+        @keyframes jackpot-flash {
+            0%, 100% {
+                box-shadow: 
+                    0 0 30px var(--warning-yellow),
+                    inset 0 0 20px rgba(255, 255, 0, 0.2);
+            }
+            50% {
+                box-shadow: 
+                    0 0 50px var(--warning-yellow),
+                    0 0 70px var(--warning-yellow),
+                    inset 0 0 30px rgba(255, 255, 0, 0.3);
+            }
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /*                          CONTROL BUTTONS                             */
+        /* ═══════════════════════════════════════════════════════════════════ */
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+        
+        .control-btn {
+            padding: 12px 24px;
+            font-family: 'Courier New', monospace;
+            font-size: 1rem;
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid var(--neon-cyan);
+            border-radius: 5px;
+            color: var(--neon-cyan);
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 0 10px var(--neon-cyan);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        
+        .control-btn:hover {
+            background: var(--neon-cyan);
+            color: var(--dark-bg);
+            box-shadow: 
+                0 0 20px var(--neon-cyan),
+                0 0 30px var(--neon-cyan);
+        }
+        
+        .control-btn:active {
+            transform: scale(0.95);
+        }
+        
+        .control-btn.active {
+            background: var(--neon-green);
+            border-color: var(--neon-green);
+            color: var(--dark-bg);
+            box-shadow: 0 0 15px var(--neon-green);
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /*                      FLICKERING CURSOR                               */
+        /* ═══════════════════════════════════════════════════════════════════ */
+        .cursor {
+            display: inline-block;
+            width: 10px;
+            height: 20px;
+            background: var(--neon-green);
+            margin-left: 5px;
+            animation: cursor-blink 1s step-end infinite;
+        }
+        
+        @keyframes cursor-blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /*                      RESPONSIVE DESIGN                               */
+        /* ═══════════════════════════════════════════════════════════════════ */
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .reels {
+                flex-direction: column;
+                align-items: center;
+                gap: 15px;
+            }
+            
+            .reel {
+                width: 120px;
+                height: 160px;
+            }
+            
+            .symbol {
+                height: 160px;
+                font-size: 1.5rem;
+            }
+            
+            .spin-button {
+                font-size: 1.5rem;
+                padding: 15px 30px;
+                max-width: 100%;
+            }
+            
+            .slot-machine {
+                padding: 20px 15px;
+            }
+            
+            .outcome-box {
+                font-size: 1.2rem;
+                padding: 15px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .ascii-banner {
+                font-size: 2rem;
+                margin: 10px 0 20px 0;
+            }
+            
+            .credits-value {
+                font-size: 2rem;
+            }
+            
+            .reel {
+                width: 100px;
+                height: 140px;
+            }
+            
+            .symbol {
+                height: 140px;
+                font-size: 1.2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Background Watermark -->
+    <div class="watermark">MAQSADBEK</div>
+    
+    <!-- Matrix Rain Canvas -->
+    <canvas id="matrix-canvas"></canvas>
+    
+    <!-- Main Container -->
+    <div class="container">
+        <!-- ASCII Banner -->
+        <div class="ascii-banner">
+            MAQSADBEK
+        </div>
+        
+        <!-- Slot Machine -->
+        <div class="slot-machine">
+            <!-- Credits Display -->
+            <div class="credits-display">
+                CYBER CREDITS: <span class="credits-value" id="credits">100</span>
+            </div>
+            
+            <!-- Reels -->
+            <div class="reels">
+                <div class="reel" id="reel1">
+                    <div class="reel-symbols" id="reel1-symbols"></div>
+                </div>
+                <div class="reel" id="reel2">
+                    <div class="reel-symbols" id="reel2-symbols"></div>
+                </div>
+                <div class="reel" id="reel3">
+                    <div class="reel-symbols" id="reel3-symbols"></div>
+                </div>
+            </div>
+            
+            <!-- Status Message -->
+            <div class="status-message" id="status">[ READY TO SPIN ]</div>
+            
+            <!-- Spin Button -->
+            <button class="spin-button" id="spin-btn">
+                SPIN
+            </button>
+            
+            <!-- Outcome Message Box -->
+            <div class="outcome-box" id="outcome"></div>
+        </div>
+        
+        <!-- Controls -->
+        <div class="controls">
+            <button class="control-btn" id="reset-btn">Reset Credits</button>
+            <button class="control-btn" id="save-toggle-btn">Save: ON</button>
+            <button class="control-btn" id="sound-toggle-btn">Sound: ON</button>
+            <button class="control-btn" id="matrix-toggle-btn">Matrix: ON</button>
+        </div>
+    </div>
+    
+    <script>
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /*                          GAME CONFIGURATION                          */
+        /* ═══════════════════════════════════════════════════════════════════ */
+        const symbols = ['0xA', '0xF', 'HASH', 'MAQ', 'CRT', '$$$', 'NEON', 'ROOT', 'SYS'];
+        const SPIN_COST = 5;
+        const DEFAULT_CREDITS = 100;
+        
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /*                          STATE MANAGEMENT                            */
+        /* ═══════════════════════════════════════════════════════════════════ */
+        let credits = DEFAULT_CREDITS;
+        let isSpinning = false;
+        let soundEnabled = true;
+        let saveEnabled = true;
+        let matrixEnabled = true;
+        
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /*                          DOM ELEMENTS                                */
+        /* ═══════════════════════════════════════════════════════════════════ */
+        const creditsDisplay = document.getElementById('credits');
+        const spinBtn = document.getElementById('spin-btn');
+        const statusMsg = document.getElementById('status');
+        const outcomeBox = document.getElementById('outcome');
+        const resetBtn = document.getElementById('reset-btn');
+        const saveToggleBtn = document.getElementById('save-toggle-btn');
+        const soundToggleBtn = document.getElementById('sound-toggle-btn');
+        const matrixToggleBtn = document.getElementById('matrix-toggle-btn');
+        
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /*                      WEBAUDIO API SETUP                              */
+        /* ═══════════════════════════════════════════════════════════════════ */
+        let audioContext = null;
+        
+        function initAudio() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+        
+        function playGlitchSound() {
+            if (!soundEnabled || !audioContext) return;
+            
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+            oscillator.frequency.exponentialRampToValueAtTime(200, audioContext.currentTime + 0.1);
+            
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+            
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.1);
+        }
+        
+        function playWinSound() {
+            if (!soundEnabled || !audioContext) return;
+            
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.frequency.setValueAtTime(400, audioContext.currentTime);
+            oscillator.frequency.exponentialRampToValueAtTime(800, audioContext.currentTime + 0.3);
+            
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+            
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.3);
+        }
+        
+        function playLoseSound() {
+            if (!soundEnabled || !audioContext) return;
+            
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.frequency.setValueAtTime(200, audioContext.currentTime);
+            oscillator.frequency.exponentialRampToValueAtTime(50, audioContext.currentTime + 0.3);
+            
+            gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+            
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.3);
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /*                      LOCALSTORAGE FUNCTIONS                          */
+        /* ═══════════════════════════════════════════════════════════════════ */
+        function loadCredits() {
+            const saved = localStorage.getItem('cyberCredits');
+            if (saved !== null) {
+                credits = parseInt(saved);
+            }
+            updateCreditsDisplay();
+        }
+        
+        function saveCredits() {
+            if (saveEnabled) {
+                localStorage.setItem('cyberCredits', credits);
+            }
+        }
+        
+        function loadSettings() {
+            const savedSound = localStorage.getItem('soundEnabled');
+            const savedSave = localStorage.getItem('saveEnabled');
+            const savedMatrix = localStorage.getItem('matrixEnabled');
+            
+            if (savedSound !== null) {
+                soundEnabled = savedSound === 'true';
+                soundToggleBtn.textContent = `Sound: ${soundEnabled ? 'ON' : 'OFF'}`;
+                soundToggleBtn.classList.toggle('active', soundEnabled);
+            }
+            
+            if (savedSave !== null) {
+                saveEnabled = savedSave === 'true';
+                saveToggleBtn.textContent = `Save: ${saveEnabled ? 'ON' : 'OFF'}`;
+                saveToggleBtn.classList.toggle('active', saveEnabled);
+            }
+            
+            if (savedMatrix !== null) {
+                matrixEnabled = savedMatrix === 'true';
+                matrixToggleBtn.textContent = `Matrix: ${matrixEnabled ? 'ON' : 'OFF'}`;
+                matrixToggleBtn.classList.toggle('active', matrixEnabled);
+                toggleMatrix();
+            }
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /*                      REEL INITIALIZATION                             */
+        /* ═══════════════════════════════════════════════════════════════════ */
+        function initializeReels() {
+            for (let i = 1; i <= 3; i++) {
+                const reelSymbols = document.getElementById(`reel${i}-symbols`);
+                reelSymbols.innerHTML = '';
+                
+                // Create 10 symbols for smooth looping
+                for (let j = 0; j < 10; j++) {
+                    const symbolDiv = document.createElement('div');
+                    symbolDiv.className = 'symbol';
+                    symbolDiv.textContent = symbols[Math.floor(Math.random() * symbols.length)];
+                    reelSymbols.appendChild(symbolDiv);
+                }
+            }
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /*                      SPIN LOGIC                                      */
+        /* ═══════════════════════════════════════════════════════════════════ */
+        async function spin() {
+            if (isSpinning) return;
+            
+            if (credits < SPIN_COST) {
+                statusMsg.textContent = '[ INSUFFICIENT CREDITS ]';
+                statusMsg.style.color = 'var(--error-red)';
+                playLoseSound();
+                return;
+            }
+            
+            // Initialize audio on first interaction
+            initAudio();
+            
+            isSpinning = true;
+            credits -= SPIN_COST;
+            updateCreditsDisplay();
+            saveCredits();
+            
+            spinBtn.disabled = true;
+            outcomeBox.classList.remove('show');
+            statusMsg.textContent = '[ Analyzing entropy... ]';
+            statusMsg.classList.add('analyzing');
+            statusMsg.style.color = 'var(--neon-cyan)';
+            
+            playGlitchSound();
+            
+            // Start all reels spinning
+            const reel1 = document.getElementById('reel1-symbols');
+            const reel2 = document.getElementById('reel2-symbols');
+            const reel3 = document.getElementById('reel3-symbols');
+            
+            reel1.classList.add('spinning');
+            reel2.classList.add('spinning');
+            reel3.classList.add('spinning');
+            
+            // Random spin durations
+            const durations = [
+                2000 + Math.random() * 1000,
+                2500 + Math.random() * 1000,
+                3000 + Math.random() * 1000
+            ];
+            
+            // Select final symbols
+            const finalSymbols = [
+                symbols[Math.floor(Math.random() * symbols.length)],
+                symbols[Math.floor(Math.random() * symbols.length)],
+                symbols[Math.floor(Math.random() * symbols.length)]
+            ];
+            
+            // Stop reels sequentially
+            await stopReel(reel1, finalSymbols[0], durations[0]);
+            playGlitchSound();
+            
+            await stopReel(reel2, finalSymbols[1], durations[1]);
+            playGlitchSound();
+            
+            await stopReel(reel3, finalSymbols[2], durations[2]);
+            
+            statusMsg.classList.remove('analyzing');
+            
+            // Evaluate outcome
+            evaluateOutcome(finalSymbols);
+            
+            isSpinning = false;
+            spinBtn.disabled = false;
+        }
+        
+        function stopReel(reelElement, targetSymbol, duration) {
+            return new Promise(resolve => {
+                setTimeout(() => {
+                    reelElement.classList.remove('spinning');
+                    
+                    // Find the target symbol in the reel
+                    const symbols = reelElement.querySelectorAll('.symbol');
+                    let targetIndex = 0;
+                    
+                    for (let i = 0; i < symbols.length; i++) {
+                        if (symbols[i].textContent === targetSymbol) {
+                            targetIndex = i;
+                            break;
+                        }
+                    }
+                    
+                    // Position the reel to show the target symbol in the center
+                    const offset = -targetIndex * 200;
+                    reelElement.style.transform = `translateY(${offset}px)`;
+                    
+                    setTimeout(resolve, 500);
+                }, duration);
+            });
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /*                      WIN EVALUATION                                  */
+        /* ═══════════════════════════════════════════════════════════════════ */
+        function evaluateOutcome(results) {
+            const [s1, s2, s3] = results;
+            let message = '';
+            let winAmount = 0;
+            let outcomeType = 'lose';
+            
+            // Check for special MAQSADBEK BONUS
+            if (s1 === 'MAQ' && s2 === 'MAQ' && s3 === 'MAQ') {
+                message = '🎉 MAQSADBEK BONUS — SYSTEM BREACH! 🎉';
+                winAmount = 200;
+                outcomeType = 'jackpot';
+            }
+            // Check for 3-match jackpot
+            else if (s1 === s2 && s2 === s3) {
+                message = '💎 ACCESS GRANTED — JACKPOT! 💎';
+                winAmount = 50 + Math.floor(Math.random() * 50);
+                outcomeType = 'jackpot';
+            }
+            // Check for 2-in-a-row
+            else if (s1 === s2 || s2 === s3) {
+                message = '⚡ PARTIAL MATCH — Credits Awarded ⚡';
+                winAmount = 10 + Math.floor(Math.random() * 20);
+                outcomeType = 'win';
+            }
+            // No match
+            else {
+                message = '❌ ACCESS DENIED — TRY AGAIN ❌';
+                winAmount = 0;
+                outcomeType = 'lose';
+            }
+            
+            // Update credits
+            if (winAmount > 0) {
+                credits += winAmount;
+                updateCreditsDisplay();
+                saveCredits();
+                playWinSound();
+                message += ` (+${winAmount} Credits)`;
+            } else {
+                playLoseSound();
+            }
+            
+            // Display outcome
+            outcomeBox.textContent = message;
+            outcomeBox.className = 'outcome-box show ' + outcomeType;
+            statusMsg.textContent = `[ ${s1} | ${s2} | ${s3} ]`;
+            statusMsg.style.color = outcomeType === 'jackpot' ? 'var(--warning-yellow)' : 
+                                    outcomeType === 'win' ? 'var(--neon-green)' : 
+                                    'var(--error-red)';
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /*                      UTILITY FUNCTIONS                               */
+        /* ═══════════════════════════════════════════════════════════════════ */
+        function updateCreditsDisplay() {
+            creditsDisplay.textContent = credits;
+        }
+        
+        function resetCredits() {
+            credits = DEFAULT_CREDITS;
+            updateCreditsDisplay();
+            saveCredits();
+            statusMsg.textContent = '[ CREDITS RESET ]';
+            statusMsg.style.color = 'var(--neon-green)';
+            outcomeBox.classList.remove('show');
+        }
+        
+        function toggleSave() {
+            saveEnabled = !saveEnabled;
+            saveToggleBtn.textContent = `Save: ${saveEnabled ? 'ON' : 'OFF'}`;
+            saveToggleBtn.classList.toggle('active', saveEnabled);
+            localStorage.setItem('saveEnabled', saveEnabled);
+            
+            if (saveEnabled) {
+                saveCredits();
+            }
+        }
+        
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            soundToggleBtn.textContent = `Sound: ${soundEnabled ? 'ON' : 'OFF'}`;
+            soundToggleBtn.classList.toggle('active', soundEnabled);
+            localStorage.setItem('soundEnabled', soundEnabled);
+            
+            if (soundEnabled) {
+                initAudio();
+                playGlitchSound();
+            }
+        }
+        
+        function toggleMatrixRain() {
+            matrixEnabled = !matrixEnabled;
+            matrixToggleBtn.textContent = `Matrix: ${matrixEnabled ? 'ON' : 'OFF'}`;
+            matrixToggleBtn.classList.toggle('active', matrixEnabled);
+            localStorage.setItem('matrixEnabled', matrixEnabled);
+            toggleMatrix();
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /*                      MATRIX RAIN EFFECT                              */
+        /* ═══════════════════════════════════════════════════════════════════ */
+        const canvas = document.getElementById('matrix-canvas');
+        const ctx = canvas.getContext('2d');
+        let matrixInterval = null;
+        
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        
+        const matrixChars = '01アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン';
+        const fontSize = 14;
+        const columns = canvas.width / fontSize;
+        const drops = Array(Math.floor(columns)).fill(1);
+        
+        function drawMatrix() {
+            ctx.fillStyle = 'rgba(11, 11, 11, 0.05)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.fillStyle = '#39ff14';
+            ctx.font = `${fontSize}px monospace`;
+            
+            for (let i = 0; i < drops.length; i++) {
+                const text = matrixChars[Math.floor(Math.random() * matrixChars.length)];
+                ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+                
+                if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
+                    drops[i] = 0;
+                }
+                drops[i]++;
+            }
+        }
+        
+        function toggleMatrix() {
+            if (matrixEnabled) {
+                matrixInterval = setInterval(drawMatrix, 50);
+                canvas.style.display = 'block';
+            } else {
+                clearInterval(matrixInterval);
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                canvas.style.display = 'none';
+            }
+        }
+        
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+        
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /*                      EVENT LISTENERS                                 */
+        /* ═══════════════════════════════════════════════════════════════════ */
+        spinBtn.addEventListener('click', spin);
+        resetBtn.addEventListener('click', resetCredits);
+        saveToggleBtn.addEventListener('click', toggleSave);
+        soundToggleBtn.addEventListener('click', toggleSound);
+        matrixToggleBtn.addEventListener('click', toggleMatrixRain);
+        
+        // Keyboard shortcut: Space to spin
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' && !isSpinning) {
+                e.preventDefault();
+                spin();
+            }
+        });
+        
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /*                      INITIALIZATION                                  */
+        /* ═══════════════════════════════════════════════════════════════════ */
+        loadSettings();
+        loadCredits();
+        initializeReels();
+        toggleMatrix();
+        
+        console.log('%c[SYSTEM] Cyberpunk Slot Machine Initialized', 'color: #39ff14; font-weight: bold;');
+        console.log('%c[SYSTEM] Press SPACE to spin', 'color: #00f5ff;');
+    </script>
+</body>
+</html>
