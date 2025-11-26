@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Developer Tamagotchi | MAQSADBEK</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #0d1117;
+            color: #00ff00;
+            font-family: 'Courier New', Courier, monospace;
+            overflow-x: hidden;
+            position: relative;
+            min-height: 100vh;
+        }
+
+        #matrix-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            opacity: 0.1;
+            pointer-events: none;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .ascii-header {
+            text-align: center;
+            font-size: 12px;
+            line-height: 1.2;
+            margin-bottom: 30px;
+            text-shadow: 0 0 10px #00ff00;
+            animation: glow 2s ease-in-out infinite alternate;
+        }
+
+        @keyframes glow {
+            from { text-shadow: 0 0 5px #00ff00, 0 0 10px #00ff00; }
+            to { text-shadow: 0 0 10px #00ff00, 0 0 20px #00ff00, 0 0 30px #00ff00; }
+        }
+
+        .game-container {
+            background: rgba(13, 17, 23, 0.9);
+            border: 2px solid #00ff00;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.3);
+        }
+
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: rgba(0, 255, 0, 0.05);
+            border: 1px solid #00ff00;
+            border-radius: 5px;
+        }
+
+        .status-item {
+            text-align: center;
+        }
+
+        .character-display {
+            text-align: center;
+            margin: 30px 0;
+            position: relative;
+        }
+
+        .pixel-character {
+            font-size: 80px;
+            animation: bounce 2s ease-in-out infinite;
+            display: inline-block;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .character-level {
+            font-size: 18px;
+            margin-top: 10px;
+            color: #ffff00;
+        }
+
+        .burnout {
+            animation: shake 0.5s ease-in-out infinite;
+            filter: grayscale(100%);
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+
+        .stats-container {
+            margin: 30px 0;
+        }
+
+        .stat-row {
+            margin-bottom: 15px;
+        }
+
+        .stat-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
+
+        .stat-bar {
+            height: 25px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid #00ff00;
+            border-radius: 5px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .stat-fill {
+            height: 100%;
+            transition: width 0.5s ease, background 0.5s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .stat-good { background: linear-gradient(90deg, #00ff00, #00cc00); }
+        .stat-warning { background: linear-gradient(90deg, #ffff00, #ffaa00); }
+        .stat-critical { background: linear-gradient(90deg, #ff0000, #cc0000); }
+
+        .actions-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 30px 0;
+        }
+
+        .action-btn {
+            background: rgba(0, 255, 0, 0.1);
+            border: 2px solid #00ff00;
+            color: #00ff00;
+            padding: 15px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 14px;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .action-btn:hover:not(:disabled) {
+            background: rgba(0, 255, 0, 0.2);
+            transform: scale(1.05);
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.5);
+        }
+
+        .action-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .cooldown-timer {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            font-size: 10px;
+            color: #ffff00;
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 255, 0, 0.95);
+            color: #0d1117;
+            padding: 20px;
+            border-radius: 10px;
+            border: 2px solid #00ff00;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
+            z-index: 1000;
+            animation: slideIn 0.5s ease;
+            max-width: 300px;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .achievement-popup {
+            background: linear-gradient(135deg, #ffd700, #ffaa00);
+            color: #000;
+            font-weight: bold;
+        }
+
+        .warning-popup {
+            background: rgba(255, 0, 0, 0.95);
+            color: #fff;
+        }
+
+        .info-section {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .info-box {
+            background: rgba(0, 255, 0, 0.05);
+            border: 1px solid #00ff00;
+            padding: 15px;
+            border-radius: 5px;
+            text-align: center;
+        }
+
+        .info-title {
+            color: #ffff00;
+            margin-bottom: 10px;
+            font-size: 12px;
+        }
+
+        .info-value {
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        .achievements-list {
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(0, 255, 0, 0.05);
+            border: 1px solid #00ff00;
+            border-radius: 5px;
+        }
+
+        .achievement-item {
+            padding: 8px;
+            margin: 5px 0;
+            background: rgba(255, 215, 0, 0.2);
+            border-left: 3px solid #ffd700;
+            border-radius: 3px;
+        }
+
+        .achievement-locked {
+            opacity: 0.5;
+            background: rgba(255, 255, 255, 0.05);
+            border-left-color: #666;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="matrix-bg"></canvas>
+    
+    <div class="container">
+        <pre class="ascii-header">
+███╗   ███╗ █████╗  ██████╗ ███████╗ █████╗ ██████╗ ██████╗ ███████╗██╗  ██╗
+████╗ ████║██╔══██╗██╔═══██╗██╔════╝██╔══██╗██╔══██╗██╔══██╗██╔════╝██║ ██╔╝
+██╔████╔██║███████║██║   ██║███████╗███████║██║  ██║██████╔╝█████╗  █████╔╝ 
+██║╚██╔╝██║██╔══██║██║▄▄ ██║╚════██║██╔══██║██║  ██║██╔══██╗██╔══╝  ██╔═██╗ 
+██║ ╚═╝ ██║██║  ██║╚██████╔╝███████║██║  ██║██████╔╝██████╔╝███████╗██║  ██╗
+╚═╝     ╚═╝╚═╝  ╚═╝ ╚══▀▀═╝ ╚══════╝╚═╝  ╚═╝╚═════╝ ╚═════╝ ╚══════╝╚═╝  ╚═╝
+                    [ DEVELOPER TAMAGOTCHI v1.0 ]
+        </pre>
+
+        <div class="game-container">
+            <div class="status-bar">
+                <div class="status-item">
+                    <div>💰 Coins</div>
+                    <div id="coins" class="info-value">10</div>
+                </div>
+                <div class="status-item">
+                    <div>⭐ XP</div>
+                    <div id="xp" class="info-value">0</div>
+                </div>
+                <div class="status-item">
+                    <div>📅 Days Alive</div>
+                    <div id="days-alive" class="info-value">0</div>
+                </div>
+                <div class="status-item">
+                    <div>☕ Coffee</div>
+                    <div id="coffee-count" class="info-value">0</div>
+                </div>
+            </div>
+
+            <div class="character-display">
+                <div id="character" class="pixel-character">👨‍💻</div>
+                <div class="character-level" id="level-display">Junior Developer - Level 1</div>
+            </div>
+
+            <div class="stats-container">
+                <div class="stat-row">
+                    <div class="stat-label">
+                        <span>☕ Energy</span>
+                        <span id="energy-value">100</span>
+                    </div>
+                    <div class="stat-bar">
+                        <div id="energy-bar" class="stat-fill stat-good" style="width: 100%">100%</div>
+                    </div>
+                </div>
+
+                <div class="stat-row">
+                    <div class="stat-label">
+                        <span>📚 Knowledge</span>
+                        <span id="knowledge-value">100</span>
+                    </div>
+                    <div class="stat-bar">
+                        <div id="knowledge-bar" class="stat-fill stat-good" style="width: 100%">100%</div>
+                    </div>
+                </div>
+
+                <div class="stat-row">
+                    <div class="stat-label">
+                        <span>❤️ Health</span>
+                        <span id="health-value">100</span>
+                    </div>
+                    <div class="stat-bar">
+                        <div id="health-bar" class="stat-fill stat-good" style="width: 100%">100%</div>
+                    </div>
+                </div>
+
+                <div class="stat-row">
+                    <div class="stat-label">
+                        <span>😊 Happiness</span>
+                        <span id="happiness-value">100</span>
+                    </div>
+                    <div class="stat-bar">
+                        <div id="happiness-bar" class="stat-fill stat-good" style="width: 100%">100%</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="actions-container">
+                <button class="action-btn" onclick="feedCoffee()">
+                    ☕ Feed Coffee<br>
+                    <small>+20 Energy | -1 Coin</small>
+                </button>
+                <button class="action-btn" id="study-btn" onclick="studyTutorial()">
+                    📚 Study Tutorial<br>
+                    <small>+15 Know | -10 Energy</small>
+                    <div id="study-cooldown" class="cooldown-timer"></div>
+                </button>
+                <button class="action-btn" id="rest-btn" onclick="rest()">
+                    😴 Rest/Sleep<br>
+                    <small>+30 Health | +10 Energy</small>
+                    <div id="rest-cooldown" class="cooldown-timer"></div>
+                </button>
+                <button class="action-btn" onclick="debugCode()">
+                    🐛 Debug Code<br>
+                    <small>+10 Happy | +5 Know</small>
+                </button>
+                <button class="action-btn" onclick="socialBreak()">
+                    💬 Social Break<br>
+                    <small>+20 Happy | -5 Energy</small>
+                </button>
+            </div>
+
+            <div class="info-section">
+                <div class="info-box">
+                    <div class="info-title">LAST SAVE</div>
+                    <div id="last-save" style="font-size: 12px;">Never</div>
+                </div>
+                <div class="info-box">
+                    <div class="info-title">STATUS</div>
+                    <div id="status" class="info-value">Healthy</div>
+                </div>
+                <div class="info-box">
+                    <div class="info-title">NEXT LEVEL</div>
+                    <div id="next-level" class="info-value">100 XP</div>
+                </div>
+            </div>
+
+            <div class="achievements-list">
+                <div style="text-align: center; margin-bottom: 15px; color: #ffd700; font-size: 16px;">🏆 ACHIEVEMENTS 🏆</div>
+                <div id="achievements-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Game State
+        let gameState = {
+            energy: 100,
+            knowledge: 100,
+            health: 100,
+            happiness: 100,
+            coins: 10,
+            xp: 0,
+            level: 1,
+            coffeeCount: 0,
+            daysAlive: 0,
+            birthTime: Date.now(),
+            lastUpdate: Date.now(),
+            lastDecayCheck: Date.now(),
+            achievements: {},
+            cooldowns: {},
+            konamiProgress: 0,
+            coffeeTypeCount: 0,
+            lastCoffeeType: 0
+        };
+
+        const KONAMI_CODE = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'];
+
+        const achievements = {
+            nightOwl: { name: '🦉 Night Owl', desc: 'Fed coffee at 3 AM', unlocked: false },
+            bookworm: { name: '📖 Bookworm', desc: 'Studied 10 times', unlocked: false, progress: 0 },
+            balancedLife: { name: '⚖️ Balanced Life', desc: 'All stats above 80', unlocked: false },
+            survivor: { name: '🎖️ Survivor', desc: 'Kept alive for 7 days', unlocked: false },
+            coffeeAddict: { name: '☕ Coffee Addict', desc: 'Consumed 50 cups of coffee', unlocked: false },
+            midnightCoder: { name: '🌙 Midnight Coder', desc: 'Active at exactly midnight', unlocked: false },
+            konamiMaster: { name: '🎮 Konami Master', desc: 'Entered the Konami code', unlocked: false },
+            speedTyper: { name: '⚡ Speed Typer', desc: 'Typed coffee 5 times fast', unlocked: false },
+            seniorDev: { name: '👨‍💼 Senior Developer', desc: 'Reached Senior level', unlocked: false },
+            techLead: { name: '👔 Tech Lead', desc: 'Reached Tech Lead level', unlocked: false }
+        };
+
+        // Matrix Background
+        const canvas = document.getElementById('matrix-bg');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        const chars = '01アイウエオカキクケコサシスセソタチツテト';
+        const fontSize = 14;
+        const columns = canvas.width / fontSize;
+        const drops = Array(Math.floor(columns)).fill(1);
+
+        function drawMatrix() {
+            ctx.fillStyle = 'rgba(13, 17, 23, 0.05)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#00ff00';
+            ctx.font = fontSize + 'px monospace';
+
+            for (let i = 0; i < drops.length; i++) {
+                const text = chars[Math.floor(Math.random() * chars.length)];
+                ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+                if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
+                    drops[i] = 0;
+                }
+                drops[i]++;
+            }
+        }
+
+        setInterval(drawMatrix, 50);
+
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+
+        // Load saved game
+        function loadGame() {
+            const saved = localStorage.getItem('devTamagotchi');
+            if (saved) {
+                const data = JSON.parse(saved);
+                Object.assign(gameState, data);
+                achievements.bookworm.progress = data.achievements?.bookworm?.progress || 0;
+                
+                // Ensure lastDecayCheck exists for older saves
+                if (!gameState.lastDecayCheck) {
+                    gameState.lastDecayCheck = gameState.lastUpdate || Date.now();
+                }
+                
+                // Calculate time passed since last decay check
+                const timePassed = Date.now() - gameState.lastDecayCheck;
+                applyDecay(timePassed);
+                gameState.lastDecayCheck = Date.now();
+            }
+            updateAchievementsDisplay();
+        }
+
+        // Save game
+        function saveGame() {
+            gameState.lastUpdate = Date.now();
+            localStorage.setItem('devTamagotchi', JSON.stringify(gameState));
+            document.getElementById('last-save').textContent = new Date().toLocaleTimeString();
+        }
+
+        // Apply stat decay for time passed
+        function applyDecay(timePassed) {
+            const minutes = timePassed / (1000 * 60);
+            
+            gameState.energy = Math.max(0, gameState.energy - Math.floor(minutes / 5));
+            gameState.happiness = Math.max(0, gameState.happiness - Math.floor(minutes / 10));
+            gameState.knowledge = Math.max(0, gameState.knowledge - Math.floor(minutes / 60));
+            gameState.health = Math.max(0, gameState.health - Math.floor(minutes / 15));
+        }
+
+        // Update displays
+        function updateDisplay() {
+            // Update stats
+            updateStat('energy', gameState.energy);
+            updateStat('knowledge', gameState.knowledge);
+            updateStat('health', gameState.health);
+            updateStat('happiness', gameState.happiness);
+
+            // Update info
+            document.getElementById('coins').textContent = gameState.coins;
+            document.getElementById('xp').textContent = gameState.xp;
+            document.getElementById('coffee-count').textContent = gameState.coffeeCount;
+
+            // Calculate days alive
+            const daysAlive = Math.floor((Date.now() - gameState.birthTime) / (1000 * 60 * 60 * 24));
+            gameState.daysAlive = daysAlive;
+            document.getElementById('days-alive').textContent = daysAlive;
+
+            // Check achievements
+            checkAchievements();
+
+            // Update level and character
+            updateLevel();
+            updateCharacter();
+
+            // Check for warnings
+            checkWarnings();
+
+            // Auto-save
+            saveGame();
+        }
+
+        function updateStat(stat, value) {
+            value = Math.max(0, Math.min(100, value));
+            gameState[stat] = value;
+
+            const bar = document.getElementById(`${stat}-bar`);
+            const valueDisplay = document.getElementById(`${stat}-value`);
+
+            bar.style.width = value + '%';
+            bar.textContent = value + '%';
+            valueDisplay.textContent = value;
+
+            // Color coding
+            bar.className = 'stat-fill';
+            if (value >= 60) bar.classList.add('stat-good');
+            else if (value >= 30) bar.classList.add('stat-warning');
+            else bar.classList.add('stat-critical');
+        }
+
+        function updateLevel() {
+            let level = 1;
+            let levelName = 'Junior Developer';
+            let nextXP = 100;
+
+            if (gameState.xp >= 500) {
+                level = 4;
+                levelName = 'Tech Lead';
+                nextXP = '∞';
+                unlockAchievement('techLead');
+            } else if (gameState.xp >= 300) {
+                level = 3;
+                levelName = 'Senior Developer';
+                nextXP = 500;
+                unlockAchievement('seniorDev');
+            } else if (gameState.xp >= 100) {
+                level = 2;
+                levelName = 'Mid-Level Developer';
+                nextXP = 300;
+            }
+
+            gameState.level = level;
+            document.getElementById('level-display').textContent = `${levelName} - Level ${level}`;
+            document.getElementById('next-level').textContent = nextXP === '∞' ? 'MAX' : `${nextXP} XP`;
+        }
+
+        function updateCharacter() {
+            const char = document.getElementById('character');
+            const isBurnout = gameState.energy === 0 || gameState.health === 0 || 
+                             gameState.happiness === 0 || gameState.knowledge === 0;
+
+            if (isBurnout) {
+                char.textContent = '😵';
+                char.classList.add('burnout');
+                document.getElementById('status').textContent = '🔥 BURNOUT';
+                document.getElementById('status').style.color = '#ff0000';
+            } else {
+                char.classList.remove('burnout');
+                document.getElementById('status').textContent = '✅ Healthy';
+                document.getElementById('status').style.color = '#00ff00';
+
+                // Character based on level
+                const chars = ['👨‍💻', '👨‍💼', '🧑‍🏫', '👔'];
+                char.textContent = chars[gameState.level - 1] || '👨‍💻';
+            }
+        }
+
+        function checkWarnings() {
+            const stats = ['energy', 'knowledge', 'health', 'happiness'];
+            stats.forEach(stat => {
+                if (gameState[stat] < 30 && gameState[stat] > 0) {
+                    const lastWarning = localStorage.getItem(`warning-${stat}`);
+                    const now = Date.now();
+                    if (!lastWarning || now - parseInt(lastWarning) > 300000) { // 5 min cooldown
+                        showNotification(`⚠️ Warning: ${stat.charAt(0).toUpperCase() + stat.slice(1)} is low!`, 'warning');
+                        localStorage.setItem(`warning-${stat}`, now.toString());
+                    }
+                }
+            });
+        }
+
+        // Actions
+        function feedCoffee() {
+            if (gameState.coins < 1) {
+                showNotification('❌ Not enough coins!', 'warning');
+                return;
+            }
+
+            gameState.coins--;
+            gameState.energy = Math.min(100, gameState.energy + 20);
+            gameState.coffeeCount++;
+            updateDisplay();
+            showNotification('☕ Mmm... coffee! +20 Energy');
+
+            // Check for night owl achievement
+            const hour = new Date().getHours();
+            if (hour === 3) {
+                unlockAchievement('nightOwl');
+            }
+        }
+
+        function studyTutorial() {
+            if (gameState.cooldowns.study && Date.now() < gameState.cooldowns.study) {
+                return;
+            }
+
+            if (gameState.energy < 10) {
+                showNotification('❌ Not enough energy to study!', 'warning');
+                return;
+            }
+
+            gameState.knowledge = Math.min(100, gameState.knowledge + 15);
+            gameState.energy = Math.max(0, gameState.energy - 10);
+            
+            if (!achievements.bookworm.progress) achievements.bookworm.progress = 0;
+            achievements.bookworm.progress++;
+            
+            gameState.cooldowns.study = Date.now() + 30000; // 30 seconds
+            startCooldown('study', 30);
+
+            updateDisplay();
+            showNotification('📚 Learning new skills! +15 Knowledge');
+        }
+
+        function rest() {
+            if (gameState.cooldowns.rest && Date.now() < gameState.cooldowns.rest) {
+                return;
+            }
+
+            gameState.health = Math.min(100, gameState.health + 30);
+            gameState.energy = Math.min(100, gameState.energy + 10);
+            gameState.cooldowns.rest = Date.now() + 60000; // 1 minute
+            startCooldown('rest', 60);
+
+            updateDisplay();
+            showNotification('😴 Feeling refreshed! +30 Health, +10 Energy');
+        }
+
+        function debugCode() {
+            if (gameState.energy < 15) {
+                showNotification('❌ Too tired to debug!', 'warning');
+                return;
+            }
+
+            gameState.happiness = Math.min(100, gameState.happiness + 10);
+            gameState.knowledge = Math.min(100, gameState.knowledge + 5);
+            gameState.energy = Math.max(0, gameState.energy - 15);
+            updateDisplay();
+            showNotification('🐛 Bug fixed! +10 Happiness, +5 Knowledge');
+        }
+
+        function socialBreak() {
+            if (gameState.energy < 5) {
+                showNotification('❌ Too tired for socializing!', 'warning');
+                return;
+            }
+
+            gameState.happiness = Math.min(100, gameState.happiness + 20);
+            gameState.energy = Math.max(0, gameState.energy - 5);
+            updateDisplay();
+            showNotification('💬 Great conversation! +20 Happiness');
+        }
+
+        function startCooldown(action, seconds) {
+            const btn = document.getElementById(`${action}-btn`);
+            const timer = document.getElementById(`${action}-cooldown`);
+            btn.disabled = true;
+
+            let remaining = seconds;
+            const interval = setInterval(() => {
+                remaining--;
+                timer.textContent = `${remaining}s`;
+                if (remaining <= 0) {
+                    clearInterval(interval);
+                    timer.textContent = '';
+                    btn.disabled = false;
+                }
+            }, 1000);
+        }
+
+        // Notifications
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.className = 'notification';
+            if (type === 'achievement') notification.classList.add('achievement-popup');
+            if (type === 'warning') notification.classList.add('warning-popup');
+            notification.textContent = message;
+            document.body.appendChild(notification);
+
+            setTimeout(() => {
+                notification.remove();
+            }, 4000);
+        }
+
+        // Achievements
+        function unlockAchievement(key) {
+            if (!gameState.achievements[key]) {
+                gameState.achievements[key] = true;
+                achievements[key].unlocked = true;
+                showNotification(`🏆 Achievement Unlocked: ${achievements[key].name}`, 'achievement');
+                updateAchievementsDisplay();
+                saveGame();
+            }
+        }
+
+        function checkAchievements() {
+            // Balanced Life
+            if (gameState.energy >= 80 && gameState.health >= 80 && 
+                gameState.happiness >= 80 && gameState.knowledge >= 80) {
+                unlockAchievement('balancedLife');
+            }
+
+            // Bookworm
+            if (achievements.bookworm.progress >= 10) {
+                unlockAchievement('bookworm');
+            }
+
+            // Coffee Addict
+            if (gameState.coffeeCount >= 50) {
+                unlockAchievement('coffeeAddict');
+            }
+
+            // Survivor
+            if (gameState.daysAlive >= 7) {
+                unlockAchievement('survivor');
+            }
+
+            // Midnight Coder
+            const now = new Date();
+            if (now.getHours() === 0 && now.getMinutes() === 0) {
+                unlockAchievement('midnightCoder');
+            }
+        }
+
+        function updateAchievementsDisplay() {
+            const container = document.getElementById('achievements-container');
+            container.innerHTML = '';
+
+            for (const [key, ach] of Object.entries(achievements)) {
+                const div = document.createElement('div');
+                div.className = 'achievement-item';
+                if (!gameState.achievements[key]) {
+                    div.classList.add('achievement-locked');
+                }
+                
+                let progressText = '';
+                if (key === 'bookworm' && !gameState.achievements[key]) {
+                    progressText = ` (${achievements.bookworm.progress || 0}/10)`;
+                }
+                
+                div.textContent = `${ach.name} - ${ach.desc}${progressText}`;
+                container.appendChild(div);
+            }
+        }
+
+        // Stat decay loop
+        setInterval(() => {
+            const now = Date.now();
+            const elapsed = now - gameState.lastDecayCheck;
+            const minutes = elapsed / (1000 * 60);
+            
+            // Only apply decay if at least 1 minute has passed
+            if (minutes >= 1) {
+                // Energy: -1 every 5 minutes
+                const energyDecay = Math.floor(minutes / 5);
+                if (energyDecay > 0) {
+                    gameState.energy = Math.max(0, gameState.energy - energyDecay);
+                }
+                
+                // Happiness: -1 every 10 minutes
+                const happinessDecay = Math.floor(minutes / 10);
+                if (happinessDecay > 0) {
+                    gameState.happiness = Math.max(0, gameState.happiness - happinessDecay);
+                }
+                
+                // Knowledge: -1 every hour
+                const knowledgeDecay = Math.floor(minutes / 60);
+                if (knowledgeDecay > 0) {
+                    gameState.knowledge = Math.max(0, gameState.knowledge - knowledgeDecay);
+                }
+                
+                // Health: -1 every 15 minutes
+                const healthDecay = Math.floor(minutes / 15);
+                if (healthDecay > 0) {
+                    gameState.health = Math.max(0, gameState.health - healthDecay);
+                }
+
+                // Reset decay check timestamp
+                gameState.lastDecayCheck = now;
+                updateDisplay();
+            }
+        }, 60000); // Check every minute
+
+        // XP and coins earning
+        setInterval(() => {
+            if (gameState.energy >= 50 && gameState.health >= 50 && 
+                gameState.happiness >= 50 && gameState.knowledge >= 50) {
+                gameState.xp += 1;
+                gameState.coins += 1;
+                updateDisplay();
+            }
+        }, 30000); // Every 30 seconds
+
+        // Daily check-in
+        function checkDailyBonus() {
+            const lastBonus = localStorage.getItem('lastDailyBonus');
+            const today = new Date().toDateString();
+            
+            if (lastBonus !== today) {
+                gameState.coins += 10;
+                localStorage.setItem('lastDailyBonus', today);
+                showNotification('🎁 Daily bonus: +10 coins!', 'achievement');
+            }
+        }
+
+        // Easter Eggs
+        document.addEventListener('keydown', (e) => {
+            // Konami Code
+            if (e.key === KONAMI_CODE[gameState.konamiProgress]) {
+                gameState.konamiProgress++;
+                if (gameState.konamiProgress === KONAMI_CODE.length) {
+                    gameState.energy = 100;
+                    gameState.health = 100;
+                    gameState.happiness = 100;
+                    gameState.knowledge = 100;
+                    unlockAchievement('konamiMaster');
+                    showNotification('🎮 KONAMI CODE ACTIVATED! All stats restored!', 'achievement');
+                    gameState.konamiProgress = 0;
+                    updateDisplay();
+                }
+            } else {
+                gameState.konamiProgress = 0;
+            }
+
+            // Coffee typing easter egg
+            if (e.key.toLowerCase() === 'c' || e.key.toLowerCase() === 'o' || 
+                e.key.toLowerCase() === 'f' || e.key.toLowerCase() === 'e') {
+                const now = Date.now();
+                if (now - gameState.lastCoffeeType < 2000) {
+                    gameState.coffeeTypeCount++;
+                    if (gameState.coffeeTypeCount >= 20) { // "coffee" is 6 letters x 5 = 30, but being lenient
+                        gameState.coins += 1;
+                        gameState.energy = Math.min(100, gameState.energy + 10);
+                        unlockAchievement('speedTyper');
+                        showNotification('⚡ Speed typing detected! Free coffee!', 'achievement');
+                        gameState.coffeeTypeCount = 0;
+                        updateDisplay();
+                    }
+                } else {
+                    gameState.coffeeTypeCount = 1;
+                }
+                gameState.lastCoffeeType = now;
+            }
+        });
+
+        // Initialize
+        loadGame();
+        updateDisplay();
+        checkDailyBonus();
+
+        // Update display every second for smooth animations
+        setInterval(() => {
+            updateDisplay();
+        }, 5000);
+    </script>
+</body>
+</html>

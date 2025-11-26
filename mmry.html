@@ -1,0 +1,1221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MAQSADBEK - Browser Memory Inspector</title>
+    <style>
+        /* ==========================================
+           DEVELOPER NOTES:
+           
+           Browser Memory API Limitations:
+           - performance.memory is only available in Chrome/Chromium with --enable-precise-memory-info flag
+           - Heap size limits are browser-dependent (typically 2-4GB on desktop)
+           - Memory measurements include JS heap only, not DOM, CSS, or other browser internals
+           
+           Real vs Simulated Metrics:
+           - REAL: performance.memory.usedJSHeapSize, totalJSHeapSize (Chrome only)
+           - REAL: FPS counter (via requestAnimationFrame)
+           - REAL: DOM node count (via document.getElementsByTagName)
+           - SIMULATED: Event listener count (tracked internally)
+           - SIMULATED: Object count (based on our allocations)
+           - SIMULATED: GC events (detected by sharp drops in heap usage)
+           
+           GC Spike Detection:
+           - When heap usage drops by >10% in one sample → GC detected
+           - Visual red flash animation triggers
+           - Logged in timeline with timestamp
+           
+           Key Constants:
+           - Default polling interval: 100ms
+           - Chart max samples: 100 points
+           - Max log entries: 500
+           - Chart colors: #39ff14 (neon green), #00f5ff (cyan), #ff073a (red for GC)
+           - GC threshold: 10% drop in heap
+           - Auto-clean threshold: 90% of total heap
+        ========================================== */
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-dark: #0b0b0b;
+            --neon-green: #39ff14;
+            --neon-cyan: #00f5ff;
+            --neon-red: #ff073a;
+            --neon-yellow: #ffea00;
+            --panel-bg: rgba(15, 15, 15, 0.95);
+            --border-color: rgba(57, 255, 20, 0.3);
+            --text-primary: #39ff14;
+            --text-secondary: #00f5ff;
+            --font-mono: 'Courier New', Consolas, Monaco, monospace;
+        }
+
+        body {
+            font-family: var(--font-mono);
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            overflow-x: hidden;
+            position: relative;
+            min-height: 100vh;
+        }
+
+        /* Background Watermark */
+        body::before {
+            content: 'MAQSADBEK';
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-45deg);
+            font-size: clamp(60px, 15vw, 200px);
+            font-weight: bold;
+            color: rgba(57, 255, 20, 0.03);
+            z-index: 0;
+            pointer-events: none;
+            white-space: nowrap;
+            letter-spacing: 20px;
+        }
+
+        /* Scanline overlay */
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: repeating-linear-gradient(
+                0deg,
+                rgba(0, 0, 0, 0.15),
+                rgba(0, 0, 0, 0.15) 1px,
+                transparent 1px,
+                transparent 2px
+            );
+            pointer-events: none;
+            z-index: 9999;
+            animation: scanlines 8s linear infinite;
+        }
+
+        @keyframes scanlines {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(100px); }
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+            max-width: 1800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* ASCII Banner */
+        .ascii-banner {
+            text-align: center;
+            padding: 30px 20px;
+            margin-bottom: 30px;
+            background: var(--panel-bg);
+            border: 2px solid var(--neon-green);
+            box-shadow: 0 0 20px rgba(57, 255, 20, 0.5),
+                        inset 0 0 20px rgba(57, 255, 20, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .ascii-text {
+            font-size: clamp(16px, 4vw, 32px);
+            line-height: 1.2;
+            color: var(--neon-green);
+            text-shadow: 0 0 10px var(--neon-green),
+                         0 0 20px var(--neon-green);
+            font-weight: bold;
+            letter-spacing: 2px;
+            animation: glitch 3s infinite;
+            position: relative;
+        }
+
+        @keyframes glitch {
+            0%, 90%, 100% { transform: translate(0); }
+            91% { transform: translate(-2px, 2px); }
+            92% { transform: translate(2px, -2px); }
+            93% { transform: translate(-2px, -2px); }
+            94% { transform: translate(2px, 2px); }
+        }
+
+        .cursor {
+            display: inline-block;
+            width: 12px;
+            height: 20px;
+            background: var(--neon-green);
+            animation: blink 1s infinite;
+            margin-left: 5px;
+        }
+
+        @keyframes blink {
+            0%, 49% { opacity: 1; }
+            50%, 100% { opacity: 0; }
+        }
+
+        /* Main Grid Layout */
+        .main-grid {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        /* Panels */
+        .panel {
+            background: var(--panel-bg);
+            border: 2px solid var(--border-color);
+            padding: 20px;
+            border-radius: 4px;
+            box-shadow: 0 0 15px rgba(57, 255, 20, 0.2);
+            transition: all 0.3s ease;
+        }
+
+        .panel:hover {
+            border-color: var(--neon-green);
+            box-shadow: 0 0 25px rgba(57, 255, 20, 0.4);
+        }
+
+        .panel-title {
+            font-size: 18px;
+            margin-bottom: 15px;
+            color: var(--neon-cyan);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
+            text-shadow: 0 0 10px var(--neon-cyan);
+        }
+
+        /* Buttons */
+        .btn {
+            background: transparent;
+            border: 1px solid var(--neon-green);
+            color: var(--neon-green);
+            padding: 10px 15px;
+            margin: 5px;
+            cursor: pointer;
+            font-family: var(--font-mono);
+            font-size: 12px;
+            transition: all 0.3s ease;
+            border-radius: 3px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn:hover {
+            background: var(--neon-green);
+            color: var(--bg-dark);
+            box-shadow: 0 0 15px var(--neon-green);
+            transform: translateY(-2px);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-danger {
+            border-color: var(--neon-red);
+            color: var(--neon-red);
+        }
+
+        .btn-danger:hover {
+            background: var(--neon-red);
+            box-shadow: 0 0 15px var(--neon-red);
+        }
+
+        .btn-cyan {
+            border-color: var(--neon-cyan);
+            color: var(--neon-cyan);
+        }
+
+        .btn-cyan:hover {
+            background: var(--neon-cyan);
+            box-shadow: 0 0 15px var(--neon-cyan);
+        }
+
+        /* Memory Stats */
+        .memory-stat {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            margin: 8px 0;
+            background: rgba(0, 0, 0, 0.3);
+            border-left: 3px solid var(--neon-green);
+            transition: all 0.2s ease;
+        }
+
+        .memory-stat:hover {
+            background: rgba(57, 255, 20, 0.1);
+            border-left-color: var(--neon-cyan);
+        }
+
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 13px;
+        }
+
+        .stat-value {
+            color: var(--neon-green);
+            font-weight: bold;
+            font-size: 14px;
+            text-shadow: 0 0 5px var(--neon-green);
+        }
+
+        /* Canvas Chart */
+        #memoryChart {
+            width: 100%;
+            height: 300px;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid var(--border-color);
+            border-radius: 3px;
+            box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5);
+        }
+
+        /* Object List */
+        .object-item {
+            margin: 10px 0;
+        }
+
+        .object-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+            font-size: 12px;
+        }
+
+        .object-name {
+            color: var(--neon-cyan);
+        }
+
+        .object-count {
+            color: var(--neon-green);
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 4px;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--neon-green), var(--neon-cyan));
+            transition: width 0.3s ease;
+            box-shadow: 0 0 10px var(--neon-green);
+        }
+
+        /* Controls */
+        .control-group {
+            margin: 15px 0;
+        }
+
+        .control-label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--neon-cyan);
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid var(--border-color);
+            outline: none;
+            border-radius: 3px;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            background: var(--neon-green);
+            cursor: pointer;
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--neon-green);
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            background: var(--neon-green);
+            cursor: pointer;
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--neon-green);
+        }
+
+        .toggle-switch {
+            display: inline-flex;
+            align-items: center;
+            cursor: pointer;
+            margin: 10px 0;
+        }
+
+        .toggle-switch input {
+            display: none;
+        }
+
+        .toggle-slider {
+            width: 50px;
+            height: 24px;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            position: relative;
+            transition: all 0.3s ease;
+            margin-right: 10px;
+        }
+
+        .toggle-slider::before {
+            content: '';
+            position: absolute;
+            width: 18px;
+            height: 18px;
+            background: var(--neon-red);
+            border-radius: 50%;
+            top: 2px;
+            left: 2px;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 10px var(--neon-red);
+        }
+
+        .toggle-switch input:checked + .toggle-slider {
+            background: rgba(57, 255, 20, 0.2);
+        }
+
+        .toggle-switch input:checked + .toggle-slider::before {
+            left: 28px;
+            background: var(--neon-green);
+            box-shadow: 0 0 10px var(--neon-green);
+        }
+
+        /* Timeline */
+        .timeline {
+            background: var(--panel-bg);
+            border: 2px solid var(--border-color);
+            padding: 20px;
+            border-radius: 4px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .timeline-entry {
+            padding: 8px;
+            margin: 5px 0;
+            background: rgba(0, 0, 0, 0.3);
+            border-left: 3px solid var(--neon-cyan);
+            font-size: 11px;
+            transition: all 0.2s ease;
+        }
+
+        .timeline-entry:hover {
+            background: rgba(0, 255, 255, 0.1);
+            transform: translateX(5px);
+        }
+
+        .timeline-entry.gc-event {
+            border-left-color: var(--neon-red);
+            color: var(--neon-red);
+        }
+
+        .timeline-time {
+            color: var(--text-secondary);
+            margin-right: 10px;
+        }
+
+        /* GC Flash */
+        .gc-flash {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--neon-red);
+            opacity: 0;
+            pointer-events: none;
+            z-index: 10000;
+            animation: flash 0.3s ease-out;
+        }
+
+        @keyframes flash {
+            0% { opacity: 0; }
+            50% { opacity: 0.3; }
+            100% { opacity: 0; }
+        }
+
+        /* Warning */
+        .warning {
+            background: rgba(255, 7, 58, 0.2);
+            border: 1px solid var(--neon-red);
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 3px;
+            color: var(--neon-red);
+            font-size: 12px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.5);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--neon-green);
+            border-radius: 5px;
+            box-shadow: 0 0 10px var(--neon-green);
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--neon-cyan);
+        }
+
+        /* Matrix Rain Toggle */
+        #matrixCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            opacity: 0.15;
+            pointer-events: none;
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .ascii-text {
+                font-size: 16px;
+            }
+
+            .btn {
+                padding: 8px 12px;
+                font-size: 10px;
+                margin: 3px;
+            }
+
+            #memoryChart {
+                height: 200px;
+            }
+
+            .panel {
+                padding: 15px;
+            }
+        }
+
+        /* Button Grid */
+        .button-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 5px;
+        }
+
+        .value-display {
+            text-align: center;
+            color: var(--neon-green);
+            font-size: 14px;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Matrix Rain Canvas -->
+    <canvas id="matrixCanvas"></canvas>
+
+    <div class="container">
+        <!-- ASCII Banner -->
+        <div class="ascii-banner">
+            <div class="ascii-text">
+███╗   ███╗ █████╗  ██████╗ ███████╗ █████╗ ██████╗ ██████╗ ███████╗██╗  ██╗
+████╗ ████║██╔══██╗██╔═══██╗██╔════╝██╔══██╗██╔══██╗██╔══██╗██╔════╝██║ ██╔╝
+██╔████╔██║███████║██║   ██║███████╗███████║██║  ██║██████╔╝█████╗  █████╔╝ 
+██║╚██╔╝██║██╔══██║██║▄▄ ██║╚════██║██╔══██║██║  ██║██╔══██╗██╔══╝  ██╔═██╗ 
+██║ ╚═╝ ██║██║  ██║╚██████╔╝███████║██║  ██║██████╔╝██████╔╝███████╗██║  ██╗
+╚═╝     ╚═╝╚═╝  ╚═╝ ╚══▀▀═╝ ╚══════╝╚═╝  ╚═╝╚═════╝ ╚═════╝ ╚══════╝╚═╝  ╚═╝
+                    [ BROWSER MEMORY INSPECTOR ]<span class="cursor"></span>
+            </div>
+        </div>
+
+        <!-- Main Grid -->
+        <div class="main-grid">
+            <!-- Left Panel: Tools & Controls -->
+            <div>
+                <!-- Memory Tools -->
+                <div class="panel">
+                    <h2 class="panel-title">⚡ Memory Tools</h2>
+                    
+                    <div style="margin-bottom: 20px;">
+                        <div style="color: var(--neon-cyan); font-size: 12px; margin-bottom: 10px;">ALLOCATE OBJECTS:</div>
+                        <div class="button-grid">
+                            <button class="btn" onclick="allocateObjects(1000)">Allocate 1,000 Objects</button>
+                            <button class="btn" onclick="allocateObjects(10000)">Allocate 10,000 Objects</button>
+                            <button class="btn" onclick="allocateBlob(1)">Allocate 1 MB Blob</button>
+                            <button class="btn" onclick="allocateBlob(5)">Allocate 5 MB Blob</button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div style="color: var(--neon-cyan); font-size: 12px; margin-bottom: 10px;">FREE MEMORY:</div>
+                        <div class="button-grid">
+                            <button class="btn btn-danger" onclick="releaseObjects()">Release Objects</button>
+                            <button class="btn btn-danger" onclick="forceGC()">Force GC (Simulate)</button>
+                            <button class="btn btn-danger" onclick="clearDOMNodes()">Clear DOM Nodes</button>
+                            <button class="btn btn-danger" onclick="resetInspector()">Reset Inspector</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Controls -->
+                <div class="panel" style="margin-top: 20px;">
+                    <h2 class="panel-title">⚙️ Controls</h2>
+                    
+                    <div class="control-group">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="neonToggle" checked onchange="toggleNeonMode()">
+                            <span class="toggle-slider"></span>
+                            <span>Neon Mode</span>
+                        </label>
+                    </div>
+
+                    <div class="control-group">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="animToggle" checked onchange="toggleAnimations()">
+                            <span class="toggle-slider"></span>
+                            <span>Animations</span>
+                        </label>
+                    </div>
+
+                    <div class="control-group">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="matrixToggle" onchange="toggleMatrix()">
+                            <span class="toggle-slider"></span>
+                            <span>Matrix Rain</span>
+                        </label>
+                    </div>
+
+                    <div class="control-group">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="autoCleanToggle" onchange="toggleAutoClean()">
+                            <span class="toggle-slider"></span>
+                            <span>Auto-Clean (90%)</span>
+                        </label>
+                    </div>
+
+                    <div class="control-group">
+                        <label class="control-label">Refresh Interval: <span id="intervalValue">100ms</span></label>
+                        <input type="range" id="intervalSlider" min="50" max="2000" value="100" step="50" oninput="updateInterval(this.value)">
+                    </div>
+
+                    <div class="button-grid" style="margin-top: 20px;">
+                        <button class="btn btn-cyan" onclick="dumpMemory()">📥 Dump Memory JSON</button>
+                    </div>
+                </div>
+
+                <!-- Object Visualization -->
+                <div class="panel" style="margin-top: 20px;">
+                    <h2 class="panel-title">📦 Object Types</h2>
+                    <div id="objectList"></div>
+                </div>
+            </div>
+
+            <!-- Right Panel: Live Memory Inspector -->
+            <div>
+                <div class="panel">
+                    <h2 class="panel-title">🔍 Live Memory Inspector</h2>
+                    
+                    <div id="warningBox"></div>
+
+                    <div id="memoryStats">
+                        <div class="memory-stat">
+                            <span class="stat-label">JS Heap Used:</span>
+                            <span class="stat-value" id="heapUsed">0 MB</span>
+                        </div>
+                        <div class="memory-stat">
+                            <span class="stat-label">JS Heap Total:</span>
+                            <span class="stat-value" id="heapTotal">0 MB</span>
+                        </div>
+                        <div class="memory-stat">
+                            <span class="stat-label">Heap Usage %:</span>
+                            <span class="stat-value" id="heapPercent">0%</span>
+                        </div>
+                        <div class="memory-stat">
+                            <span class="stat-label">Object Count:</span>
+                            <span class="stat-value" id="objectCount">0</span>
+                        </div>
+                        <div class="memory-stat">
+                            <span class="stat-label">Event Listeners:</span>
+                            <span class="stat-value" id="listenerCount">0</span>
+                        </div>
+                        <div class="memory-stat">
+                            <span class="stat-label">DOM Nodes:</span>
+                            <span class="stat-value" id="domCount">0</span>
+                        </div>
+                        <div class="memory-stat">
+                            <span class="stat-label">FPS:</span>
+                            <span class="stat-value" id="fpsCount">60</span>
+                        </div>
+                        <div class="memory-stat">
+                            <span class="stat-label">GC Events:</span>
+                            <span class="stat-value" id="gcCount">0</span>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 20px;">
+                        <h3 style="color: var(--neon-cyan); margin-bottom: 10px; font-size: 14px;">MEMORY USAGE GRAPH</h3>
+                        <canvas id="memoryChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Timeline -->
+        <div class="panel">
+            <h2 class="panel-title">📊 Memory Timeline & Events</h2>
+            <div class="timeline" id="timeline"></div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // GLOBAL STATE
+        // ==========================================
+        const state = {
+            allocatedObjects: [],
+            allocatedBlobs: [],
+            objectTypes: {},
+            gcEvents: 0,
+            eventListeners: 0,
+            updateInterval: 100,
+            animationsEnabled: true,
+            neonMode: true,
+            matrixEnabled: false,
+            autoClean: false,
+            
+            // Memory tracking
+            memoryHistory: [],
+            maxSamples: 100,
+            lastHeapUsed: 0,
+            
+            // Timeline
+            timeline: [],
+            maxTimelineEntries: 500,
+            
+            // FPS
+            fps: 60,
+            lastFrameTime: performance.now(),
+            frameCount: 0,
+            
+            // Chart
+            chartUpdateId: null,
+            monitorIntervalId: null,
+            
+            // API support
+            hasMemoryAPI: !!(performance.memory)
+        };
+
+        // ==========================================
+        // MEMORY MONITORING
+        // ==========================================
+        function getMemoryInfo() {
+            if (state.hasMemoryAPI) {
+                return {
+                    used: performance.memory.usedJSHeapSize,
+                    total: performance.memory.totalJSHeapSize,
+                    limit: performance.memory.jsHeapSizeLimit
+                };
+            } else {
+                // Simulated fallback
+                const baseUsed = 50 * 1024 * 1024; // 50MB base
+                const objectMem = state.allocatedObjects.length * 1000; // ~1KB per object
+                const blobMem = state.allocatedBlobs.reduce((sum, blob) => sum + blob.size, 0);
+                const used = baseUsed + objectMem + blobMem;
+                const total = 2048 * 1024 * 1024; // 2GB simulated
+                
+                return { used, total, limit: total };
+            }
+        }
+
+        function updateMemoryStats() {
+            const mem = getMemoryInfo();
+            const usedMB = (mem.used / 1024 / 1024).toFixed(2);
+            const totalMB = (mem.total / 1024 / 1024).toFixed(2);
+            const percent = ((mem.used / mem.total) * 100).toFixed(1);
+
+            document.getElementById('heapUsed').textContent = `${usedMB} MB`;
+            document.getElementById('heapTotal').textContent = `${totalMB} MB`;
+            document.getElementById('heapPercent').textContent = `${percent}%`;
+            document.getElementById('objectCount').textContent = state.allocatedObjects.length.toLocaleString();
+            document.getElementById('listenerCount').textContent = state.eventListeners;
+            document.getElementById('domCount').textContent = document.getElementsByTagName('*').length;
+            document.getElementById('fpsCount').textContent = Math.round(state.fps);
+            document.getElementById('gcCount').textContent = state.gcEvents;
+
+            // Add to history
+            state.memoryHistory.push({
+                timestamp: Date.now(),
+                used: mem.used,
+                total: mem.total,
+                objects: state.allocatedObjects.length
+            });
+
+            if (state.memoryHistory.length > state.maxSamples) {
+                state.memoryHistory.shift();
+            }
+
+            // Detect GC (sharp drop in memory)
+            if (state.lastHeapUsed > 0) {
+                const drop = ((state.lastHeapUsed - mem.used) / state.lastHeapUsed) * 100;
+                if (drop > 10) {
+                    triggerGCEvent();
+                }
+            }
+            state.lastHeapUsed = mem.used;
+
+            // Memory leak warning
+            const warningBox = document.getElementById('warningBox');
+            if (percent > 85) {
+                warningBox.innerHTML = '<div class="warning">⚠️ WARNING: Memory usage exceeds 85%! Potential memory leak detected.</div>';
+                
+                if (state.autoClean && percent > 90) {
+                    addTimelineEntry('Auto-clean triggered at 90% memory usage');
+                    releaseObjects();
+                }
+            } else {
+                warningBox.innerHTML = '';
+            }
+
+            // Update object visualization
+            updateObjectVisualization();
+        }
+
+        function triggerGCEvent() {
+            state.gcEvents++;
+            
+            // Visual flash
+            const flash = document.createElement('div');
+            flash.className = 'gc-flash';
+            document.body.appendChild(flash);
+            setTimeout(() => flash.remove(), 300);
+            
+            addTimelineEntry('GC Event Detected', true);
+        }
+
+        // ==========================================
+        // MEMORY ALLOCATION
+        // ==========================================
+        function allocateObjects(count) {
+            const newObjects = [];
+            for (let i = 0; i < count; i++) {
+                newObjects.push({
+                    id: Date.now() + i,
+                    data: new Array(100).fill(Math.random()),
+                    timestamp: new Date().toISOString(),
+                    type: 'SmallObject'
+                });
+            }
+            state.allocatedObjects.push(...newObjects);
+            
+            // Track object types
+            if (!state.objectTypes['SmallObject']) {
+                state.objectTypes['SmallObject'] = 0;
+            }
+            state.objectTypes['SmallObject'] += count;
+            
+            addTimelineEntry(`Allocated ${count.toLocaleString()} objects`);
+        }
+
+        function allocateBlob(sizeMB) {
+            const blob = new Blob([new ArrayBuffer(sizeMB * 1024 * 1024)]);
+            state.allocatedBlobs.push(blob);
+            
+            const type = `Blob${sizeMB}MB`;
+            if (!state.objectTypes[type]) {
+                state.objectTypes[type] = 0;
+            }
+            state.objectTypes[type]++;
+            
+            addTimelineEntry(`Allocated ${sizeMB}MB blob`);
+        }
+
+        function releaseObjects() {
+            const count = state.allocatedObjects.length;
+            state.allocatedObjects = [];
+            state.allocatedBlobs = [];
+            state.objectTypes = {};
+            addTimelineEntry(`Released ${count.toLocaleString()} objects`);
+        }
+
+        function forceGC() {
+            // Simulate GC by releasing some objects
+            const count = Math.floor(state.allocatedObjects.length * 0.3);
+            state.allocatedObjects.splice(0, count);
+            triggerGCEvent();
+            addTimelineEntry(`Simulated GC: cleared ${count.toLocaleString()} objects`);
+        }
+
+        function clearDOMNodes() {
+            // We can't actually clear real DOM nodes, but we can clear our test nodes
+            const testNodes = document.querySelectorAll('.test-node');
+            testNodes.forEach(node => node.remove());
+            addTimelineEntry(`Cleared ${testNodes.length} test DOM nodes`);
+        }
+
+        function resetInspector() {
+            state.allocatedObjects = [];
+            state.allocatedBlobs = [];
+            state.objectTypes = {};
+            state.gcEvents = 0;
+            state.memoryHistory = [];
+            state.timeline = [];
+            document.getElementById('timeline').innerHTML = '';
+            addTimelineEntry('Inspector reset');
+        }
+
+        // ==========================================
+        // OBJECT VISUALIZATION
+        // ==========================================
+        function updateObjectVisualization() {
+            const container = document.getElementById('objectList');
+            const totalObjects = state.allocatedObjects.length + state.allocatedBlobs.length;
+            
+            if (totalObjects === 0) {
+                container.innerHTML = '<div style="color: var(--text-secondary); font-size: 12px; text-align: center; padding: 20px;">No objects allocated</div>';
+                return;
+            }
+            
+            let html = '';
+            for (const [type, count] of Object.entries(state.objectTypes)) {
+                const percent = (count / totalObjects) * 100;
+                html += `
+                    <div class="object-item">
+                        <div class="object-header">
+                            <span class="object-name">${type}</span>
+                            <span class="object-count">${count} (${percent.toFixed(1)}%)</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: ${percent}%"></div>
+                        </div>
+                    </div>
+                `;
+            }
+            container.innerHTML = html;
+        }
+
+        // ==========================================
+        // TIMELINE
+        // ==========================================
+        function addTimelineEntry(message, isGC = false) {
+            const time = new Date().toLocaleTimeString();
+            const mem = getMemoryInfo();
+            const usedMB = (mem.used / 1024 / 1024).toFixed(2);
+            
+            const entry = {
+                time,
+                message,
+                heapUsed: usedMB,
+                objectCount: state.allocatedObjects.length,
+                isGC
+            };
+            
+            state.timeline.unshift(entry);
+            if (state.timeline.length > state.maxTimelineEntries) {
+                state.timeline.pop();
+            }
+            
+            renderTimeline();
+        }
+
+        function renderTimeline() {
+            const container = document.getElementById('timeline');
+            const html = state.timeline.map(entry => `
+                <div class="timeline-entry ${entry.isGC ? 'gc-event' : ''}">
+                    <span class="timeline-time">[${entry.time}]</span>
+                    ${entry.message} | Heap: ${entry.heapUsed}MB | Objects: ${entry.objectCount.toLocaleString()}
+                </div>
+            `).join('');
+            container.innerHTML = html;
+        }
+
+        // ==========================================
+        // CHART RENDERING
+        // ==========================================
+        function drawChart() {
+            if (!state.animationsEnabled) return;
+            
+            const canvas = document.getElementById('memoryChart');
+            const ctx = canvas.getContext('2d');
+            
+            // Set canvas size
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+            
+            const width = canvas.width;
+            const height = canvas.height;
+            const padding = 40;
+            
+            // Clear
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+            ctx.fillRect(0, 0, width, height);
+            
+            if (state.memoryHistory.length < 2) return;
+            
+            // Find max value
+            const maxUsed = Math.max(...state.memoryHistory.map(h => h.used));
+            const maxTotal = state.memoryHistory[0].total;
+            
+            // Draw grid
+            ctx.strokeStyle = 'rgba(57, 255, 20, 0.1)';
+            ctx.lineWidth = 1;
+            for (let i = 0; i < 10; i++) {
+                const y = padding + (height - padding * 2) * (i / 10);
+                ctx.beginPath();
+                ctx.moveTo(padding, y);
+                ctx.lineTo(width - padding, y);
+                ctx.stroke();
+            }
+            
+            // Draw memory limit line
+            ctx.strokeStyle = 'rgba(255, 7, 58, 0.5)';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([5, 5]);
+            const limitY = padding + (height - padding * 2) * (1 - (maxTotal / (maxTotal * 1.1)));
+            ctx.beginPath();
+            ctx.moveTo(padding, limitY);
+            ctx.lineTo(width - padding, limitY);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            
+            // Draw memory usage line
+            ctx.strokeStyle = '#39ff14';
+            ctx.lineWidth = 2;
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#39ff14';
+            ctx.beginPath();
+            
+            state.memoryHistory.forEach((point, i) => {
+                const x = padding + (width - padding * 2) * (i / (state.maxSamples - 1));
+                const y = padding + (height - padding * 2) * (1 - (point.used / (maxTotal * 1.1)));
+                
+                if (i === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            });
+            ctx.stroke();
+            
+            // Draw fill
+            ctx.lineTo(width - padding, height - padding);
+            ctx.lineTo(padding, height - padding);
+            ctx.closePath();
+            ctx.fillStyle = 'rgba(57, 255, 20, 0.1)';
+            ctx.fill();
+            
+            // Draw labels
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = '#00f5ff';
+            ctx.font = '10px monospace';
+            ctx.fillText(`Max: ${(maxTotal / 1024 / 1024).toFixed(0)}MB`, padding, padding - 10);
+            ctx.fillText(`Current: ${(state.memoryHistory[state.memoryHistory.length - 1].used / 1024 / 1024).toFixed(2)}MB`, width - padding - 100, padding - 10);
+            
+            state.chartUpdateId = requestAnimationFrame(drawChart);
+        }
+
+        // ==========================================
+        // FPS COUNTER
+        // ==========================================
+        function updateFPS() {
+            const now = performance.now();
+            state.frameCount++;
+            
+            if (now >= state.lastFrameTime + 1000) {
+                state.fps = state.frameCount;
+                state.frameCount = 0;
+                state.lastFrameTime = now;
+            }
+            
+            requestAnimationFrame(updateFPS);
+        }
+
+        // ==========================================
+        // CONTROLS
+        // ==========================================
+        function updateInterval(value) {
+            state.updateInterval = parseInt(value);
+            document.getElementById('intervalValue').textContent = `${value}ms`;
+            
+            clearInterval(state.monitorIntervalId);
+            state.monitorIntervalId = setInterval(updateMemoryStats, state.updateInterval);
+        }
+
+        function toggleNeonMode() {
+            state.neonMode = !state.neonMode;
+            if (!state.neonMode) {
+                document.documentElement.style.setProperty('--neon-green', '#00ff00');
+                document.documentElement.style.setProperty('--neon-cyan', '#00ffff');
+            } else {
+                document.documentElement.style.setProperty('--neon-green', '#39ff14');
+                document.documentElement.style.setProperty('--neon-cyan', '#00f5ff');
+            }
+        }
+
+        function toggleAnimations() {
+            state.animationsEnabled = !state.animationsEnabled;
+            if (!state.animationsEnabled) {
+                cancelAnimationFrame(state.chartUpdateId);
+            } else {
+                drawChart();
+            }
+        }
+
+        function toggleAutoClean() {
+            state.autoClean = !state.autoClean;
+            addTimelineEntry(`Auto-clean ${state.autoClean ? 'enabled' : 'disabled'}`);
+        }
+
+        function dumpMemory() {
+            const dump = {
+                timestamp: new Date().toISOString(),
+                memoryInfo: getMemoryInfo(),
+                stats: {
+                    objectCount: state.allocatedObjects.length,
+                    blobCount: state.allocatedBlobs.length,
+                    gcEvents: state.gcEvents,
+                    fps: state.fps
+                },
+                objectTypes: state.objectTypes,
+                timeline: state.timeline,
+                memoryHistory: state.memoryHistory
+            };
+            
+            const json = JSON.stringify(dump, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `memory-dump-${Date.now()}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            addTimelineEntry('Memory snapshot downloaded');
+        }
+
+        // ==========================================
+        // MATRIX RAIN
+        // ==========================================
+        function toggleMatrix() {
+            state.matrixEnabled = !state.matrixEnabled;
+            const canvas = document.getElementById('matrixCanvas');
+            
+            if (state.matrixEnabled) {
+                startMatrix();
+            } else {
+                canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+            }
+        }
+
+        function startMatrix() {
+            const canvas = document.getElementById('matrixCanvas');
+            const ctx = canvas.getContext('2d');
+            
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            
+            const chars = 'ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜｦﾝ01';
+            const fontSize = 14;
+            const columns = canvas.width / fontSize;
+            const drops = Array(Math.floor(columns)).fill(1);
+            
+            function draw() {
+                if (!state.matrixEnabled) return;
+                
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                ctx.fillStyle = '#39ff14';
+                ctx.font = `${fontSize}px monospace`;
+                
+                for (let i = 0; i < drops.length; i++) {
+                    const text = chars[Math.floor(Math.random() * chars.length)];
+                    ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+                    
+                    if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
+                        drops[i] = 0;
+                    }
+                    drops[i]++;
+                }
+                
+                setTimeout(() => requestAnimationFrame(draw), 50);
+            }
+            
+            draw();
+        }
+
+        // ==========================================
+        // INITIALIZATION
+        // ==========================================
+        function init() {
+            // Track event listeners
+            const originalAddEventListener = EventTarget.prototype.addEventListener;
+            EventTarget.prototype.addEventListener = function(...args) {
+                state.eventListeners++;
+                return originalAddEventListener.apply(this, args);
+            };
+            
+            // Start monitoring
+            state.monitorIntervalId = setInterval(updateMemoryStats, state.updateInterval);
+            
+            // Start chart
+            drawChart();
+            
+            // Start FPS counter
+            updateFPS();
+            
+            // Initial stats
+            updateMemoryStats();
+            
+            // Welcome message
+            addTimelineEntry('Memory Inspector initialized');
+            
+            if (!state.hasMemoryAPI) {
+                addTimelineEntry('⚠️ performance.memory API not available - using simulated data');
+            }
+            
+            console.log('%c MAQSADBEK Memory Inspector Loaded ', 'background: #39ff14; color: #0b0b0b; font-size: 16px; font-weight: bold;');
+        }
+
+        // Start on load
+        window.addEventListener('load', init);
+        
+        // Cleanup on unload
+        window.addEventListener('beforeunload', () => {
+            clearInterval(state.monitorIntervalId);
+            cancelAnimationFrame(state.chartUpdateId);
+        });
+    </script>
+</body>
+</html>
