@@ -1,0 +1,1424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MAQSADBEK | Image to ASCII Converter Pro</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --neon-green: #39ff14;
+            --neon-cyan: #00f5ff;
+            --bg-dark: #0b0b0b;
+            --bg-secondary: #141414;
+            --text-dim: #555;
+        }
+
+        @keyframes flicker {
+            0%, 100% { opacity: 1; }
+            92% { opacity: 1; }
+            93% { opacity: 0.8; }
+            94% { opacity: 1; }
+            97% { opacity: 0.9; }
+            98% { opacity: 1; }
+        }
+
+        @keyframes scanline {
+            0% { transform: translateY(-100%); }
+            100% { transform: translateY(100vh); }
+        }
+
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+
+        @keyframes glow {
+            0%, 100% { text-shadow: 0 0 10px var(--neon-green), 0 0 20px var(--neon-green), 0 0 30px var(--neon-green); }
+            50% { text-shadow: 0 0 20px var(--neon-green), 0 0 40px var(--neon-green), 0 0 60px var(--neon-green); }
+        }
+
+        @keyframes matrixFall {
+            0% { transform: translateY(-100%); opacity: 1; }
+            100% { transform: translateY(100vh); opacity: 0; }
+        }
+
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 5px var(--neon-green); }
+            50% { box-shadow: 0 0 20px var(--neon-green), 0 0 30px var(--neon-cyan); }
+        }
+
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            background: var(--bg-dark);
+            color: var(--neon-green);
+            min-height: 100vh;
+            overflow-x: hidden;
+            animation: flicker 5s infinite;
+        }
+
+        .scanlines {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 9999;
+            background: repeating-linear-gradient(
+                0deg,
+                rgba(0, 0, 0, 0.15),
+                rgba(0, 0, 0, 0.15) 1px,
+                transparent 1px,
+                transparent 2px
+            );
+        }
+
+        .scanline-moving {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: rgba(57, 255, 20, 0.1);
+            pointer-events: none;
+            z-index: 9998;
+            animation: scanline 8s linear infinite;
+        }
+
+        .watermark {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-45deg);
+            font-size: 15vw;
+            color: rgba(57, 255, 20, 0.03);
+            pointer-events: none;
+            z-index: 0;
+            white-space: nowrap;
+            font-weight: bold;
+        }
+
+        #matrix-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: -1;
+            overflow: hidden;
+            display: none;
+        }
+
+        .matrix-char {
+            position: absolute;
+            color: var(--neon-green);
+            font-size: 14px;
+            opacity: 0.5;
+            animation: matrixFall linear infinite;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .ascii-banner {
+            text-align: center;
+            padding: 20px 0;
+            font-size: clamp(6px, 1.2vw, 12px);
+            line-height: 1.1;
+            color: var(--neon-green);
+            animation: glow 2s ease-in-out infinite;
+            white-space: pre;
+            overflow-x: auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 1px solid var(--neon-green);
+            padding-bottom: 20px;
+        }
+
+        .header h1 {
+            font-size: clamp(18px, 4vw, 32px);
+            margin-top: 10px;
+            text-shadow: 0 0 10px var(--neon-green);
+        }
+
+        .header p {
+            color: var(--neon-cyan);
+            margin-top: 10px;
+        }
+
+        .cursor {
+            display: inline-block;
+            width: 10px;
+            height: 20px;
+            background: var(--neon-green);
+            animation: blink 1s infinite;
+            vertical-align: middle;
+            margin-left: 5px;
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 900px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .panel {
+            background: var(--bg-secondary);
+            border: 1px solid var(--neon-green);
+            border-radius: 5px;
+            padding: 20px;
+            position: relative;
+        }
+
+        .panel::before {
+            content: '';
+            position: absolute;
+            top: -1px;
+            left: 20px;
+            right: 20px;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--neon-cyan), transparent);
+        }
+
+        .panel-title {
+            font-size: 14px;
+            color: var(--neon-cyan);
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px dashed var(--text-dim);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .panel-title::before {
+            content: '>';
+            color: var(--neon-green);
+        }
+
+        .upload-zone {
+            border: 2px dashed var(--neon-green);
+            border-radius: 10px;
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: rgba(57, 255, 20, 0.02);
+        }
+
+        .upload-zone:hover, .upload-zone.dragover {
+            background: rgba(57, 255, 20, 0.1);
+            border-color: var(--neon-cyan);
+            box-shadow: 0 0 20px rgba(57, 255, 20, 0.3);
+        }
+
+        .upload-zone input {
+            display: none;
+        }
+
+        .upload-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+
+        .preview-container {
+            margin-top: 20px;
+            text-align: center;
+            display: none;
+        }
+
+        .preview-container img {
+            max-width: 100%;
+            max-height: 300px;
+            border: 1px solid var(--neon-green);
+            border-radius: 5px;
+        }
+
+        .controls-section {
+            margin-top: 20px;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        .control-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+            font-size: 12px;
+            color: var(--neon-cyan);
+        }
+
+        .control-value {
+            color: var(--neon-green);
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            -webkit-appearance: none;
+            background: var(--bg-dark);
+            border: 1px solid var(--neon-green);
+            border-radius: 3px;
+            outline: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            background: var(--neon-green);
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 0 10px var(--neon-green);
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            background: var(--neon-green);
+            border-radius: 50%;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 0 10px var(--neon-green);
+        }
+
+        select {
+            width: 100%;
+            padding: 10px;
+            background: var(--bg-dark);
+            border: 1px solid var(--neon-green);
+            color: var(--neon-green);
+            font-family: inherit;
+            font-size: 14px;
+            border-radius: 5px;
+            cursor: pointer;
+            outline: none;
+        }
+
+        select:focus {
+            box-shadow: 0 0 10px var(--neon-green);
+        }
+
+        .custom-charset {
+            margin-top: 10px;
+            display: none;
+        }
+
+        .custom-charset input {
+            width: 100%;
+            padding: 10px;
+            background: var(--bg-dark);
+            border: 1px solid var(--neon-green);
+            color: var(--neon-green);
+            font-family: inherit;
+            font-size: 14px;
+            border-radius: 5px;
+            outline: none;
+        }
+
+        .custom-charset input:focus {
+            box-shadow: 0 0 10px var(--neon-green);
+        }
+
+        .btn-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            background: transparent;
+            border: 1px solid var(--neon-green);
+            color: var(--neon-green);
+            font-family: inherit;
+            font-size: 12px;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn:hover {
+            background: var(--neon-green);
+            color: var(--bg-dark);
+            box-shadow: 0 0 20px var(--neon-green);
+        }
+
+        .btn-primary {
+            background: var(--neon-green);
+            color: var(--bg-dark);
+        }
+
+        .btn-primary:hover {
+            background: var(--neon-cyan);
+            border-color: var(--neon-cyan);
+        }
+
+        .btn-cyan {
+            border-color: var(--neon-cyan);
+            color: var(--neon-cyan);
+        }
+
+        .btn-cyan:hover {
+            background: var(--neon-cyan);
+            color: var(--bg-dark);
+            box-shadow: 0 0 20px var(--neon-cyan);
+        }
+
+        .toggle-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .toggle-btn {
+            padding: 8px 15px;
+            background: transparent;
+            border: 1px solid var(--text-dim);
+            color: var(--text-dim);
+            font-family: inherit;
+            font-size: 11px;
+            cursor: pointer;
+            border-radius: 3px;
+            transition: all 0.3s;
+        }
+
+        .toggle-btn.active {
+            border-color: var(--neon-green);
+            color: var(--neon-green);
+            box-shadow: 0 0 10px rgba(57, 255, 20, 0.3);
+        }
+
+        .toggle-btn:hover {
+            border-color: var(--neon-green);
+            color: var(--neon-green);
+        }
+
+        .ascii-output {
+            background: #000;
+            border: 1px solid var(--neon-green);
+            border-radius: 5px;
+            padding: 10px;
+            min-height: 400px;
+            max-height: 600px;
+            overflow: auto;
+            font-size: 8px;
+            line-height: 1;
+            white-space: pre;
+            position: relative;
+        }
+
+        .ascii-output::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        .ascii-output::-webkit-scrollbar-track {
+            background: var(--bg-dark);
+        }
+
+        .ascii-output::-webkit-scrollbar-thumb {
+            background: var(--neon-green);
+            border-radius: 4px;
+        }
+
+        .ascii-content {
+            display: inline-block;
+        }
+
+        .export-section {
+            margin-top: 20px;
+        }
+
+        .shortcuts-panel {
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(0, 245, 255, 0.05);
+            border: 1px solid var(--neon-cyan);
+            border-radius: 5px;
+        }
+
+        .shortcuts-panel h3 {
+            color: var(--neon-cyan);
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+
+        .shortcut-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            font-size: 12px;
+            border-bottom: 1px dashed rgba(0, 245, 255, 0.2);
+        }
+
+        .shortcut-key {
+            background: var(--bg-dark);
+            padding: 2px 8px;
+            border-radius: 3px;
+            border: 1px solid var(--neon-cyan);
+            color: var(--neon-cyan);
+        }
+
+        .status-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--neon-green);
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 12px;
+            z-index: 100;
+        }
+
+        .status-left {
+            display: flex;
+            gap: 20px;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--neon-green);
+            animation: pulse 2s infinite;
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--neon-green);
+            padding: 15px 25px;
+            border-radius: 5px;
+            z-index: 10000;
+            transform: translateX(150%);
+            transition: transform 0.3s;
+        }
+
+        .notification.show {
+            transform: translateX(0);
+        }
+
+        .hidden-canvas {
+            display: none;
+        }
+
+        .mode-tabs {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+
+        .mode-tab {
+            padding: 8px 15px;
+            background: transparent;
+            border: 1px solid var(--text-dim);
+            color: var(--text-dim);
+            font-family: inherit;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .mode-tab.active {
+            border-color: var(--neon-green);
+            color: var(--neon-green);
+            background: rgba(57, 255, 20, 0.1);
+        }
+
+        .mode-tab:hover {
+            border-color: var(--neon-green);
+            color: var(--neon-green);
+        }
+
+        .instructions {
+            background: rgba(57, 255, 20, 0.05);
+            border: 1px dashed var(--neon-green);
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 20px;
+            font-size: 12px;
+            line-height: 1.6;
+        }
+
+        .instructions h4 {
+            color: var(--neon-cyan);
+            margin-bottom: 10px;
+        }
+
+        .instructions ul {
+            list-style: none;
+            padding-left: 15px;
+        }
+
+        .instructions li::before {
+            content: '>';
+            color: var(--neon-green);
+            margin-right: 10px;
+        }
+
+        footer {
+            text-align: center;
+            padding: 40px 20px 80px;
+            color: var(--text-dim);
+            font-size: 12px;
+        }
+
+        footer a {
+            color: var(--neon-cyan);
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        @media (max-width: 600px) {
+            .ascii-banner {
+                font-size: 5px;
+            }
+            
+            .btn {
+                padding: 8px 12px;
+                font-size: 10px;
+            }
+            
+            .panel {
+                padding: 15px;
+            }
+            
+            .ascii-output {
+                font-size: 6px;
+                min-height: 300px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="scanlines"></div>
+    <div class="scanline-moving"></div>
+    <div class="watermark">MAQSADBEK</div>
+    <div id="matrix-bg"></div>
+
+    <div class="container">
+        <header class="header">
+            <pre class="ascii-banner">
+███╗   ███╗ █████╗  ██████╗ ███████╗ █████╗ ██████╗ ██████╗ ███████╗██╗  ██╗
+████╗ ████║██╔══██╗██╔═══██╗██╔════╝██╔══██╗██╔══██╗██╔══██╗██╔════╝██║ ██╔╝
+██╔████╔██║███████║██║   ██║███████╗███████║██║  ██║██████╔╝█████╗  █████╔╝ 
+██║╚██╔╝██║██╔══██║██║▄▄ ██║╚════██║██╔══██║██║  ██║██╔══██╗██╔══╝  ██╔═██╗ 
+██║ ╚═╝ ██║██║  ██║╚██████╔╝███████║██║  ██║██████╔╝██████╔╝███████╗██║  ██╗
+╚═╝     ╚═╝╚═╝  ╚═╝ ╚══▀▀═╝ ╚══════╝╚═╝  ╚═╝╚═════╝ ╚═════╝ ╚══════╝╚═╝  ╚═╝
+            </pre>
+            <h1>Image to ASCII Converter <span style="color: var(--neon-cyan);">PRO</span><span class="cursor"></span></h1>
+            <p>Transform your images into stunning ASCII art with advanced controls</p>
+        </header>
+
+        <div class="instructions">
+            <h4>[ QUICK START GUIDE ]</h4>
+            <ul>
+                <li>Upload an image using the drop zone or click to browse</li>
+                <li>Adjust sliders for resolution, brightness, contrast, and more</li>
+                <li>Choose your preferred ASCII mode and character set</li>
+                <li>Export as text, copy to clipboard, or download as PNG</li>
+            </ul>
+        </div>
+
+        <div class="main-grid">
+            <div class="left-column">
+                <div class="panel">
+                    <div class="panel-title">IMAGE INPUT</div>
+                    <div class="upload-zone" id="uploadZone">
+                        <input type="file" id="imageInput" accept="image/png,image/jpeg,image/jpg">
+                        <div class="upload-icon">[+]</div>
+                        <p>Drop image here or click to upload</p>
+                        <p style="font-size: 11px; color: var(--text-dim); margin-top: 10px;">Supports: PNG, JPG, JPEG</p>
+                    </div>
+                    <div class="preview-container" id="previewContainer">
+                        <img id="imagePreview" alt="Preview">
+                    </div>
+                </div>
+
+                <div class="panel" style="margin-top: 20px;">
+                    <div class="panel-title">CONVERSION SETTINGS</div>
+                    
+                    <div class="control-group">
+                        <div class="control-label">
+                            <span>Character Set</span>
+                        </div>
+                        <select id="charsetSelect">
+                            <option value="standard">Standard ASCII (@#%+=-:. )</option>
+                            <option value="dense">Dense ASCII (More Detail)</option>
+                            <option value="blocks">Block Characters</option>
+                            <option value="minimal">Minimal (. : + #)</option>
+                            <option value="custom">Custom Character Set</option>
+                        </select>
+                        <div class="custom-charset" id="customCharsetDiv">
+                            <input type="text" id="customCharset" placeholder="Enter characters (dark to light)">
+                        </div>
+                    </div>
+
+                    <div class="control-group">
+                        <div class="control-label">
+                            <span>Resolution / Quality</span>
+                            <span class="control-value" id="resolutionValue">100</span>
+                        </div>
+                        <input type="range" id="resolution" min="20" max="5000" value="100">
+                    </div>
+
+                    <div class="control-group">
+                        <div class="control-label">
+                            <span>Brightness</span>
+                            <span class="control-value" id="brightnessValue">0</span>
+                        </div>
+                        <input type="range" id="brightness" min="-100" max="100" value="0">
+                    </div>
+
+                    <div class="control-group">
+                        <div class="control-label">
+                            <span>Contrast</span>
+                            <span class="control-value" id="contrastValue">0</span>
+                        </div>
+                        <input type="range" id="contrast" min="-100" max="100" value="0">
+                    </div>
+
+                    <div class="control-group">
+                        <div class="control-label">
+                            <span>Font Size (px)</span>
+                            <span class="control-value" id="fontSizeValue">8</span>
+                        </div>
+                        <input type="range" id="fontSize" min="4" max="16" value="8">
+                    </div>
+
+                    <div class="control-group">
+                        <div class="control-label">
+                            <span>Noise Reduction</span>
+                            <span class="control-value" id="noiseValue">0</span>
+                        </div>
+                        <input type="range" id="noise" min="0" max="10" value="0">
+                    </div>
+
+                    <div class="control-group">
+                        <div class="control-label">
+                            <span>Sharpness</span>
+                            <span class="control-value" id="sharpnessValue">0</span>
+                        </div>
+                        <input type="range" id="sharpness" min="0" max="10" value="0">
+                    </div>
+                </div>
+
+                <div class="panel" style="margin-top: 20px;">
+                    <div class="panel-title">ASCII MODE</div>
+                    <div class="mode-tabs">
+                        <button class="mode-tab active" data-mode="bw">B&W</button>
+                        <button class="mode-tab" data-mode="grayscale">Grayscale</button>
+                        <button class="mode-tab" data-mode="colored">Colored</button>
+                        <button class="mode-tab" data-mode="ultra">Ultra HD</button>
+                    </div>
+
+                    <div class="panel-title" style="margin-top: 15px;">IMAGE TOOLS</div>
+                    <div class="toggle-group">
+                        <button class="toggle-btn" id="invertBtn">Invert Colors</button>
+                        <button class="toggle-btn" id="flipHBtn">Flip H</button>
+                        <button class="toggle-btn" id="flipVBtn">Flip V</button>
+                        <button class="toggle-btn" id="glitchBtn">Glitch FX</button>
+                        <button class="toggle-btn" id="animateBtn">Animate</button>
+                        <button class="toggle-btn" id="matrixBtn">Matrix BG</button>
+                    </div>
+
+                    <div class="btn-group" style="margin-top: 20px;">
+                        <button class="btn btn-primary" id="convertBtn">CONVERT TO ASCII</button>
+                        <button class="btn" id="resetBtn">RESET</button>
+                    </div>
+                </div>
+
+                <div class="shortcuts-panel">
+                    <h3>[ KEYBOARD SHORTCUTS ]</h3>
+                    <div class="shortcut-item">
+                        <span>Open Image</span>
+                        <span class="shortcut-key">Ctrl/Cmd + O</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <span>Copy ASCII</span>
+                        <span class="shortcut-key">Ctrl/Cmd + C</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <span>Save as File</span>
+                        <span class="shortcut-key">Ctrl/Cmd + S</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="right-column">
+                <div class="panel">
+                    <div class="panel-title">ASCII OUTPUT</div>
+                    <div class="ascii-output" id="asciiOutput">
+                        <div class="ascii-content" id="asciiContent">
+[ Awaiting image upload... ]
+
+Upload an image to begin conversion.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel export-section">
+                    <div class="panel-title">EXPORT OPTIONS</div>
+                    <div class="btn-group">
+                        <button class="btn btn-cyan" id="copyBtn">COPY TO CLIPBOARD</button>
+                        <button class="btn btn-cyan" id="downloadTxtBtn">DOWNLOAD .TXT</button>
+                        <button class="btn btn-cyan" id="downloadPngBtn">DOWNLOAD .PNG</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p>Created by <a href="https://maqsadbek37.vercel.app" target="_blank">MAQSADBEK</a> | Image to ASCII Converter Pro v1.0</p>
+            <p style="margin-top: 5px;">Terminal aesthetic inspired by the hacker culture</p>
+        </footer>
+    </div>
+
+    <div class="status-bar">
+        <div class="status-left">
+            <div class="status-item">
+                <div class="status-dot"></div>
+                <span>SYSTEM ONLINE</span>
+            </div>
+            <div class="status-item" id="imageDimensions">
+                <span>IMG: --</span>
+            </div>
+            <div class="status-item" id="asciiDimensions">
+                <span>ASCII: --</span>
+            </div>
+        </div>
+        <div class="status-right">
+            <span id="statusText">Ready</span>
+        </div>
+    </div>
+
+    <div class="notification" id="notification">
+        <span id="notificationText"></span>
+    </div>
+
+    <canvas id="hiddenCanvas" class="hidden-canvas"></canvas>
+    <canvas id="exportCanvas" class="hidden-canvas"></canvas>
+
+    <script>
+        const charsets = {
+            standard: '@#%+=*:-. ',
+            dense: '$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/\\|()1{}[]?-_+~<>i!lI;:,"^`\'. ',
+            blocks: '█▓▒░ ',
+            minimal: '#+=:. '
+        };
+
+        let currentImage = null;
+        let isInverted = false;
+        let isFlippedH = false;
+        let isFlippedV = false;
+        let isGlitchEnabled = false;
+        let isAnimating = false;
+        let animationInterval = null;
+        let currentMode = 'bw';
+        let lastAsciiData = null;
+
+        const uploadZone = document.getElementById('uploadZone');
+        const imageInput = document.getElementById('imageInput');
+        const previewContainer = document.getElementById('previewContainer');
+        const imagePreview = document.getElementById('imagePreview');
+        const asciiOutput = document.getElementById('asciiOutput');
+        const asciiContent = document.getElementById('asciiContent');
+        const hiddenCanvas = document.getElementById('hiddenCanvas');
+        const exportCanvas = document.getElementById('exportCanvas');
+        const ctx = hiddenCanvas.getContext('2d');
+        const exportCtx = exportCanvas.getContext('2d');
+
+        const resolutionSlider = document.getElementById('resolution');
+        const brightnessSlider = document.getElementById('brightness');
+        const contrastSlider = document.getElementById('contrast');
+        const fontSizeSlider = document.getElementById('fontSize');
+        const noiseSlider = document.getElementById('noise');
+        const sharpnessSlider = document.getElementById('sharpness');
+        const charsetSelect = document.getElementById('charsetSelect');
+        const customCharsetDiv = document.getElementById('customCharsetDiv');
+        const customCharsetInput = document.getElementById('customCharset');
+
+        uploadZone.addEventListener('click', () => imageInput.click());
+        uploadZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadZone.classList.add('dragover');
+        });
+        uploadZone.addEventListener('dragleave', () => {
+            uploadZone.classList.remove('dragover');
+        });
+        uploadZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadZone.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file && file.type.startsWith('image/')) {
+                handleImageUpload(file);
+            }
+        });
+
+        imageInput.addEventListener('change', (e) => {
+            if (e.target.files[0]) {
+                handleImageUpload(e.target.files[0]);
+            }
+        });
+
+        function handleImageUpload(file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    currentImage = img;
+                    imagePreview.src = e.target.result;
+                    previewContainer.style.display = 'block';
+                    document.getElementById('imageDimensions').innerHTML = `<span>IMG: ${img.width}x${img.height}</span>`;
+                    showNotification('Image loaded successfully!');
+                    updateStatus('Image ready for conversion');
+                    convertToAscii();
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        charsetSelect.addEventListener('change', () => {
+            customCharsetDiv.style.display = charsetSelect.value === 'custom' ? 'block' : 'none';
+            if (currentImage) convertToAscii();
+        });
+
+        [resolutionSlider, brightnessSlider, contrastSlider, fontSizeSlider, noiseSlider, sharpnessSlider].forEach(slider => {
+            slider.addEventListener('input', () => {
+                updateSliderValues();
+                if (currentImage) convertToAscii();
+            });
+        });
+
+        customCharsetInput.addEventListener('input', () => {
+            if (currentImage) convertToAscii();
+        });
+
+        function updateSliderValues() {
+            document.getElementById('resolutionValue').textContent = resolutionSlider.value;
+            document.getElementById('brightnessValue').textContent = brightnessSlider.value;
+            document.getElementById('contrastValue').textContent = contrastSlider.value;
+            document.getElementById('fontSizeValue').textContent = fontSizeSlider.value;
+            document.getElementById('noiseValue').textContent = noiseSlider.value;
+            document.getElementById('sharpnessValue').textContent = sharpnessSlider.value;
+            asciiOutput.style.fontSize = fontSizeSlider.value + 'px';
+        }
+
+        document.querySelectorAll('.mode-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                currentMode = tab.dataset.mode;
+                if (currentImage) convertToAscii();
+            });
+        });
+
+        document.getElementById('invertBtn').addEventListener('click', function() {
+            this.classList.toggle('active');
+            isInverted = !isInverted;
+            if (currentImage) convertToAscii();
+        });
+
+        document.getElementById('flipHBtn').addEventListener('click', function() {
+            this.classList.toggle('active');
+            isFlippedH = !isFlippedH;
+            if (currentImage) convertToAscii();
+        });
+
+        document.getElementById('flipVBtn').addEventListener('click', function() {
+            this.classList.toggle('active');
+            isFlippedV = !isFlippedV;
+            if (currentImage) convertToAscii();
+        });
+
+        document.getElementById('glitchBtn').addEventListener('click', function() {
+            this.classList.toggle('active');
+            isGlitchEnabled = !isGlitchEnabled;
+            if (currentImage) convertToAscii();
+        });
+
+        document.getElementById('animateBtn').addEventListener('click', function() {
+            this.classList.toggle('active');
+            isAnimating = !isAnimating;
+            if (isAnimating && currentImage) {
+                startAnimation();
+            } else {
+                stopAnimation();
+            }
+        });
+
+        document.getElementById('matrixBtn').addEventListener('click', function() {
+            this.classList.toggle('active');
+            const matrixBg = document.getElementById('matrix-bg');
+            if (this.classList.contains('active')) {
+                matrixBg.style.display = 'block';
+                createMatrixEffect();
+            } else {
+                matrixBg.style.display = 'none';
+                matrixBg.innerHTML = '';
+            }
+        });
+
+        function createMatrixEffect() {
+            const matrixBg = document.getElementById('matrix-bg');
+            matrixBg.innerHTML = '';
+            const chars = 'MAQSADBEK01アイウエオカキクケコサシスセソタチツテト';
+            const columns = Math.floor(window.innerWidth / 20);
+            
+            for (let i = 0; i < columns; i++) {
+                const column = document.createElement('div');
+                column.style.position = 'absolute';
+                column.style.left = (i * 20) + 'px';
+                column.style.top = '0';
+                
+                const length = Math.floor(Math.random() * 20) + 10;
+                for (let j = 0; j < length; j++) {
+                    const char = document.createElement('span');
+                    char.className = 'matrix-char';
+                    char.textContent = chars[Math.floor(Math.random() * chars.length)];
+                    char.style.top = (j * 20) + 'px';
+                    char.style.animationDuration = (Math.random() * 10 + 5) + 's';
+                    char.style.animationDelay = (Math.random() * 5) + 's';
+                    column.appendChild(char);
+                }
+                matrixBg.appendChild(column);
+            }
+        }
+
+        document.getElementById('convertBtn').addEventListener('click', () => {
+            if (currentImage) {
+                convertToAscii();
+                showNotification('Conversion complete!');
+            } else {
+                showNotification('Please upload an image first!');
+            }
+        });
+
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            resolutionSlider.value = 100;
+            brightnessSlider.value = 0;
+            contrastSlider.value = 0;
+            fontSizeSlider.value = 8;
+            noiseSlider.value = 0;
+            sharpnessSlider.value = 0;
+            charsetSelect.value = 'standard';
+            customCharsetDiv.style.display = 'none';
+            isInverted = false;
+            isFlippedH = false;
+            isFlippedV = false;
+            isGlitchEnabled = false;
+            stopAnimation();
+            document.querySelectorAll('.toggle-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.mode-tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelector('.mode-tab[data-mode="bw"]').classList.add('active');
+            currentMode = 'bw';
+            updateSliderValues();
+            if (currentImage) convertToAscii();
+            showNotification('Settings reset!');
+        });
+
+        function convertToAscii() {
+            if (!currentImage) return;
+
+            updateStatus('Converting...');
+
+            const resolution = parseInt(resolutionSlider.value);
+            const brightness = parseInt(brightnessSlider.value);
+            const contrast = parseInt(contrastSlider.value);
+            const noiseReduction = parseInt(noiseSlider.value);
+            const sharpness = parseInt(sharpnessSlider.value);
+
+            let charset = charsets[charsetSelect.value];
+            if (charsetSelect.value === 'custom' && customCharsetInput.value) {
+                charset = customCharsetInput.value;
+            }
+
+            if (currentMode === 'ultra') {
+                charset = charsets.dense;
+            }
+
+            const maxWidth = currentMode === 'ultra' ? 350 : resolution;
+            const aspectRatio = currentImage.height / currentImage.width;
+            const charAspect = 0.5;
+            
+            let width = Math.min(currentImage.width, maxWidth);
+            let height = Math.floor(width * aspectRatio * charAspect);
+
+            hiddenCanvas.width = width;
+            hiddenCanvas.height = height;
+
+            ctx.save();
+            if (isFlippedH) {
+                ctx.translate(width, 0);
+                ctx.scale(-1, 1);
+            }
+            if (isFlippedV) {
+                ctx.translate(0, height);
+                ctx.scale(1, -1);
+            }
+            ctx.drawImage(currentImage, 0, 0, width, height);
+            ctx.restore();
+
+            let imageData = ctx.getImageData(0, 0, width, height);
+            let pixelData = new Uint8ClampedArray(imageData.data);
+
+            if (noiseReduction > 0) {
+                pixelData = applyNoiseReduction(pixelData, width, height, noiseReduction);
+            }
+
+            if (sharpness > 0) {
+                pixelData = applySharpen(pixelData, width, height, sharpness);
+            }
+
+            const contrastFactor = (259 * (contrast + 255)) / (255 * (259 - contrast));
+
+            let asciiHtml = '';
+            let asciiText = '';
+            lastAsciiData = [];
+
+            const glitchChars = '!@#$%^&*()_+-=[]{}|;:,.<>?/~`';
+            const glitchProbability = isGlitchEnabled ? 0.08 : 0;
+
+            for (let y = 0; y < height; y++) {
+                let row = [];
+                for (let x = 0; x < width; x++) {
+                    const idx = (y * width + x) * 4;
+                    let r = pixelData[idx];
+                    let g = pixelData[idx + 1];
+                    let b = pixelData[idx + 2];
+
+                    r = Math.max(0, Math.min(255, r + brightness));
+                    g = Math.max(0, Math.min(255, g + brightness));
+                    b = Math.max(0, Math.min(255, b + brightness));
+
+                    r = Math.max(0, Math.min(255, contrastFactor * (r - 128) + 128));
+                    g = Math.max(0, Math.min(255, contrastFactor * (g - 128) + 128));
+                    b = Math.max(0, Math.min(255, contrastFactor * (b - 128) + 128));
+
+                    if (isInverted) {
+                        r = 255 - r;
+                        g = 255 - g;
+                        b = 255 - b;
+                    }
+
+                    const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+                    const charIndex = Math.floor((gray / 255) * (charset.length - 1));
+                    let char = charset[charset.length - 1 - charIndex];
+
+                    if (Math.random() < glitchProbability) {
+                        if (Math.random() < 0.5) {
+                            char = glitchChars[Math.floor(Math.random() * glitchChars.length)];
+                        } else {
+                            char = charset[Math.floor(Math.random() * charset.length)];
+                        }
+                    }
+
+                    row.push({ char, r, g, b, gray, originalCharIndex: charIndex });
+
+                    if (currentMode === 'colored') {
+                        asciiHtml += `<span style="color:rgb(${Math.round(r)},${Math.round(g)},${Math.round(b)})">${escapeHtml(char)}</span>`;
+                    } else if (currentMode === 'grayscale') {
+                        asciiHtml += `<span style="color:rgb(${Math.round(gray)},${Math.round(gray)},${Math.round(gray)})">${escapeHtml(char)}</span>`;
+                    } else {
+                        asciiHtml += escapeHtml(char);
+                    }
+                    asciiText += char;
+                }
+                lastAsciiData.push(row);
+                asciiHtml += '\n';
+                asciiText += '\n';
+            }
+
+            if (currentMode === 'bw' || currentMode === 'ultra') {
+                asciiContent.textContent = asciiText;
+            } else {
+                asciiContent.innerHTML = asciiHtml;
+            }
+
+            document.getElementById('asciiDimensions').innerHTML = `<span>ASCII: ${width}x${height}</span>`;
+            updateStatus('Conversion complete');
+        }
+
+        function escapeHtml(char) {
+            const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+            return map[char] || char;
+        }
+
+        function applyNoiseReduction(data, width, height, strength) {
+            const newData = new Uint8ClampedArray(data.length);
+            for (let i = 0; i < data.length; i++) newData[i] = data[i];
+            
+            const radius = Math.max(1, Math.ceil(strength / 2));
+            const sigma = strength * 0.5;
+            
+            for (let y = radius; y < height - radius; y++) {
+                for (let x = radius; x < width - radius; x++) {
+                    for (let c = 0; c < 3; c++) {
+                        let sum = 0;
+                        let weightSum = 0;
+                        
+                        for (let ky = -radius; ky <= radius; ky++) {
+                            for (let kx = -radius; kx <= radius; kx++) {
+                                const dist = Math.sqrt(kx * kx + ky * ky);
+                                const weight = Math.exp(-(dist * dist) / (2 * sigma * sigma));
+                                const idx = ((y + ky) * width + (x + kx)) * 4 + c;
+                                sum += data[idx] * weight;
+                                weightSum += weight;
+                            }
+                        }
+                        newData[(y * width + x) * 4 + c] = Math.round(sum / weightSum);
+                    }
+                }
+            }
+            return newData;
+        }
+
+        function applySharpen(data, width, height, strength) {
+            const newData = new Uint8ClampedArray(data.length);
+            for (let i = 0; i < data.length; i++) newData[i] = data[i];
+            
+            const factor = (strength / 10) * 2;
+            const kernel = [
+                0, -factor, 0,
+                -factor, 1 + 4 * factor, -factor,
+                0, -factor, 0
+            ];
+
+            for (let y = 1; y < height - 1; y++) {
+                for (let x = 1; x < width - 1; x++) {
+                    for (let c = 0; c < 3; c++) {
+                        let sum = 0;
+                        let ki = 0;
+                        for (let ky = -1; ky <= 1; ky++) {
+                            for (let kx = -1; kx <= 1; kx++) {
+                                const idx = ((y + ky) * width + (x + kx)) * 4 + c;
+                                sum += data[idx] * kernel[ki];
+                                ki++;
+                            }
+                        }
+                        newData[(y * width + x) * 4 + c] = Math.max(0, Math.min(255, Math.round(sum)));
+                    }
+                }
+            }
+            return newData;
+        }
+
+        function startAnimation() {
+            if (animationInterval) clearInterval(animationInterval);
+            
+            let frameCount = 0;
+            const glitchChars = '!@#$%^&*()_+-=[]{}|;:,.<>?/~`█▓▒░';
+            
+            animationInterval = setInterval(() => {
+                if (currentImage && lastAsciiData && lastAsciiData.length > 0) {
+                    let charset = charsets[charsetSelect.value];
+                    if (charsetSelect.value === 'custom' && customCharsetInput.value) {
+                        charset = customCharsetInput.value;
+                    }
+                    if (currentMode === 'ultra') charset = charsets.dense;
+
+                    frameCount++;
+                    const waveOffset = Math.sin(frameCount * 0.1) * 2;
+
+                    let asciiHtml = '';
+                    let asciiText = '';
+                    
+                    for (let y = 0; y < lastAsciiData.length; y++) {
+                        for (let x = 0; x < lastAsciiData[y].length; x++) {
+                            const pixel = lastAsciiData[y][x];
+                            let char = pixel.char;
+                            
+                            const animationChance = 0.15 + Math.sin((x + y + frameCount) * 0.2) * 0.05;
+                            
+                            if (Math.random() < animationChance) {
+                                const charIndex = pixel.originalCharIndex || Math.floor((pixel.gray / 255) * (charset.length - 1));
+                                const wave = Math.sin((x + frameCount) * 0.3) * 2;
+                                const variation = Math.floor(Math.random() * 5) - 2 + Math.round(wave);
+                                const newIndex = Math.max(0, Math.min(charset.length - 1, charset.length - 1 - charIndex + variation));
+                                char = charset[newIndex];
+                            }
+                            
+                            if (isGlitchEnabled && Math.random() < 0.03) {
+                                char = glitchChars[Math.floor(Math.random() * glitchChars.length)];
+                            }
+
+                            if (currentMode === 'colored') {
+                                const flicker = 0.9 + Math.random() * 0.2;
+                                asciiHtml += `<span style="color:rgb(${Math.round(pixel.r * flicker)},${Math.round(pixel.g * flicker)},${Math.round(pixel.b * flicker)})">${escapeHtml(char)}</span>`;
+                            } else if (currentMode === 'grayscale') {
+                                asciiHtml += `<span style="color:rgb(${Math.round(pixel.gray)},${Math.round(pixel.gray)},${Math.round(pixel.gray)})">${escapeHtml(char)}</span>`;
+                            } else {
+                                asciiText += char;
+                            }
+                        }
+                        if (currentMode === 'colored' || currentMode === 'grayscale') {
+                            asciiHtml += '\n';
+                        } else {
+                            asciiText += '\n';
+                        }
+                    }
+
+                    if (currentMode === 'bw' || currentMode === 'ultra') {
+                        asciiContent.textContent = asciiText;
+                    } else {
+                        asciiContent.innerHTML = asciiHtml;
+                    }
+                }
+            }, 80);
+        }
+
+        function stopAnimation() {
+            if (animationInterval) {
+                clearInterval(animationInterval);
+                animationInterval = null;
+            }
+            isAnimating = false;
+            document.getElementById('animateBtn').classList.remove('active');
+        }
+
+        document.getElementById('copyBtn').addEventListener('click', () => {
+            const text = asciiContent.textContent || asciiContent.innerText;
+            navigator.clipboard.writeText(text).then(() => {
+                showNotification('ASCII copied to clipboard!');
+            });
+        });
+
+        document.getElementById('downloadTxtBtn').addEventListener('click', () => {
+            const text = asciiContent.textContent || asciiContent.innerText;
+            const blob = new Blob([text], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'ascii-art.txt';
+            a.click();
+            URL.revokeObjectURL(url);
+            showNotification('ASCII saved as TXT!');
+        });
+
+        document.getElementById('downloadPngBtn').addEventListener('click', () => {
+            if (!lastAsciiData || lastAsciiData.length === 0) {
+                showNotification('Please convert an image first!');
+                return;
+            }
+
+            const fontSize = parseInt(fontSizeSlider.value);
+            const charWidth = fontSize * 0.6;
+            const charHeight = fontSize;
+            
+            const width = lastAsciiData[0].length;
+            const height = lastAsciiData.length;
+            
+            exportCanvas.width = width * charWidth;
+            exportCanvas.height = height * charHeight;
+            
+            exportCtx.fillStyle = 'transparent';
+            exportCtx.clearRect(0, 0, exportCanvas.width, exportCanvas.height);
+            
+            exportCtx.font = `${fontSize}px monospace`;
+            exportCtx.textBaseline = 'top';
+
+            let charset = charsets[charsetSelect.value];
+            if (charsetSelect.value === 'custom' && customCharsetInput.value) {
+                charset = customCharsetInput.value;
+            }
+
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    const pixel = lastAsciiData[y][x];
+                    
+                    if (currentMode === 'colored') {
+                        exportCtx.fillStyle = `rgb(${Math.round(pixel.r)},${Math.round(pixel.g)},${Math.round(pixel.b)})`;
+                    } else if (currentMode === 'grayscale') {
+                        exportCtx.fillStyle = `rgb(${Math.round(pixel.gray)},${Math.round(pixel.gray)},${Math.round(pixel.gray)})`;
+                    } else {
+                        exportCtx.fillStyle = '#39ff14';
+                    }
+                    
+                    exportCtx.fillText(pixel.char, x * charWidth, y * charHeight);
+                }
+            }
+
+            const link = document.createElement('a');
+            link.download = 'ascii-art.png';
+            link.href = exportCanvas.toDataURL('image/png');
+            link.click();
+            showNotification('ASCII saved as PNG!');
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'o') {
+                e.preventDefault();
+                imageInput.click();
+            }
+            if ((e.ctrlKey || e.metaKey) && e.key === 'c' && !window.getSelection().toString()) {
+                e.preventDefault();
+                document.getElementById('copyBtn').click();
+            }
+            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                e.preventDefault();
+                document.getElementById('downloadTxtBtn').click();
+            }
+        });
+
+        function showNotification(message) {
+            const notification = document.getElementById('notification');
+            document.getElementById('notificationText').textContent = message;
+            notification.classList.add('show');
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 3000);
+        }
+
+        function updateStatus(status) {
+            document.getElementById('statusText').textContent = status;
+        }
+
+        updateSliderValues();
+    </script>
+</body>
+</html>

@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MAQSADBEK Terminal Calculator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        @keyframes flicker {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.98; }
+            25%, 75% { opacity: 0.96; }
+        }
+
+        @keyframes scanline {
+            0% { transform: translateY(-100%); }
+            100% { transform: translateY(100vh); }
+        }
+
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+
+        @keyframes glow {
+            0%, 100% { box-shadow: 0 0 5px #39ff14, 0 0 10px #39ff14, 0 0 15px #39ff14; }
+            50% { box-shadow: 0 0 10px #39ff14, 0 0 20px #39ff14, 0 0 30px #39ff14; }
+        }
+
+        @keyframes textGlow {
+            0%, 100% { text-shadow: 0 0 5px #39ff14, 0 0 10px #39ff14; }
+            50% { text-shadow: 0 0 10px #39ff14, 0 0 20px #39ff14, 0 0 30px #39ff14; }
+        }
+
+        body {
+            background: #0b0b0b;
+            min-height: 100vh;
+            font-family: 'Courier New', monospace;
+            color: #39ff14;
+            overflow-x: hidden;
+            animation: flicker 0.15s infinite;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: repeating-linear-gradient(
+                0deg,
+                rgba(0, 0, 0, 0.15),
+                rgba(0, 0, 0, 0.15) 1px,
+                transparent 1px,
+                transparent 2px
+            );
+            pointer-events: none;
+            z-index: 1000;
+        }
+
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background: rgba(57, 255, 20, 0.1);
+            animation: scanline 8s linear infinite;
+            pointer-events: none;
+            z-index: 1001;
+        }
+
+        .terminal-container {
+            max-width: 900px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+
+        .terminal {
+            background: rgba(0, 0, 0, 0.9);
+            border: 2px solid #39ff14;
+            border-radius: 10px;
+            overflow: hidden;
+            animation: glow 2s ease-in-out infinite;
+        }
+
+        .terminal-header {
+            background: linear-gradient(90deg, #1a1a1a, #0d0d0d);
+            padding: 10px 15px;
+            display: flex;
+            align-items: center;
+            border-bottom: 1px solid #39ff14;
+        }
+
+        .terminal-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .terminal-btn {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .btn-red { background: #ff5f56; }
+        .btn-yellow { background: #ffbd2e; }
+        .btn-green { background: #27ca40; }
+
+        .terminal-title {
+            flex: 1;
+            text-align: center;
+            color: #00f5ff;
+            font-size: 14px;
+            text-shadow: 0 0 10px #00f5ff;
+        }
+
+        .ascii-banner {
+            padding: 15px;
+            text-align: center;
+            color: #39ff14;
+            font-size: 8px;
+            line-height: 1.1;
+            white-space: pre;
+            animation: textGlow 2s ease-in-out infinite;
+            overflow-x: auto;
+        }
+
+        .terminal-body {
+            padding: 15px;
+            height: 60vh;
+            min-height: 400px;
+            overflow-y: auto;
+            scroll-behavior: smooth;
+        }
+
+        .terminal-body::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .terminal-body::-webkit-scrollbar-track {
+            background: #0b0b0b;
+        }
+
+        .terminal-body::-webkit-scrollbar-thumb {
+            background: #39ff14;
+            border-radius: 4px;
+        }
+
+        .output-line {
+            margin-bottom: 5px;
+            word-wrap: break-word;
+        }
+
+        .output-line.command {
+            color: #00f5ff;
+        }
+
+        .output-line.result {
+            color: #39ff14;
+        }
+
+        .output-line.error {
+            color: #ff4444;
+            text-shadow: 0 0 5px #ff4444;
+        }
+
+        .output-line.system {
+            color: #ffaa00;
+        }
+
+        .output-line.info {
+            color: #00f5ff;
+        }
+
+        .input-line {
+            display: flex;
+            align-items: center;
+            margin-top: 10px;
+        }
+
+        .prompt {
+            color: #00f5ff;
+            margin-right: 10px;
+            text-shadow: 0 0 5px #00f5ff;
+        }
+
+        .input-wrapper {
+            flex: 1;
+            position: relative;
+        }
+
+        #terminal-input {
+            width: 100%;
+            background: transparent;
+            border: none;
+            color: #39ff14;
+            font-family: 'Courier New', monospace;
+            font-size: 16px;
+            outline: none;
+            caret-color: transparent;
+        }
+
+        .cursor {
+            display: inline-block;
+            width: 10px;
+            height: 18px;
+            background: #39ff14;
+            animation: blink 1s step-end infinite;
+            position: absolute;
+            top: 0;
+        }
+
+        .welcome-msg {
+            color: #00f5ff;
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px dashed #333;
+        }
+
+        .graph-output {
+            font-size: 12px;
+            line-height: 1.2;
+            color: #39ff14;
+        }
+
+        .matrix-output {
+            font-family: 'Courier New', monospace;
+        }
+
+        .progress-bar {
+            color: #39ff14;
+        }
+
+        .help-section {
+            color: #00f5ff;
+            margin: 5px 0;
+        }
+
+        .help-cmd {
+            color: #39ff14;
+            display: inline-block;
+            min-width: 250px;
+        }
+
+        .help-desc {
+            color: #888;
+        }
+
+        @media (max-width: 768px) {
+            .terminal-container {
+                margin: 10px;
+                padding: 10px;
+            }
+
+            .ascii-banner {
+                font-size: 5px;
+            }
+
+            .terminal-body {
+                height: 50vh;
+                min-height: 300px;
+            }
+
+            #terminal-input {
+                font-size: 14px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .ascii-banner {
+                font-size: 4px;
+            }
+
+            .terminal-title {
+                font-size: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="terminal-container">
+        <div class="terminal">
+            <div class="terminal-header">
+                <div class="terminal-buttons">
+                    <div class="terminal-btn btn-red"></div>
+                    <div class="terminal-btn btn-yellow"></div>
+                    <div class="terminal-btn btn-green"></div>
+                </div>
+                <div class="terminal-title">MAQSADBEK@terminal:~$</div>
+            </div>
+            <div class="ascii-banner" id="ascii-banner"></div>
+            <div class="terminal-body" id="terminal-body">
+                <div class="welcome-msg" id="welcome-msg"></div>
+            </div>
+            <div class="input-line" style="padding: 0 15px 15px;">
+                <span class="prompt">$&gt;</span>
+                <div class="input-wrapper">
+                    <input type="text" id="terminal-input" autocomplete="off" autofocus>
+                    <span class="cursor" id="cursor"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const asciiBanner = `
+███╗   ███╗ █████╗  ██████╗ ███████╗ █████╗ ██████╗ ██████╗ ███████╗██╗  ██╗
+████╗ ████║██╔══██╗██╔═══██╗██╔════╝██╔══██╗██╔══██╗██╔══██╗██╔════╝██║ ██╔╝
+██╔████╔██║███████║██║   ██║███████╗███████║██║  ██║██████╔╝█████╗  █████╔╝ 
+██║╚██╔╝██║██╔══██║██║▄▄ ██║╚════██║██╔══██║██║  ██║██╔══██╗██╔══╝  ██╔═██╗ 
+██║ ╚═╝ ██║██║  ██║╚██████╔╝███████║██║  ██║██████╔╝██████╔╝███████╗██║  ██╗
+╚═╝     ╚═╝╚═╝  ╚═╝ ╚══▀▀═╝ ╚══════╝╚═╝  ╚═╝╚═════╝ ╚═════╝ ╚══════╝╚═╝  ╚═╝
+        `;
+
+        const welcomeMessage = `
+[SYSTEM] Terminal Calculator v2.0 initialized...
+[SYSTEM] Welcome, Operator. All systems online.
+[SYSTEM] Type 'help' for available commands.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        `;
+
+        const variables = {};
+        let commandHistory = [];
+        let historyIndex = -1;
+
+        const currencyRates = {
+            usd: 1,
+            uzs: 12500,
+            eur: 0.92,
+            gbp: 0.79,
+            rub: 92,
+            jpy: 149,
+            cny: 7.24,
+            krw: 1320
+        };
+
+        const unitConversions = {
+            length: {
+                km: 1000,
+                m: 1,
+                mile: 1609.34,
+                ft: 0.3048,
+                cm: 0.01,
+                inch: 0.0254
+            },
+            weight: {
+                kg: 1,
+                lb: 0.453592,
+                g: 0.001,
+                oz: 0.0283495
+            },
+            time: {
+                sec: 1,
+                min: 60,
+                hr: 3600,
+                day: 86400
+            }
+        };
+
+        document.getElementById('ascii-banner').textContent = asciiBanner;
+
+        function typeWriter(element, text, speed = 10) {
+            let i = 0;
+            element.innerHTML = '';
+            function type() {
+                if (i < text.length) {
+                    element.innerHTML += text.charAt(i);
+                    i++;
+                    setTimeout(type, speed);
+                }
+            }
+            type();
+        }
+
+        const welcomeEl = document.getElementById('welcome-msg');
+        typeWriter(welcomeEl, welcomeMessage, 5);
+
+        const input = document.getElementById('terminal-input');
+        const terminalBody = document.getElementById('terminal-body');
+        const cursor = document.getElementById('cursor');
+
+        input.addEventListener('input', updateCursor);
+        input.addEventListener('click', updateCursor);
+        input.addEventListener('keydown', handleKeyDown);
+        document.addEventListener('click', () => input.focus());
+
+        function updateCursor() {
+            const textWidth = getTextWidth(input.value, '16px Courier New');
+            cursor.style.left = textWidth + 'px';
+        }
+
+        function getTextWidth(text, font) {
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            context.font = font;
+            return context.measureText(text).width;
+        }
+
+        function handleKeyDown(e) {
+            if (e.key === 'Enter') {
+                const cmd = input.value.trim();
+                if (cmd) {
+                    commandHistory.push(cmd);
+                    historyIndex = commandHistory.length;
+                    executeCommand(cmd);
+                }
+                input.value = '';
+                updateCursor();
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (historyIndex > 0) {
+                    historyIndex--;
+                    input.value = commandHistory[historyIndex];
+                    updateCursor();
+                }
+            } else if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                if (historyIndex < commandHistory.length - 1) {
+                    historyIndex++;
+                    input.value = commandHistory[historyIndex];
+                } else {
+                    historyIndex = commandHistory.length;
+                    input.value = '';
+                }
+                updateCursor();
+            }
+        }
+
+        function addOutput(text, type = 'result') {
+            const line = document.createElement('div');
+            line.className = `output-line ${type}`;
+            line.innerHTML = text;
+            terminalBody.appendChild(line);
+            terminalBody.scrollTop = terminalBody.scrollHeight;
+        }
+
+        function executeCommand(cmd) {
+            addOutput(`$> ${cmd}`, 'command');
+
+            const lowerCmd = cmd.toLowerCase().trim();
+            const parts = cmd.trim().split(/\s+/);
+
+            try {
+                if (lowerCmd === 'help') {
+                    showHelp();
+                } else if (lowerCmd === 'clear' || lowerCmd === 'cls') {
+                    clearTerminal();
+                } else if (lowerCmd.startsWith('convert ')) {
+                    handleConvert(cmd);
+                } else if (/^[a-z]+\s+[\d.]+\s+to\s+[a-z]+$/i.test(lowerCmd)) {
+                    handleCurrencyConvert(cmd);
+                } else if (lowerCmd.startsWith('plot ')) {
+                    handlePlot(cmd.substring(5));
+                } else if (lowerCmd.startsWith('matrix ')) {
+                    handleMatrix(cmd.substring(7));
+                } else if (lowerCmd.startsWith('random ')) {
+                    handleRandom(parts);
+                } else if (lowerCmd.startsWith('passgen')) {
+                    handlePassgen(parts);
+                } else if (lowerCmd.startsWith('roll ')) {
+                    handleDice(parts[1]);
+                } else if (lowerCmd.startsWith('prime ')) {
+                    handlePrime(parts[1]);
+                } else if (lowerCmd.startsWith('b64 ')) {
+                    handleBase64(cmd.substring(4));
+                } else if (lowerCmd.startsWith('hash ')) {
+                    handleHash(cmd.substring(5));
+                } else if (lowerCmd.startsWith('progress ')) {
+                    handleProgress(parts[1]);
+                } else if (lowerCmd.startsWith('delete ')) {
+                    handleDelete(parts[1]);
+                } else if (lowerCmd === 'vars') {
+                    showVariables();
+                } else if (cmd.includes('=')) {
+                    handleVariable(cmd);
+                } else {
+                    handleCalculation(cmd);
+                }
+            } catch (error) {
+                addOutput(`[ERROR] ${error.message}`, 'error');
+            }
+        }
+
+        function showHelp() {
+            const helpText = `
+<div class="help-section">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</div>
+<div class="help-section">                    TERMINAL CALCULATOR - HELP MENU</div>
+<div class="help-section">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</div>
+
+<div class="help-section">[BASIC CALCULATOR]</div>
+<span class="help-cmd">  5+3, 10*2, 20/4, 2^8</span><span class="help-desc">Basic operations</span>
+<span class="help-cmd">  5*(3+2), (10+5)/3</span><span class="help-desc">Parentheses supported</span>
+<span class="help-cmd">  sin(1), cos(0), sqrt(16)</span><span class="help-desc">Math functions</span>
+
+<div class="help-section">[UNIT CONVERTER]</div>
+<span class="help-cmd">  convert 10km to miles</span><span class="help-desc">Length conversion</span>
+<span class="help-cmd">  convert 5kg to lb</span><span class="help-desc">Weight conversion</span>
+<span class="help-cmd">  convert 30C to F</span><span class="help-desc">Temperature conversion</span>
+<span class="help-cmd">  convert 600sec to min</span><span class="help-desc">Time conversion</span>
+
+<div class="help-section">[CURRENCY CONVERTER]</div>
+<span class="help-cmd">  usd 100 to uzs</span><span class="help-desc">USD to UZS</span>
+<span class="help-cmd">  uzs 50000 to usd</span><span class="help-desc">UZS to USD</span>
+<span class="help-desc">  Available: USD, UZS, EUR, GBP, RUB, JPY, CNY, KRW</span>
+
+<div class="help-section">[VARIABLES]</div>
+<span class="help-cmd">  x = 20</span><span class="help-desc">Define variable</span>
+<span class="help-cmd">  y = x * 3</span><span class="help-desc">Use variables in expressions</span>
+<span class="help-cmd">  delete x</span><span class="help-desc">Delete variable</span>
+<span class="help-cmd">  vars</span><span class="help-desc">Show all variables</span>
+
+<div class="help-section">[ASCII GRAPH PLOTTER]</div>
+<span class="help-cmd">  plot sin(x)</span><span class="help-desc">Plot sine wave</span>
+<span class="help-cmd">  plot x^2</span><span class="help-desc">Plot parabola</span>
+<span class="help-cmd">  plot cos(x)</span><span class="help-desc">Plot cosine wave</span>
+
+<div class="help-section">[MATRIX OPERATIONS]</div>
+<span class="help-cmd">  matrix add [[1,2],[3,4]] [[5,6],[7,8]]</span>
+<span class="help-cmd">  matrix sub [[1,2]] [[1,1]]</span>
+<span class="help-cmd">  matrix mul [[1,2],[3,4]] [[5,6],[7,8]]</span>
+
+<div class="help-section">[RANDOM TOOLS]</div>
+<span class="help-cmd">  random 1 100</span><span class="help-desc">Random number between 1-100</span>
+<span class="help-cmd">  passgen 16</span><span class="help-desc">Generate 16-char password</span>
+<span class="help-cmd">  roll d6</span><span class="help-desc">Roll a 6-sided die</span>
+<span class="help-cmd">  roll d20</span><span class="help-desc">Roll a 20-sided die</span>
+
+<div class="help-section">[UTILITIES]</div>
+<span class="help-cmd">  prime 97</span><span class="help-desc">Check if number is prime</span>
+<span class="help-cmd">  b64 encode hello</span><span class="help-desc">Encode to Base64</span>
+<span class="help-cmd">  b64 decode aGVsbG8=</span><span class="help-desc">Decode from Base64</span>
+<span class="help-cmd">  hash "hello world"</span><span class="help-desc">Generate SHA-256 hash</span>
+<span class="help-cmd">  progress 75</span><span class="help-desc">Show progress bar (0-100)</span>
+
+<div class="help-section">[SYSTEM]</div>
+<span class="help-cmd">  clear, cls</span><span class="help-desc">Clear terminal</span>
+<span class="help-cmd">  help</span><span class="help-desc">Show this help menu</span>
+
+<div class="help-section">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</div>
+<div class="help-section">[COMMON ERRORS & SOLUTIONS]</div>
+<span style="color:#ff4444;">  "Invalid expression"</span>
+<span class="help-desc">    - Check for typos in your math expression</span>
+<span class="help-desc">    - Use * for multiplication (not x)</span>
+<span class="help-desc">    - Ensure parentheses are balanced</span>
+
+<span style="color:#ff4444;">  "Cannot convert X to Y"</span>
+<span class="help-desc">    - Units must be in same category (length/weight/time)</span>
+<span class="help-desc">    - Check spelling: km, m, mile, ft, kg, lb, sec, min, hr</span>
+
+<span style="color:#ff4444;">  "Unknown currency"</span>
+<span class="help-desc">    - Supported: USD, UZS, EUR, GBP, RUB, JPY, CNY, KRW</span>
+<span class="help-desc">    - Format: usd 100 to uzs (not "100 usd to uzs")</span>
+
+<span style="color:#ff4444;">  "Invalid matrix format"</span>
+<span class="help-desc">    - Use JSON notation: [[1,2],[3,4]]</span>
+<span class="help-desc">    - No spaces inside brackets</span>
+<span class="help-desc">    - Add/Sub: matrices must be same size</span>
+<span class="help-desc">    - Mul: A's columns must equal B's rows</span>
+
+<span style="color:#ff4444;">  "Variable not found"</span>
+<span class="help-desc">    - Define first: x = 10</span>
+<span class="help-desc">    - Use 'vars' to see all defined variables</span>
+
+<span style="color:#ff4444;">  "Usage: command <args>"</span>
+<span class="help-desc">    - Missing required arguments</span>
+<span class="help-desc">    - Check the examples above for correct format</span>
+
+<div class="help-section">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</div>
+            `;
+            addOutput(helpText, 'info');
+        }
+
+        function clearTerminal() {
+            const welcomeMsg = document.getElementById('welcome-msg');
+            terminalBody.innerHTML = '';
+            const newWelcome = document.createElement('div');
+            newWelcome.className = 'welcome-msg';
+            newWelcome.id = 'welcome-msg';
+            terminalBody.appendChild(newWelcome);
+            typeWriter(newWelcome, '[SYSTEM] Terminal cleared.', 10);
+        }
+
+        function handleConvert(cmd) {
+            const match = cmd.match(/convert\s+([\d.]+)\s*([a-zA-Z]+)\s+to\s+([a-zA-Z]+)/i);
+            if (!match) {
+                throw new Error('Invalid format. Use: convert 10km to miles');
+            }
+
+            const value = parseFloat(match[1]);
+            const fromUnit = match[2].toLowerCase();
+            const toUnit = match[3].toLowerCase();
+
+            if (fromUnit === 'c' || fromUnit === 'f' || fromUnit === 'k') {
+                const result = convertTemperature(value, fromUnit, toUnit);
+                addOutput(`${value}${fromUnit.toUpperCase()} = ${result.toFixed(2)}${toUnit.toUpperCase()}`, 'result');
+                return;
+            }
+
+            let category = null;
+            for (const [cat, units] of Object.entries(unitConversions)) {
+                if (units[fromUnit] && units[toUnit]) {
+                    category = cat;
+                    break;
+                }
+            }
+
+            if (!category) {
+                throw new Error(`Cannot convert ${fromUnit} to ${toUnit}. Unknown or incompatible units.`);
+            }
+
+            const fromBase = value * unitConversions[category][fromUnit];
+            const result = fromBase / unitConversions[category][toUnit];
+            addOutput(`${value} ${fromUnit} = ${result.toFixed(4)} ${toUnit}`, 'result');
+        }
+
+        function convertTemperature(value, from, to) {
+            let celsius;
+            if (from === 'c') celsius = value;
+            else if (from === 'f') celsius = (value - 32) * 5/9;
+            else if (from === 'k') celsius = value - 273.15;
+            else throw new Error('Invalid temperature unit');
+
+            if (to === 'c') return celsius;
+            else if (to === 'f') return celsius * 9/5 + 32;
+            else if (to === 'k') return celsius + 273.15;
+            else throw new Error('Invalid temperature unit');
+        }
+
+        function handleCurrencyConvert(cmd) {
+            const match = cmd.match(/([a-zA-Z]+)\s+([\d.]+)\s+to\s+([a-zA-Z]+)/i);
+            if (!match) {
+                throw new Error('Invalid format. Use: usd 100 to uzs');
+            }
+
+            const fromCurrency = match[1].toLowerCase();
+            const value = parseFloat(match[2]);
+            const toCurrency = match[3].toLowerCase();
+
+            if (!currencyRates[fromCurrency] || !currencyRates[toCurrency]) {
+                throw new Error(`Unknown currency. Available: ${Object.keys(currencyRates).join(', ').toUpperCase()}`);
+            }
+
+            const inUsd = value / currencyRates[fromCurrency];
+            const result = inUsd * currencyRates[toCurrency];
+            addOutput(`${value} ${fromCurrency.toUpperCase()} = ${result.toFixed(2)} ${toCurrency.toUpperCase()}`, 'result');
+        }
+
+        function handlePlot(expr) {
+            const width = 60;
+            const height = 20;
+            const xMin = -10;
+            const xMax = 10;
+            const yMin = -5;
+            const yMax = 5;
+
+            const grid = Array(height).fill(null).map(() => Array(width).fill(' '));
+
+            const axisY = Math.floor(height / 2);
+            const axisX = Math.floor(width / 2);
+
+            for (let i = 0; i < width; i++) grid[axisY][i] = '─';
+            for (let i = 0; i < height; i++) grid[i][axisX] = '│';
+            grid[axisY][axisX] = '┼';
+
+            for (let px = 0; px < width; px++) {
+                const x = xMin + (px / width) * (xMax - xMin);
+                let y;
+                try {
+                    y = evaluateMathExpr(expr, x);
+                } catch {
+                    continue;
+                }
+
+                const py = Math.round(height - 1 - ((y - yMin) / (yMax - yMin)) * (height - 1));
+                if (py >= 0 && py < height) {
+                    grid[py][px] = '█';
+                }
+            }
+
+            let output = `<div class="graph-output">Plot: f(x) = ${expr}\n`;
+            output += '┌' + '─'.repeat(width) + '┐\n';
+            for (const row of grid) {
+                output += '│' + row.join('') + '│\n';
+            }
+            output += '└' + '─'.repeat(width) + '┘</div>';
+            addOutput(output, 'result');
+        }
+
+        function evaluateMathExpr(expr, xVal) {
+            let safeExpr = expr
+                .replace(/\^/g, '**')
+                .replace(/sin/g, 'Math.sin')
+                .replace(/cos/g, 'Math.cos')
+                .replace(/tan/g, 'Math.tan')
+                .replace(/sqrt/g, 'Math.sqrt')
+                .replace(/abs/g, 'Math.abs')
+                .replace(/log/g, 'Math.log')
+                .replace(/exp/g, 'Math.exp')
+                .replace(/pi/gi, 'Math.PI')
+                .replace(/e(?![xp])/gi, 'Math.E')
+                .replace(/\bx\b/g, `(${xVal})`);
+
+            return Function(`"use strict"; return (${safeExpr})`)();
+        }
+
+        function extractBalancedBrackets(str, startIndex) {
+            let depth = 0;
+            let start = -1;
+            for (let i = startIndex; i < str.length; i++) {
+                if (str[i] === '[') {
+                    if (depth === 0) start = i;
+                    depth++;
+                } else if (str[i] === ']') {
+                    depth--;
+                    if (depth === 0) {
+                        return { content: str.substring(start, i + 1), endIndex: i };
+                    }
+                }
+            }
+            return null;
+        }
+
+        function validateMatrix(mat, name) {
+            if (!Array.isArray(mat) || mat.length === 0) {
+                throw new Error(`${name} must be a non-empty 2D array.`);
+            }
+            if (!Array.isArray(mat[0])) {
+                throw new Error(`${name} must be a 2D array (e.g., [[1,2],[3,4]]).`);
+            }
+            const cols = mat[0].length;
+            if (cols === 0) {
+                throw new Error(`${name} rows cannot be empty.`);
+            }
+            for (let i = 0; i < mat.length; i++) {
+                if (!Array.isArray(mat[i])) {
+                    throw new Error(`${name} row ${i + 1} is not an array.`);
+                }
+                if (mat[i].length !== cols) {
+                    throw new Error(`${name} has inconsistent row lengths. Row 1 has ${cols} elements, but row ${i + 1} has ${mat[i].length}.`);
+                }
+                for (let j = 0; j < mat[i].length; j++) {
+                    if (typeof mat[i][j] !== 'number' || isNaN(mat[i][j])) {
+                        throw new Error(`${name}[${i}][${j}] is not a valid number.`);
+                    }
+                }
+            }
+            return { rows: mat.length, cols: cols };
+        }
+
+        function handleMatrix(cmd) {
+            const opMatch = cmd.match(/^(add|sub|mul)\s+/i);
+            if (!opMatch) {
+                throw new Error('Invalid format. Use: matrix add [[1,2],[3,4]] [[5,6],[7,8]]');
+            }
+
+            const operation = opMatch[1].toLowerCase();
+            const remaining = cmd.substring(opMatch[0].length);
+
+            const firstMatrix = extractBalancedBrackets(remaining, 0);
+            if (!firstMatrix) {
+                throw new Error('Could not parse first matrix. Ensure brackets are balanced.');
+            }
+
+            const secondMatrix = extractBalancedBrackets(remaining, firstMatrix.endIndex + 1);
+            if (!secondMatrix) {
+                throw new Error('Could not parse second matrix. Ensure brackets are balanced.');
+            }
+
+            let matA, matB;
+            try {
+                matA = JSON.parse(firstMatrix.content);
+                matB = JSON.parse(secondMatrix.content);
+            } catch {
+                throw new Error('Invalid matrix format. Use JSON array notation: [[1,2],[3,4]]');
+            }
+
+            const dimsA = validateMatrix(matA, 'Matrix A');
+            const dimsB = validateMatrix(matB, 'Matrix B');
+
+            let result;
+            if (operation === 'add') {
+                if (dimsA.rows !== dimsB.rows || dimsA.cols !== dimsB.cols) {
+                    throw new Error(`Matrices must have same dimensions for addition. A is ${dimsA.rows}x${dimsA.cols}, B is ${dimsB.rows}x${dimsB.cols}.`);
+                }
+                result = matrixAdd(matA, matB);
+            } else if (operation === 'sub') {
+                if (dimsA.rows !== dimsB.rows || dimsA.cols !== dimsB.cols) {
+                    throw new Error(`Matrices must have same dimensions for subtraction. A is ${dimsA.rows}x${dimsA.cols}, B is ${dimsB.rows}x${dimsB.cols}.`);
+                }
+                result = matrixSub(matA, matB);
+            } else if (operation === 'mul') {
+                if (dimsA.cols !== dimsB.rows) {
+                    throw new Error(`Matrix A columns (${dimsA.cols}) must equal Matrix B rows (${dimsB.rows}) for multiplication.`);
+                }
+                result = matrixMul(matA, matB);
+            }
+
+            let output = '<div class="matrix-output">Result:\n';
+            for (const row of result) {
+                output += '[ ' + row.map(n => n.toString().padStart(6)).join(' ') + ' ]\n';
+            }
+            output += '</div>';
+            addOutput(output, 'result');
+        }
+
+        function matrixAdd(a, b) {
+            return a.map((row, i) => row.map((val, j) => val + b[i][j]));
+        }
+
+        function matrixSub(a, b) {
+            return a.map((row, i) => row.map((val, j) => val - b[i][j]));
+        }
+
+        function matrixMul(a, b) {
+            const rowsA = a.length, colsA = a[0].length;
+            const colsB = b[0].length;
+            const result = Array(rowsA).fill(null).map(() => Array(colsB).fill(0));
+            for (let i = 0; i < rowsA; i++) {
+                for (let j = 0; j < colsB; j++) {
+                    for (let k = 0; k < colsA; k++) {
+                        result[i][j] += a[i][k] * b[k][j];
+                    }
+                }
+            }
+            return result;
+        }
+
+        function handleRandom(parts) {
+            if (parts.length < 3) {
+                throw new Error('Usage: random <min> <max>');
+            }
+            const min = parseInt(parts[1]);
+            const max = parseInt(parts[2]);
+            const result = Math.floor(Math.random() * (max - min + 1)) + min;
+            addOutput(`Random number (${min}-${max}): ${result}`, 'result');
+        }
+
+        function handlePassgen(parts) {
+            const length = parts[1] ? parseInt(parts[1]) : 16;
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=[]{}|;:,.<>?';
+            let password = '';
+            for (let i = 0; i < length; i++) {
+                password += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            addOutput(`Generated password: ${password}`, 'result');
+        }
+
+        function handleDice(dice) {
+            const match = dice.match(/d(\d+)/i);
+            if (!match) {
+                throw new Error('Invalid dice format. Use: roll d6, roll d20');
+            }
+            const sides = parseInt(match[1]);
+            const result = Math.floor(Math.random() * sides) + 1;
+            addOutput(`🎲 Rolling d${sides}... Result: ${result}`, 'result');
+        }
+
+        function handlePrime(num) {
+            const n = parseInt(num);
+            if (isNaN(n) || n < 2) {
+                addOutput(`${num} is not a valid number for prime check`, 'error');
+                return;
+            }
+            const isPrime = checkPrime(n);
+            addOutput(`${n} is ${isPrime ? 'PRIME' : 'NOT PRIME'}`, 'result');
+        }
+
+        function checkPrime(n) {
+            if (n < 2) return false;
+            if (n === 2) return true;
+            if (n % 2 === 0) return false;
+            for (let i = 3; i <= Math.sqrt(n); i += 2) {
+                if (n % i === 0) return false;
+            }
+            return true;
+        }
+
+        function handleBase64(cmd) {
+            const parts = cmd.trim().split(/\s+/);
+            const action = parts[0].toLowerCase();
+            const text = parts.slice(1).join(' ');
+
+            if (action === 'encode') {
+                const encoded = btoa(text);
+                addOutput(`Encoded: ${encoded}`, 'result');
+            } else if (action === 'decode') {
+                try {
+                    const decoded = atob(text);
+                    addOutput(`Decoded: ${decoded}`, 'result');
+                } catch {
+                    throw new Error('Invalid Base64 string');
+                }
+            } else {
+                throw new Error('Usage: b64 encode <text> OR b64 decode <base64>');
+            }
+        }
+
+        async function handleHash(input) {
+            const text = input.replace(/^["']|["']$/g, '');
+            const encoder = new TextEncoder();
+            const data = encoder.encode(text);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+            addOutput(`SHA-256: ${hashHex}`, 'result');
+        }
+
+        function handleProgress(value) {
+            const percent = Math.min(100, Math.max(0, parseInt(value)));
+            const filled = Math.round(percent / 2);
+            const empty = 50 - filled;
+            const bar = '█'.repeat(filled) + '░'.repeat(empty);
+            addOutput(`<span class="progress-bar">[${bar}] ${percent}%</span>`, 'result');
+        }
+
+        function handleVariable(cmd) {
+            const match = cmd.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(.+)$/);
+            if (!match) {
+                throw new Error('Invalid variable assignment. Use: x = 10');
+            }
+
+            const varName = match[1];
+            const expr = match[2];
+
+            let exprWithVars = expr;
+            for (const [name, val] of Object.entries(variables)) {
+                exprWithVars = exprWithVars.replace(new RegExp(`\\b${name}\\b`, 'g'), val);
+            }
+
+            const result = evaluateExpression(exprWithVars);
+            variables[varName] = result;
+            addOutput(`${varName} = ${result}`, 'result');
+        }
+
+        function handleDelete(varName) {
+            if (variables[varName] !== undefined) {
+                delete variables[varName];
+                addOutput(`Variable '${varName}' deleted.`, 'system');
+            } else {
+                throw new Error(`Variable '${varName}' not found.`);
+            }
+        }
+
+        function showVariables() {
+            if (Object.keys(variables).length === 0) {
+                addOutput('No variables defined.', 'info');
+                return;
+            }
+            let output = 'Defined variables:\n';
+            for (const [name, val] of Object.entries(variables)) {
+                output += `  ${name} = ${val}\n`;
+            }
+            addOutput(output, 'result');
+        }
+
+        function handleCalculation(expr) {
+            let exprWithVars = expr;
+            for (const [name, val] of Object.entries(variables)) {
+                exprWithVars = exprWithVars.replace(new RegExp(`\\b${name}\\b`, 'g'), val);
+            }
+
+            if (/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(expr.trim())) {
+                if (variables[expr.trim()] !== undefined) {
+                    addOutput(`${expr.trim()} = ${variables[expr.trim()]}`, 'result');
+                    return;
+                }
+            }
+
+            const result = evaluateExpression(exprWithVars);
+            addOutput(`= ${result}`, 'result');
+        }
+
+        function evaluateExpression(expr) {
+            let safeExpr = expr
+                .replace(/\^/g, '**')
+                .replace(/sin/g, 'Math.sin')
+                .replace(/cos/g, 'Math.cos')
+                .replace(/tan/g, 'Math.tan')
+                .replace(/sqrt/g, 'Math.sqrt')
+                .replace(/abs/g, 'Math.abs')
+                .replace(/log/g, 'Math.log')
+                .replace(/log10/g, 'Math.log10')
+                .replace(/exp/g, 'Math.exp')
+                .replace(/floor/g, 'Math.floor')
+                .replace(/ceil/g, 'Math.ceil')
+                .replace(/round/g, 'Math.round')
+                .replace(/pi/gi, 'Math.PI')
+                .replace(/(?<![a-zA-Z])e(?![a-zA-Z])/gi, 'Math.E');
+
+            if (!/^[\d\s+\-*/%().Math,sincoqrtablogexpflceiu10PIE\[\]]*$/i.test(safeExpr.replace(/Math\.\w+/g, ''))) {
+                throw new Error('Invalid expression. Type "help" for examples.');
+            }
+
+            try {
+                const result = Function(`"use strict"; return (${safeExpr})`)();
+                if (typeof result !== 'number' || isNaN(result)) {
+                    throw new Error('Invalid calculation result');
+                }
+                return Number.isInteger(result) ? result : parseFloat(result.toFixed(10));
+            } catch (e) {
+                throw new Error('Cannot evaluate expression. Check syntax.');
+            }
+        }
+
+        updateCursor();
+    </script>
+</body>
+</html>
