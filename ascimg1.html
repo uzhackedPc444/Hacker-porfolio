@@ -1,0 +1,1412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASCII Avatar Generator | MAQSADBEK</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        :root {
+            --neon-green: #00ff41;
+            --neon-cyan: #00d4ff;
+            --dark-bg: #0a0a0a;
+            --panel-bg: rgba(10, 25, 20, 0.95);
+            --border-color: #1a3a2a;
+        }
+        
+        body {
+            font-family: 'Share Tech Mono', monospace;
+            background: var(--dark-bg);
+            color: var(--neon-green);
+            min-height: 100vh;
+            overflow-x: hidden;
+            position: relative;
+        }
+        
+        .watermark {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-45deg);
+            font-family: 'Orbitron', sans-serif;
+            font-size: clamp(60px, 15vw, 200px);
+            font-weight: 700;
+            color: rgba(0, 255, 65, 0.03);
+            white-space: nowrap;
+            pointer-events: none;
+            z-index: 0;
+            user-select: none;
+            text-shadow: 0 0 50px rgba(0, 255, 65, 0.05);
+        }
+        
+        .scanlines {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1000;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(0, 0, 0, 0.1) 2px,
+                rgba(0, 0, 0, 0.1) 4px
+            );
+            animation: scanlineMove 8s linear infinite;
+        }
+        
+        @keyframes scanlineMove {
+            0% { background-position: 0 0; }
+            100% { background-position: 0 100px; }
+        }
+        
+        .crt-flicker {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 999;
+            animation: flicker 0.15s infinite;
+            opacity: 0.02;
+            background: white;
+        }
+        
+        @keyframes flicker {
+            0%, 100% { opacity: 0.02; }
+            50% { opacity: 0.04; }
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .ascii-banner {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: linear-gradient(180deg, rgba(0,255,65,0.1) 0%, transparent 100%);
+            border-bottom: 2px solid var(--neon-green);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .ascii-banner pre {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: clamp(6px, 1.5vw, 14px);
+            line-height: 1.1;
+            color: var(--neon-green);
+            text-shadow: 0 0 10px var(--neon-green), 0 0 20px var(--neon-green), 0 0 40px var(--neon-green);
+            animation: textGlow 2s ease-in-out infinite alternate;
+            white-space: pre;
+            display: inline-block;
+        }
+        
+        @keyframes textGlow {
+            from { text-shadow: 0 0 10px var(--neon-green), 0 0 20px var(--neon-green); }
+            to { text-shadow: 0 0 20px var(--neon-green), 0 0 40px var(--neon-green), 0 0 60px var(--neon-cyan); }
+        }
+        
+        .glitch-effect {
+            animation: glitch 3s infinite;
+        }
+        
+        @keyframes glitch {
+            0%, 90%, 100% { transform: translate(0); filter: none; }
+            91% { transform: translate(-2px, 1px); filter: hue-rotate(90deg); }
+            92% { transform: translate(2px, -1px); filter: hue-rotate(-90deg); }
+            93% { transform: translate(-1px, 2px); }
+            94% { transform: translate(1px, -2px); filter: hue-rotate(180deg); }
+            95% { transform: translate(0); }
+        }
+        
+        .subtitle {
+            font-family: 'Orbitron', sans-serif;
+            font-size: clamp(14px, 3vw, 24px);
+            color: var(--neon-cyan);
+            text-transform: uppercase;
+            letter-spacing: 8px;
+            margin-top: 15px;
+            text-shadow: 0 0 10px var(--neon-cyan);
+        }
+        
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 20px;
+            padding-bottom: 60px;
+        }
+        
+        @media (max-width: 900px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .panel {
+            background: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .panel::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--neon-green), var(--neon-cyan), var(--neon-green));
+            animation: borderGlow 3s linear infinite;
+        }
+        
+        @keyframes borderGlow {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .panel-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 16px;
+            color: var(--neon-cyan);
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .panel-title::before {
+            content: '>';
+            color: var(--neon-green);
+            animation: blink 1s infinite;
+        }
+        
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+        
+        .upload-zone {
+            border: 2px dashed var(--neon-green);
+            border-radius: 8px;
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: rgba(0, 255, 65, 0.02);
+            margin-bottom: 20px;
+        }
+        
+        .upload-zone:hover, .upload-zone.dragover {
+            background: rgba(0, 255, 65, 0.1);
+            border-color: var(--neon-cyan);
+            box-shadow: 0 0 20px rgba(0, 255, 65, 0.3);
+        }
+        
+        .upload-zone input {
+            display: none;
+        }
+        
+        .upload-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+            display: block;
+        }
+        
+        .upload-text {
+            font-size: 14px;
+            color: #888;
+        }
+        
+        .upload-text span {
+            color: var(--neon-cyan);
+        }
+        
+        .preview-container {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .preview-container img {
+            max-width: 100%;
+            max-height: 200px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+        }
+        
+        .control-group {
+            margin-bottom: 15px;
+        }
+        
+        .control-label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            font-size: 12px;
+            color: #aaa;
+        }
+        
+        .control-value {
+            color: var(--neon-cyan);
+            font-weight: bold;
+        }
+        
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            -webkit-appearance: none;
+            background: linear-gradient(90deg, var(--neon-green) 0%, var(--border-color) 0%);
+            border-radius: 3px;
+            outline: none;
+            cursor: pointer;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            background: var(--neon-green);
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 0 10px var(--neon-green);
+            transition: all 0.2s;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+            box-shadow: 0 0 20px var(--neon-green);
+        }
+        
+        input[type="range"]::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            background: var(--neon-green);
+            border-radius: 50%;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 0 10px var(--neon-green);
+        }
+        
+        .mode-buttons {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .mode-btn {
+            padding: 12px 8px;
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: #888;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.3s;
+            border-radius: 4px;
+            text-transform: uppercase;
+        }
+        
+        .mode-btn:hover {
+            border-color: var(--neon-green);
+            color: var(--neon-green);
+        }
+        
+        .mode-btn.active {
+            background: rgba(0, 255, 65, 0.2);
+            border-color: var(--neon-green);
+            color: var(--neon-green);
+            box-shadow: 0 0 15px rgba(0, 255, 65, 0.3);
+        }
+        
+        .effect-toggle {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+        
+        .toggle-switch {
+            position: relative;
+            width: 44px;
+            height: 22px;
+            background: #333;
+            border-radius: 11px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .toggle-switch::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 18px;
+            height: 18px;
+            background: #666;
+            border-radius: 50%;
+            transition: all 0.3s;
+        }
+        
+        .toggle-switch.active {
+            background: var(--neon-green);
+            box-shadow: 0 0 10px var(--neon-green);
+        }
+        
+        .toggle-switch.active::after {
+            left: 24px;
+            background: white;
+        }
+        
+        .export-buttons {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .export-btn {
+            padding: 12px;
+            background: linear-gradient(135deg, rgba(0, 255, 65, 0.1), rgba(0, 212, 255, 0.1));
+            border: 1px solid var(--neon-green);
+            color: var(--neon-green);
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+            border-radius: 4px;
+            text-transform: uppercase;
+        }
+        
+        .export-btn:hover {
+            background: rgba(0, 255, 65, 0.2);
+            box-shadow: 0 0 20px rgba(0, 255, 65, 0.4);
+            transform: translateY(-2px);
+        }
+        
+        .ascii-output {
+            background: #000;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            overflow: auto;
+            min-height: 400px;
+            max-height: 70vh;
+            position: relative;
+        }
+        
+        .ascii-output pre {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 8px;
+            line-height: 1;
+            white-space: pre;
+            margin: 0;
+            transition: font-size 0.3s;
+        }
+        
+        .ascii-output.neon-glow pre {
+            text-shadow: 0 0 5px currentColor, 0 0 10px currentColor;
+        }
+        
+        .ascii-output.outline-mode pre span {
+            -webkit-text-stroke: 0.5px currentColor;
+            color: transparent !important;
+        }
+        
+        .ascii-output.outline-mode pre {
+            -webkit-text-stroke: 0.5px var(--neon-green);
+            color: transparent !important;
+        }
+        
+        .zoom-controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            display: flex;
+            gap: 5px;
+            z-index: 10;
+        }
+        
+        .zoom-btn {
+            width: 30px;
+            height: 30px;
+            background: rgba(0, 255, 65, 0.2);
+            border: 1px solid var(--neon-green);
+            color: var(--neon-green);
+            font-size: 18px;
+            cursor: pointer;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+        }
+        
+        .zoom-btn:hover {
+            background: rgba(0, 255, 65, 0.4);
+        }
+        
+        .status-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--panel-bg);
+            border-top: 1px solid var(--border-color);
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 12px;
+            z-index: 100;
+        }
+        
+        .status-left {
+            color: var(--neon-green);
+        }
+        
+        .status-right {
+            color: #666;
+        }
+        
+        .status-right a {
+            color: var(--neon-cyan);
+            text-decoration: none;
+        }
+        
+        .placeholder-text {
+            color: #444;
+            text-align: center;
+            padding: 100px 20px;
+            font-size: 14px;
+        }
+        
+        .placeholder-text .icon {
+            font-size: 48px;
+            margin-bottom: 20px;
+            display: block;
+        }
+        
+        select {
+            width: 100%;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid var(--border-color);
+            color: var(--neon-green);
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            outline: none;
+        }
+        
+        select:focus {
+            border-color: var(--neon-green);
+        }
+        
+        select option {
+            background: #1a1a1a;
+            color: var(--neon-green);
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 50px;
+        }
+        
+        .loading.active {
+            display: block;
+        }
+        
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border-color);
+            border-top-color: var(--neon-green);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .toast {
+            position: fixed;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: var(--panel-bg);
+            border: 1px solid var(--neon-green);
+            color: var(--neon-green);
+            padding: 15px 30px;
+            border-radius: 4px;
+            font-size: 14px;
+            z-index: 1001;
+            opacity: 0;
+            transition: all 0.3s;
+            box-shadow: 0 0 20px rgba(0, 255, 65, 0.3);
+        }
+        
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
+        
+        .pixelated {
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+        
+        .controls-scroll {
+            max-height: calc(100vh - 280px);
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+        
+        .controls-scroll::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .controls-scroll::-webkit-scrollbar-track {
+            background: var(--border-color);
+            border-radius: 3px;
+        }
+        
+        .controls-scroll::-webkit-scrollbar-thumb {
+            background: var(--neon-green);
+            border-radius: 3px;
+        }
+        
+        @media (max-width: 600px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .panel {
+                padding: 15px;
+            }
+            
+            .mode-buttons {
+                grid-template-columns: 1fr;
+            }
+            
+            .export-buttons {
+                grid-template-columns: 1fr;
+            }
+            
+            .ascii-output {
+                min-height: 300px;
+            }
+            
+            .status-bar {
+                flex-direction: column;
+                gap: 5px;
+                text-align: center;
+            }
+            
+            .controls-scroll {
+                max-height: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="watermark">MAQSADBEK</div>
+    <div class="scanlines"></div>
+    <div class="crt-flicker"></div>
+    
+    <div class="container">
+        <header class="ascii-banner">
+            <pre class="glitch-effect">
+███╗   ███╗ █████╗  ██████╗ ███████╗ █████╗ ██████╗ ██████╗ ███████╗██╗  ██╗
+████╗ ████║██╔══██╗██╔═══██╗██╔════╝██╔══██╗██╔══██╗██╔══██╗██╔════╝██║ ██╔╝
+██╔████╔██║███████║██║   ██║███████╗███████║██║  ██║██████╔╝█████╗  █████╔╝ 
+██║╚██╔╝██║██╔══██║██║▄▄ ██║╚════██║██╔══██║██║  ██║██╔══██╗██╔══╝  ██╔═██╗ 
+██║ ╚═╝ ██║██║  ██║╚██████╔╝███████║██║  ██║██████╔╝██████╔╝███████╗██║  ██╗
+╚═╝     ╚═╝╚═╝  ╚═╝ ╚══▀▀═╝ ╚══════╝╚═╝  ╚═╝╚═════╝ ╚═════╝ ╚══════╝╚═╝  ╚═╝
+            </pre>
+            <div class="subtitle">ASCII Avatar Generator</div>
+        </header>
+        
+        <main class="main-content">
+            <aside class="panel controls-panel">
+                <div class="panel-title">Controls</div>
+                
+                <div class="controls-scroll">
+                    <div class="upload-zone" id="uploadZone">
+                        <input type="file" id="imageInput" accept="image/*">
+                        <span class="upload-icon">📁</span>
+                        <div class="upload-text">
+                            <strong>Drop image here</strong><br>
+                            or <span>click to browse</span>
+                        </div>
+                    </div>
+                    
+                    <div class="preview-container" id="previewContainer" style="display: none;">
+                        <img id="previewImage" alt="Preview">
+                    </div>
+                    
+                    <div class="control-group">
+                        <div class="control-label">
+                            <span>Conversion Mode</span>
+                        </div>
+                        <div class="mode-buttons">
+                            <button class="mode-btn active" data-mode="bw">B&W ASCII</button>
+                            <button class="mode-btn" data-mode="grayscale">Grayscale</button>
+                            <button class="mode-btn" data-mode="colored">Colored</button>
+                            <button class="mode-btn" data-mode="emoji">Emoji Mode</button>
+                        </div>
+                    </div>
+                    
+                    <div class="control-group">
+                        <div class="control-label">
+                            <span>Character Set</span>
+                        </div>
+                        <select id="charsetSelect">
+                            <option value="standard">Standard (@%#*+=-:. )</option>
+                            <option value="detailed">Detailed ($@B%8&WM#*...)</option>
+                            <option value="blocks">Blocks (█▓▒░ )</option>
+                            <option value="minimal">Minimal (#. )</option>
+                            <option value="binary">Binary (01)</option>
+                            <option value="matrix">Matrix (ﾊﾐﾋｰｳｼ...)</option>
+                        </select>
+                    </div>
+                    
+                    <div class="control-group">
+                        <div class="control-label">
+                            <span>Resolution</span>
+                            <span class="control-value" id="resolutionValue">100</span>
+                        </div>
+                        <input type="range" id="resolution" min="20" max="25000" value="100">
+                    </div>
+                    
+                    <div class="control-group">
+                        <div class="control-label">
+                            <span>Character Scale</span>
+                            <span class="control-value" id="charScaleValue">1.0</span>
+                        </div>
+                        <input type="range" id="charScale" min="0.5" max="2" step="0.1" value="1">
+                    </div>
+                    
+                    <div class="control-group">
+                        <div class="control-label">
+                            <span>Brightness</span>
+                            <span class="control-value" id="brightnessValue">0</span>
+                        </div>
+                        <input type="range" id="brightness" min="-100" max="100" value="0">
+                    </div>
+                    
+                    <div class="control-group">
+                        <div class="control-label">
+                            <span>Contrast</span>
+                            <span class="control-value" id="contrastValue">0</span>
+                        </div>
+                        <input type="range" id="contrast" min="-100" max="100" value="0">
+                    </div>
+                    
+                    <div class="control-group">
+                        <div class="control-label">
+                            <span>Smoothness</span>
+                            <span class="control-value" id="smoothnessValue">0</span>
+                        </div>
+                        <input type="range" id="smoothness" min="0" max="100" value="0">
+                    </div>
+                    
+                    <div class="control-group">
+                        <div class="control-label">
+                            <span>Sharpness</span>
+                            <span class="control-value" id="sharpnessValue">0</span>
+                        </div>
+                        <input type="range" id="sharpness" min="0" max="100" value="0">
+                    </div>
+                    
+                    <div class="panel-title" style="margin-top: 20px;">Effects</div>
+                    
+                    <div class="effect-toggle">
+                        <span>Glitch Effect</span>
+                        <div class="toggle-switch" id="toggleGlitch"></div>
+                    </div>
+                    
+                    <div class="effect-toggle">
+                        <span>Pixelation</span>
+                        <div class="toggle-switch" id="togglePixelation"></div>
+                    </div>
+                    
+                    <div class="effect-toggle">
+                        <span>Outline Mode</span>
+                        <div class="toggle-switch" id="toggleOutline"></div>
+                    </div>
+                    
+                    <div class="effect-toggle">
+                        <span>Neon Glow</span>
+                        <div class="toggle-switch" id="toggleNeonGlow"></div>
+                    </div>
+                    
+                    <div class="effect-toggle">
+                        <span>Hacker Face Mode</span>
+                        <div class="toggle-switch" id="toggleHacker"></div>
+                    </div>
+                    
+                    <div class="export-buttons">
+                        <button class="export-btn" id="copyClipboard">📋 Copy ASCII</button>
+                        <button class="export-btn" id="downloadTxt">📄 Download .txt</button>
+                        <button class="export-btn" id="downloadPng">🖼️ Export PNG</button>
+                        <button class="export-btn" id="downloadHtml">🌐 Export HTML</button>
+                    </div>
+                </div>
+            </aside>
+            
+            <section class="panel output-panel">
+                <div class="panel-title">ASCII Output</div>
+                <div class="ascii-output" id="asciiOutput">
+                    <div class="zoom-controls">
+                        <button class="zoom-btn" id="zoomOut">−</button>
+                        <button class="zoom-btn" id="zoomIn">+</button>
+                        <button class="zoom-btn" id="zoomReset">⟲</button>
+                    </div>
+                    <div class="loading" id="loading">
+                        <div class="spinner"></div>
+                        <div>Generating ASCII...</div>
+                    </div>
+                    <div class="placeholder-text" id="placeholder">
+                        <span class="icon">🖼️</span>
+                        Upload an image to generate ASCII art<br>
+                        <small style="color: #333;">Supports PNG, JPG, GIF, WebP</small>
+                    </div>
+                    <pre id="asciiArt"></pre>
+                </div>
+            </section>
+        </main>
+    </div>
+    
+    <div class="status-bar">
+        <div class="status-left">
+            <span id="statusText">Ready</span>
+        </div>
+        <div class="status-right">
+            <a href="https://maqsadbek37.vercel.app" target="_blank">maqsadbek37.vercel.app</a>
+        </div>
+    </div>
+    
+    <div class="toast" id="toast"></div>
+    
+    <canvas id="canvas" style="display: none;"></canvas>
+    <canvas id="exportCanvas" style="display: none;"></canvas>
+
+    <script>
+        const charsets = {
+            standard: '@%#*+=-:. ',
+            detailed: '$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/\\|()1{}[]?-_+~<>i!lI;:,"^`\'. ',
+            blocks: '█▓▒░ ',
+            minimal: '#. ',
+            binary: '01',
+            matrix: 'ﾊﾐﾋｰｳｼﾅﾓﾆｻﾜﾂｵﾘｱﾎﾃﾏｹﾒｴｶｷﾑﾕﾗｾﾈｽﾀﾇﾍ012345789Z:・."=*+-<>¦｜╌ '
+        };
+        
+        const emojis = ['😀', '😊', '🙂', '😐', '😕', '😢', '😭', '💀', '⬛'];
+        
+        let currentImage = null;
+        let currentMode = 'bw';
+        let currentZoom = 8;
+        let debounceTimer = null;
+        
+        const effects = {
+            glitch: false,
+            pixelation: false,
+            outline: false,
+            neonGlow: false,
+            hacker: false
+        };
+        
+        const uploadZone = document.getElementById('uploadZone');
+        const imageInput = document.getElementById('imageInput');
+        const previewContainer = document.getElementById('previewContainer');
+        const previewImage = document.getElementById('previewImage');
+        const asciiOutput = document.getElementById('asciiOutput');
+        const asciiArt = document.getElementById('asciiArt');
+        const placeholder = document.getElementById('placeholder');
+        const loading = document.getElementById('loading');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        const statusText = document.getElementById('statusText');
+        const toast = document.getElementById('toast');
+        
+        uploadZone.addEventListener('click', () => imageInput.click());
+        uploadZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadZone.classList.add('dragover');
+        });
+        uploadZone.addEventListener('dragleave', () => {
+            uploadZone.classList.remove('dragover');
+        });
+        uploadZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadZone.classList.remove('dragover');
+            if (e.dataTransfer.files[0]) {
+                handleImage(e.dataTransfer.files[0]);
+            }
+        });
+        imageInput.addEventListener('change', (e) => {
+            if (e.target.files[0]) {
+                handleImage(e.target.files[0]);
+            }
+        });
+        
+        function handleImage(file) {
+            if (!file.type.startsWith('image/')) {
+                showToast('Please upload an image file');
+                return;
+            }
+            
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    currentImage = img;
+                    previewImage.src = e.target.result;
+                    previewContainer.style.display = 'block';
+                    statusText.textContent = `Loaded: ${file.name} (${img.width}x${img.height})`;
+                    generateASCII();
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+        
+        document.querySelectorAll('.mode-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentMode = btn.dataset.mode;
+                generateASCII();
+            });
+        });
+        
+        ['resolution', 'charScale', 'brightness', 'contrast', 'smoothness', 'sharpness'].forEach(id => {
+            const input = document.getElementById(id);
+            const valueDisplay = document.getElementById(id + 'Value');
+            
+            input.addEventListener('input', () => {
+                let val = input.value;
+                if (id === 'charScale') val = parseFloat(val).toFixed(1);
+                valueDisplay.textContent = val;
+                updateSliderBackground(input);
+                debouncedGenerate();
+            });
+            
+            updateSliderBackground(input);
+        });
+        
+        function updateSliderBackground(input) {
+            const percent = ((input.value - input.min) / (input.max - input.min)) * 100;
+            input.style.background = `linear-gradient(90deg, var(--neon-green) ${percent}%, var(--border-color) ${percent}%)`;
+        }
+        
+        document.getElementById('charsetSelect').addEventListener('change', generateASCII);
+        
+        document.querySelectorAll('.toggle-switch').forEach(toggle => {
+            toggle.addEventListener('click', () => {
+                toggle.classList.toggle('active');
+                const effectName = toggle.id.replace('toggle', '').toLowerCase();
+                
+                if (effectName === 'glitch') effects.glitch = toggle.classList.contains('active');
+                if (effectName === 'pixelation') effects.pixelation = toggle.classList.contains('active');
+                if (effectName === 'outline') effects.outline = toggle.classList.contains('active');
+                if (effectName === 'neonglow') effects.neonGlow = toggle.classList.contains('active');
+                if (effectName === 'hacker') effects.hacker = toggle.classList.contains('active');
+                
+                applyEffects();
+                if (effectName === 'pixelation' || effectName === 'hacker') {
+                    generateASCII();
+                }
+            });
+        });
+        
+        function applyEffects() {
+            asciiOutput.classList.toggle('neon-glow', effects.neonGlow);
+            asciiOutput.classList.toggle('outline-mode', effects.outline);
+            asciiArt.classList.toggle('glitch-effect', effects.glitch);
+        }
+        
+        document.getElementById('zoomIn').addEventListener('click', () => {
+            currentZoom = Math.min(currentZoom + 1, 20);
+            asciiArt.style.fontSize = currentZoom + 'px';
+        });
+        
+        document.getElementById('zoomOut').addEventListener('click', () => {
+            currentZoom = Math.max(currentZoom - 1, 4);
+            asciiArt.style.fontSize = currentZoom + 'px';
+        });
+        
+        document.getElementById('zoomReset').addEventListener('click', () => {
+            currentZoom = 8;
+            asciiArt.style.fontSize = currentZoom + 'px';
+        });
+        
+        function debouncedGenerate() {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(generateASCII, 100);
+        }
+        
+        function generateASCII() {
+            if (!currentImage) return;
+            
+            placeholder.style.display = 'none';
+            loading.classList.add('active');
+            
+            requestAnimationFrame(() => {
+                setTimeout(() => {
+                    try {
+                        const resolution = parseInt(document.getElementById('resolution').value);
+                        const charScale = parseFloat(document.getElementById('charScale').value);
+                        const brightness = parseInt(document.getElementById('brightness').value);
+                        const contrast = parseInt(document.getElementById('contrast').value);
+                        const smoothness = parseInt(document.getElementById('smoothness').value);
+                        const sharpness = parseInt(document.getElementById('sharpness').value);
+                        const charset = charsets[document.getElementById('charsetSelect').value];
+                        
+                        const aspectRatio = currentImage.height / currentImage.width;
+                        const width = resolution;
+                        const height = Math.round(resolution * aspectRatio * 0.5);
+                        
+                        canvas.width = width;
+                        canvas.height = height;
+                        
+                        if (effects.pixelation) {
+                            ctx.imageSmoothingEnabled = false;
+                        } else {
+                            ctx.imageSmoothingEnabled = true;
+                            ctx.imageSmoothingQuality = 'high';
+                        }
+                        
+                        ctx.drawImage(currentImage, 0, 0, width, height);
+                        
+                        let imageData = ctx.getImageData(0, 0, width, height);
+                        let pixels = imageData.data;
+                        
+                        if (brightness !== 0 || contrast !== 0) {
+                            const factor = (259 * (contrast + 255)) / (255 * (259 - contrast));
+                            for (let i = 0; i < pixels.length; i += 4) {
+                                pixels[i] = clamp(factor * (pixels[i] - 128 + brightness) + 128);
+                                pixels[i + 1] = clamp(factor * (pixels[i + 1] - 128 + brightness) + 128);
+                                pixels[i + 2] = clamp(factor * (pixels[i + 2] - 128 + brightness) + 128);
+                            }
+                        }
+                        
+                        if (smoothness > 0) {
+                            imageData = applyBlur(imageData, smoothness / 25);
+                            pixels = imageData.data;
+                        }
+                        
+                        if (sharpness > 0) {
+                            imageData = applySharpen(imageData, sharpness / 100);
+                            pixels = imageData.data;
+                        }
+                        
+                        let ascii = '';
+                        const useColoredOutput = currentMode === 'colored' || currentMode === 'grayscale' || effects.hacker;
+                        
+                        if (useColoredOutput) {
+                            for (let y = 0; y < height; y++) {
+                                for (let x = 0; x < width; x++) {
+                                    const idx = (y * width + x) * 4;
+                                    const r = pixels[idx];
+                                    const g = pixels[idx + 1];
+                                    const b = pixels[idx + 2];
+                                    const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+                                    
+                                    let char;
+                                    if (currentMode === 'emoji') {
+                                        const emojiIdx = Math.floor((gray / 255) * (emojis.length - 1));
+                                        char = emojis[emojis.length - 1 - emojiIdx];
+                                    } else {
+                                        const charIdx = Math.floor((gray / 255) * (charset.length - 1));
+                                        char = charset[charset.length - 1 - charIdx];
+                                    }
+                                    
+                                    let color;
+                                    if (effects.hacker) {
+                                        const greenIntensity = Math.round(55 + (gray / 255) * 200);
+                                        color = `rgb(0, ${greenIntensity}, 0)`;
+                                    } else if (currentMode === 'grayscale') {
+                                        color = `rgb(${Math.round(gray)},${Math.round(gray)},${Math.round(gray)})`;
+                                    } else {
+                                        color = `rgb(${r}, ${g}, ${b})`;
+                                    }
+                                    
+                                    ascii += `<span style="color:${color}">${char}</span>`;
+                                }
+                                ascii += '\n';
+                            }
+                            asciiArt.innerHTML = ascii;
+                        } else {
+                            for (let y = 0; y < height; y++) {
+                                for (let x = 0; x < width; x++) {
+                                    const idx = (y * width + x) * 4;
+                                    const r = pixels[idx];
+                                    const g = pixels[idx + 1];
+                                    const b = pixels[idx + 2];
+                                    const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+                                    
+                                    let char;
+                                    if (currentMode === 'emoji') {
+                                        const emojiIdx = Math.floor((gray / 255) * (emojis.length - 1));
+                                        char = emojis[emojis.length - 1 - emojiIdx];
+                                    } else {
+                                        const charIdx = Math.floor((gray / 255) * (charset.length - 1));
+                                        char = charset[charset.length - 1 - charIdx];
+                                    }
+                                    
+                                    ascii += char;
+                                }
+                                ascii += '\n';
+                            }
+                            
+                            asciiArt.textContent = ascii;
+                            asciiArt.style.color = 'var(--neon-green)';
+                        }
+                        
+                        asciiArt.style.fontSize = (currentZoom * charScale) + 'px';
+                        loading.classList.remove('active');
+                        statusText.textContent = `Generated: ${width}x${height} characters`;
+                        applyEffects();
+                        
+                    } catch (error) {
+                        console.error('Error generating ASCII:', error);
+                        loading.classList.remove('active');
+                        showToast('Error generating ASCII art');
+                    }
+                }, 50);
+            });
+        }
+        
+        function applyBlur(imageData, radius) {
+            const width = imageData.width;
+            const height = imageData.height;
+            const src = imageData.data;
+            const output = new Uint8ClampedArray(src);
+            
+            const size = Math.ceil(radius) * 2 + 1;
+            const kernel = [];
+            let sum = 0;
+            
+            for (let i = 0; i < size; i++) {
+                for (let j = 0; j < size; j++) {
+                    const x = i - Math.floor(size / 2);
+                    const y = j - Math.floor(size / 2);
+                    const weight = Math.exp(-(x * x + y * y) / (2 * radius * radius));
+                    kernel.push(weight);
+                    sum += weight;
+                }
+            }
+            
+            for (let i = 0; i < kernel.length; i++) {
+                kernel[i] /= sum;
+            }
+            
+            const halfSize = Math.floor(size / 2);
+            
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    let r = 0, g = 0, b = 0;
+                    let ki = 0;
+                    
+                    for (let ky = -halfSize; ky <= halfSize; ky++) {
+                        for (let kx = -halfSize; kx <= halfSize; kx++) {
+                            const px = Math.min(Math.max(x + kx, 0), width - 1);
+                            const py = Math.min(Math.max(y + ky, 0), height - 1);
+                            const idx = (py * width + px) * 4;
+                            
+                            r += src[idx] * kernel[ki];
+                            g += src[idx + 1] * kernel[ki];
+                            b += src[idx + 2] * kernel[ki];
+                            ki++;
+                        }
+                    }
+                    
+                    const outIdx = (y * width + x) * 4;
+                    output[outIdx] = clamp(r);
+                    output[outIdx + 1] = clamp(g);
+                    output[outIdx + 2] = clamp(b);
+                    output[outIdx + 3] = src[outIdx + 3];
+                }
+            }
+            
+            return new ImageData(output, width, height);
+        }
+        
+        function applySharpen(imageData, amount) {
+            const width = imageData.width;
+            const height = imageData.height;
+            const src = imageData.data;
+            const output = new Uint8ClampedArray(src);
+            
+            const kernel = [
+                0, -amount, 0,
+                -amount, 1 + 4 * amount, -amount,
+                0, -amount, 0
+            ];
+            
+            for (let y = 1; y < height - 1; y++) {
+                for (let x = 1; x < width - 1; x++) {
+                    for (let c = 0; c < 3; c++) {
+                        let val = 0;
+                        for (let ky = -1; ky <= 1; ky++) {
+                            for (let kx = -1; kx <= 1; kx++) {
+                                const idx = ((y + ky) * width + (x + kx)) * 4 + c;
+                                val += src[idx] * kernel[(ky + 1) * 3 + (kx + 1)];
+                            }
+                        }
+                        output[(y * width + x) * 4 + c] = clamp(val);
+                    }
+                }
+            }
+            
+            return new ImageData(output, width, height);
+        }
+        
+        function clamp(val) {
+            return Math.max(0, Math.min(255, Math.round(val)));
+        }
+        
+        document.getElementById('copyClipboard').addEventListener('click', () => {
+            const text = asciiArt.innerText || asciiArt.textContent;
+            navigator.clipboard.writeText(text).then(() => {
+                showToast('ASCII copied to clipboard!');
+            }).catch(() => {
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                showToast('ASCII copied to clipboard!');
+            });
+        });
+        
+        document.getElementById('downloadTxt').addEventListener('click', () => {
+            const text = asciiArt.innerText || asciiArt.textContent;
+            const blob = new Blob([text], { type: 'text/plain' });
+            downloadBlob(blob, 'ascii-avatar.txt');
+            showToast('Downloaded as .txt');
+        });
+        
+        document.getElementById('downloadPng').addEventListener('click', () => {
+            if (!currentImage) {
+                showToast('Please upload an image first');
+                return;
+            }
+            
+            const exportCanvas = document.getElementById('exportCanvas');
+            const exportCtx = exportCanvas.getContext('2d');
+            
+            const lines = (asciiArt.innerText || asciiArt.textContent).split('\n').filter(l => l.length > 0);
+            const charWidth = currentZoom * 0.6;
+            const charHeight = currentZoom;
+            const maxLineLength = Math.max(...lines.map(l => l.length));
+            
+            const padding = 20;
+            exportCanvas.width = Math.ceil(maxLineLength * charWidth) + padding * 2;
+            exportCanvas.height = Math.ceil(lines.length * charHeight) + padding * 2;
+            
+            exportCtx.clearRect(0, 0, exportCanvas.width, exportCanvas.height);
+            
+            exportCtx.font = `${currentZoom}px 'Share Tech Mono', 'Courier New', monospace`;
+            exportCtx.textBaseline = 'top';
+            
+            if (effects.neonGlow) {
+                exportCtx.shadowBlur = 10;
+            }
+            
+            const spans = asciiArt.querySelectorAll('span');
+            if (spans.length > 0) {
+                let x = padding;
+                let y = padding;
+                let lineCharCount = 0;
+                const charPerLine = lines[0] ? lines[0].length : 100;
+                
+                spans.forEach((span, index) => {
+                    const char = span.textContent;
+                    let color = span.style.color || '#00ff41';
+                    
+                    if (effects.hacker) {
+                        const match = color.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+                        if (match) {
+                            color = `rgb(0, ${match[2]}, 0)`;
+                        }
+                    }
+                    
+                    if (char !== '\n' && char.trim() !== '' || char === ' ') {
+                        exportCtx.fillStyle = color;
+                        if (effects.neonGlow) {
+                            exportCtx.shadowColor = color;
+                        }
+                        
+                        if (effects.outline) {
+                            exportCtx.strokeStyle = color;
+                            exportCtx.lineWidth = 0.5;
+                            exportCtx.strokeText(char, x, y);
+                        } else {
+                            exportCtx.fillText(char, x, y);
+                        }
+                    }
+                    
+                    x += charWidth;
+                    lineCharCount++;
+                    
+                    if (lineCharCount >= charPerLine) {
+                        x = padding;
+                        y += charHeight;
+                        lineCharCount = 0;
+                    }
+                });
+            } else {
+                const defaultColor = effects.hacker ? '#00ff41' : '#00ff41';
+                exportCtx.fillStyle = defaultColor;
+                if (effects.neonGlow) {
+                    exportCtx.shadowColor = defaultColor;
+                }
+                lines.forEach((line, i) => {
+                    if (effects.outline) {
+                        exportCtx.strokeStyle = defaultColor;
+                        exportCtx.lineWidth = 0.5;
+                        exportCtx.strokeText(line, padding, padding + i * charHeight);
+                    } else {
+                        exportCtx.fillText(line, padding, padding + i * charHeight);
+                    }
+                });
+            }
+            
+            exportCanvas.toBlob((blob) => {
+                if (blob) {
+                    downloadBlob(blob, 'ascii-avatar.png');
+                    showToast('Downloaded as transparent PNG');
+                }
+            }, 'image/png');
+        });
+        
+        document.getElementById('downloadHtml').addEventListener('click', () => {
+            if (!currentImage) {
+                showToast('Please upload an image first');
+                return;
+            }
+            
+            let asciiContent = asciiArt.innerHTML || `<span style="color:#00ff41">${asciiArt.textContent}</span>`;
+            
+            if (effects.hacker && asciiArt.innerHTML) {
+                asciiContent = asciiContent.replace(/color:\s*rgb\((\d+),\s*(\d+),\s*(\d+)\)/g, (match, r, g, b) => {
+                    return `color: rgb(0, ${g}, 0)`;
+                });
+            }
+            
+            const neonGlowStyle = effects.neonGlow ? 'text-shadow: 0 0 5px currentColor, 0 0 10px currentColor;' : '';
+            const outlineStyle = effects.outline ? '-webkit-text-stroke: 0.5px currentColor; color: transparent !important;' : '';
+            const glitchKeyframes = effects.glitch ? `
+        @keyframes glitch {
+            0%, 90%, 100% { transform: translate(0); filter: none; }
+            91% { transform: translate(-2px, 1px); filter: hue-rotate(90deg); }
+            92% { transform: translate(2px, -1px); filter: hue-rotate(-90deg); }
+            93% { transform: translate(-1px, 2px); }
+            94% { transform: translate(1px, -2px); filter: hue-rotate(180deg); }
+            95% { transform: translate(0); }
+        }` : '';
+            const glitchAnimation = effects.glitch ? 'animation: glitch 3s infinite;' : '';
+            
+            const htmlContent = `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASCII Avatar - MAQSADBEK</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+        ${glitchKeyframes}
+        body {
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        pre {
+            font-family: 'Share Tech Mono', 'Courier New', monospace;
+            font-size: ${currentZoom}px;
+            line-height: 1;
+            white-space: pre;
+            color: #00ff41;
+            ${neonGlowStyle}
+            ${glitchAnimation}
+        }
+        pre span {
+            ${outlineStyle}
+        }
+    </style>
+</head>
+<body>
+    <pre>${asciiContent}</pre>
+</body>
+</html>`;
+            const blob = new Blob([htmlContent], { type: 'text/html' });
+            downloadBlob(blob, 'ascii-avatar.html');
+            showToast('Downloaded as colored HTML with effects');
+        });
+        
+        function downloadBlob(blob, filename) {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+        
+        function showToast(message) {
+            toast.textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+        
+        if ('ontouchstart' in window) {
+            document.querySelectorAll('input[type="range"]').forEach(input => {
+                input.style.height = '20px';
+            });
+        }
+        
+        console.log('%c MAQSADBEK ASCII Avatar Generator ', 'background: #000; color: #00ff41; font-size: 20px; padding: 10px;');
+        console.log('%c https://maqsadbek37.vercel.app ', 'color: #00d4ff;');
+    </script>
+</body>
+</html>
