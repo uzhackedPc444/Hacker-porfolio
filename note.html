@@ -1,0 +1,1451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MAQSADBEK | Cyber NotePad</title>
+    <style>
+        @keyframes glitch {
+            0% { transform: translate(0); }
+            20% { transform: translate(-2px, 2px); }
+            40% { transform: translate(-2px, -2px); }
+            60% { transform: translate(2px, 2px); }
+            80% { transform: translate(2px, -2px); }
+            100% { transform: translate(0); }
+        }
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+        @keyframes scanline {
+            0% { transform: translateY(-100%); }
+            100% { transform: translateY(100vh); }
+        }
+        @keyframes neonPulse {
+            0%, 100% { box-shadow: 0 0 5px #39ff14, 0 0 10px #39ff14, 0 0 20px #39ff14; }
+            50% { box-shadow: 0 0 10px #39ff14, 0 0 20px #39ff14, 0 0 40px #39ff14; }
+        }
+        @keyframes typeIn {
+            from { width: 0; }
+            to { width: 100%; }
+        }
+        @keyframes glitchText {
+            0% { clip-path: inset(40% 0 61% 0); transform: translate(-2px, 0); }
+            20% { clip-path: inset(92% 0 1% 0); transform: translate(2px, 0); }
+            40% { clip-path: inset(43% 0 1% 0); transform: translate(-1px, 0); }
+            60% { clip-path: inset(25% 0 58% 0); transform: translate(1px, 0); }
+            80% { clip-path: inset(54% 0 7% 0); transform: translate(-2px, 0); }
+            100% { clip-path: inset(58% 0 43% 0); transform: translate(0); }
+        }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Courier New', monospace;
+            background: #0b0b0b;
+            color: #39ff14;
+            min-height: 100vh;
+            overflow-x: hidden;
+            position: relative;
+        }
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: repeating-linear-gradient(
+                0deg,
+                rgba(0, 0, 0, 0.1) 0px,
+                rgba(0, 0, 0, 0.1) 1px,
+                transparent 1px,
+                transparent 2px
+            );
+            pointer-events: none;
+            z-index: 9999;
+        }
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: rgba(57, 255, 20, 0.1);
+            animation: scanline 8s linear infinite;
+            pointer-events: none;
+            z-index: 9998;
+        }
+        .watermark {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            opacity: 0.03;
+            font-size: 3rem;
+            font-weight: bold;
+            color: #39ff14;
+            pointer-events: none;
+            z-index: 0;
+            overflow: hidden;
+            word-break: break-all;
+            line-height: 1.5;
+        }
+        .app-container {
+            position: relative;
+            z-index: 1;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .ascii-header {
+            text-align: center;
+            padding: 15px;
+            background: linear-gradient(180deg, #0f0f0f 0%, #0b0b0b 100%);
+            border-bottom: 2px solid #39ff14;
+            box-shadow: 0 0 20px rgba(57, 255, 20, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+        .ascii-banner {
+            font-size: clamp(0.4rem, 2vw, 0.8rem);
+            color: #39ff14;
+            text-shadow: 0 0 10px #39ff14;
+            white-space: pre;
+            line-height: 1.2;
+            animation: glitch 0.3s infinite;
+        }
+        .ascii-banner:hover {
+            animation: glitch 0.1s infinite;
+        }
+        .subtitle {
+            color: #00f5ff;
+            font-size: 0.9rem;
+            margin-top: 10px;
+            text-shadow: 0 0 10px #00f5ff;
+            letter-spacing: 3px;
+        }
+        .main-content {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+        .sidebar {
+            width: 280px;
+            background: #0f0f0f;
+            border-right: 2px solid #39ff14;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 5px 0 20px rgba(57, 255, 20, 0.1);
+        }
+        .sidebar-header {
+            padding: 15px;
+            border-bottom: 1px solid #39ff14;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .sidebar-title {
+            color: #00f5ff;
+            font-size: 1rem;
+            text-shadow: 0 0 5px #00f5ff;
+        }
+        .notes-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+        }
+        .notes-list::-webkit-scrollbar {
+            width: 8px;
+        }
+        .notes-list::-webkit-scrollbar-track {
+            background: #0b0b0b;
+        }
+        .notes-list::-webkit-scrollbar-thumb {
+            background: #39ff14;
+            border-radius: 4px;
+        }
+        .note-item {
+            padding: 12px;
+            margin-bottom: 8px;
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .note-item:hover {
+            border-color: #39ff14;
+            box-shadow: 0 0 10px rgba(57, 255, 20, 0.3);
+            transform: translateX(5px);
+        }
+        .note-item.active {
+            border-color: #00f5ff;
+            box-shadow: 0 0 15px rgba(0, 245, 255, 0.4);
+        }
+        .note-item.self-destruct {
+            border-color: #ff3939;
+            animation: neonPulse 1s infinite;
+        }
+        .note-item.self-destruct .lock-icon {
+            color: #ff3939;
+        }
+        .note-title {
+            font-size: 0.85rem;
+            color: #39ff14;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            max-width: 180px;
+        }
+        .lock-icon {
+            font-size: 1rem;
+        }
+        .editor-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #0b0b0b;
+        }
+        .toolbar {
+            padding: 10px 15px;
+            background: #0f0f0f;
+            border-bottom: 1px solid #39ff14;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+        }
+        .btn {
+            padding: 8px 16px;
+            background: transparent;
+            border: 1px solid #39ff14;
+            color: #39ff14;
+            font-family: 'Courier New', monospace;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .btn:hover {
+            background: #39ff14;
+            color: #0b0b0b;
+            box-shadow: 0 0 20px rgba(57, 255, 20, 0.5);
+        }
+        .btn.cyan {
+            border-color: #00f5ff;
+            color: #00f5ff;
+        }
+        .btn.cyan:hover {
+            background: #00f5ff;
+            color: #0b0b0b;
+            box-shadow: 0 0 20px rgba(0, 245, 255, 0.5);
+        }
+        .btn.danger {
+            border-color: #ff3939;
+            color: #ff3939;
+        }
+        .btn.danger:hover {
+            background: #ff3939;
+            color: #0b0b0b;
+            box-shadow: 0 0 20px rgba(255, 57, 57, 0.5);
+        }
+        .btn.warning {
+            border-color: #ffaa00;
+            color: #ffaa00;
+        }
+        .btn.warning:hover {
+            background: #ffaa00;
+            color: #0b0b0b;
+            box-shadow: 0 0 20px rgba(255, 170, 0, 0.5);
+        }
+        .toggle-group {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            margin-left: auto;
+        }
+        .toggle-label {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.75rem;
+            color: #888;
+            cursor: pointer;
+        }
+        .toggle-label input {
+            accent-color: #39ff14;
+        }
+        .editor-wrapper {
+            flex: 1;
+            display: flex;
+            position: relative;
+            overflow: hidden;
+        }
+        .line-numbers {
+            width: 50px;
+            background: #0f0f0f;
+            border-right: 1px solid #333;
+            padding: 15px 5px;
+            text-align: right;
+            color: #555;
+            font-size: 0.85rem;
+            overflow: hidden;
+            user-select: none;
+        }
+        .editor {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: #39ff14;
+            font-family: 'Courier New', monospace;
+            font-size: 0.95rem;
+            padding: 15px;
+            resize: none;
+            outline: none;
+            line-height: 1.6;
+            caret-color: #39ff14;
+        }
+        .editor::placeholder {
+            color: #333;
+        }
+        .editor.no-wrap {
+            white-space: pre;
+            overflow-x: auto;
+        }
+        .terminal-log {
+            height: 150px;
+            background: #050505;
+            border-top: 2px solid #39ff14;
+            padding: 10px 15px;
+            overflow-y: auto;
+            font-size: 0.8rem;
+        }
+        .terminal-log::-webkit-scrollbar {
+            width: 8px;
+        }
+        .terminal-log::-webkit-scrollbar-track {
+            background: #0b0b0b;
+        }
+        .terminal-log::-webkit-scrollbar-thumb {
+            background: #39ff14;
+            border-radius: 4px;
+        }
+        .log-entry {
+            margin-bottom: 5px;
+            opacity: 0;
+            animation: fadeIn 0.3s forwards;
+        }
+        @keyframes fadeIn {
+            to { opacity: 1; }
+        }
+        .log-entry .timestamp {
+            color: #555;
+        }
+        .log-entry .message {
+            color: #39ff14;
+        }
+        .log-entry.error .message {
+            color: #ff3939;
+        }
+        .log-entry.warning .message {
+            color: #ffaa00;
+        }
+        .log-entry.info .message {
+            color: #00f5ff;
+        }
+        .cursor-blink::after {
+            content: '█';
+            animation: blink 1s infinite;
+        }
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            backdrop-filter: blur(5px);
+        }
+        .modal {
+            background: #0f0f0f;
+            border: 2px solid #39ff14;
+            padding: 30px;
+            max-width: 450px;
+            width: 90%;
+            box-shadow: 0 0 50px rgba(57, 255, 20, 0.3);
+            animation: glitch 0.1s;
+        }
+        .modal-title {
+            color: #00f5ff;
+            font-size: 1.2rem;
+            margin-bottom: 20px;
+            text-align: center;
+            text-shadow: 0 0 10px #00f5ff;
+        }
+        .modal-input {
+            width: 100%;
+            padding: 12px;
+            background: #1a1a1a;
+            border: 1px solid #39ff14;
+            color: #39ff14;
+            font-family: 'Courier New', monospace;
+            font-size: 1rem;
+            margin-bottom: 15px;
+            outline: none;
+        }
+        .modal-input:focus {
+            box-shadow: 0 0 10px rgba(57, 255, 20, 0.5);
+        }
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .security-notice {
+            margin-top: 20px;
+            padding: 15px;
+            background: #1a1a1a;
+            border-left: 3px solid #ffaa00;
+            font-size: 0.75rem;
+            color: #888;
+        }
+        .security-notice strong {
+            color: #ffaa00;
+        }
+        .hidden {
+            display: none !important;
+        }
+        .status-bar {
+            padding: 8px 15px;
+            background: #0f0f0f;
+            border-top: 1px solid #333;
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            color: #555;
+        }
+        .status-bar .status-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .status-bar .locked {
+            color: #39ff14;
+        }
+        .status-bar .unlocked {
+            color: #ff3939;
+        }
+        .inactivity-timer {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .timer-input {
+            width: 60px;
+            padding: 5px;
+            background: #1a1a1a;
+            border: 1px solid #333;
+            color: #39ff14;
+            font-family: 'Courier New', monospace;
+            font-size: 0.75rem;
+            text-align: center;
+        }
+        @media (max-width: 768px) {
+            .main-content {
+                flex-direction: column;
+            }
+            .sidebar {
+                width: 100%;
+                height: auto;
+                max-height: 200px;
+                border-right: none;
+                border-bottom: 2px solid #39ff14;
+            }
+            .notes-list {
+                display: flex;
+                overflow-x: auto;
+                overflow-y: hidden;
+                gap: 10px;
+                padding: 10px;
+            }
+            .note-item {
+                flex-shrink: 0;
+                width: 150px;
+            }
+            .toolbar {
+                justify-content: center;
+            }
+            .toggle-group {
+                margin-left: 0;
+                width: 100%;
+                justify-content: center;
+            }
+            .btn {
+                padding: 12px 20px;
+                font-size: 0.9rem;
+            }
+            .ascii-banner {
+                font-size: 0.35rem;
+            }
+            .terminal-log {
+                height: 120px;
+            }
+        }
+        .file-input {
+            display: none;
+        }
+        .glitch-border {
+            position: relative;
+        }
+        .glitch-border::before,
+        .glitch-border::after {
+            content: '';
+            position: absolute;
+            top: -2px;
+            left: -2px;
+            right: -2px;
+            bottom: -2px;
+            border: 2px solid #39ff14;
+            opacity: 0;
+        }
+        .glitch-border:hover::before {
+            animation: glitchText 0.3s infinite;
+            opacity: 0.5;
+        }
+        .glitch-border:hover::after {
+            animation: glitchText 0.3s infinite reverse;
+            opacity: 0.3;
+        }
+    </style>
+</head>
+<body>
+    <div class="watermark" id="watermark"></div>
+    
+    <div class="app-container">
+        <header class="ascii-header">
+            <pre class="ascii-banner">
+███╗   ███╗ █████╗  ██████╗ ███████╗ █████╗ ██████╗ ██████╗ ███████╗██╗  ██╗
+████╗ ████║██╔══██╗██╔═══██╗██╔════╝██╔══██╗██╔══██╗██╔══██╗██╔════╝██║ ██╔╝
+██╔████╔██║███████║██║   ██║███████╗███████║██║  ██║██████╔╝█████╗  █████╔╝ 
+██║╚██╔╝██║██╔══██║██║▄▄ ██║╚════██║██╔══██║██║  ██║██╔══██╗██╔══╝  ██╔═██╗ 
+██║ ╚═╝ ██║██║  ██║╚██████╔╝███████║██║  ██║██████╔╝██████╔╝███████╗██║  ██╗
+╚═╝     ╚═╝╚═╝  ╚═╝ ╚══▀▀═╝ ╚══════╝╚═╝  ╚═╝╚═════╝ ╚═════╝ ╚══════╝╚═╝  ╚═╝
+            </pre>
+            <div class="subtitle">[ CYBER NOTEPAD WITH ENCRYPTION ]</div>
+        </header>
+
+        <div class="main-content">
+            <aside class="sidebar" id="sidebar">
+                <div class="sidebar-header">
+                    <span class="sidebar-title">◢ ENCRYPTED NOTES</span>
+                    <button class="btn" onclick="createNewNote()" title="Ctrl+N">+ NEW</button>
+                </div>
+                <div class="notes-list" id="notesList"></div>
+                <div style="padding: 10px; border-top: 1px solid #333;">
+                    <button class="btn danger" onclick="showPanicConfirm()" style="width: 100%;">⚠ PANIC WIPE</button>
+                </div>
+            </aside>
+
+            <main class="editor-container">
+                <div class="toolbar">
+                    <button class="btn" onclick="saveNote()" title="Ctrl+S">💾 SAVE</button>
+                    <button class="btn cyan" onclick="toggleEncryptView()" id="encryptBtn" title="Ctrl+E">🔓 DECRYPT</button>
+                    <button class="btn warning" onclick="lockWorkspace()">🔒 LOCK</button>
+                    <button class="btn" onclick="exportNote()">📤 EXPORT</button>
+                    <button class="btn" onclick="document.getElementById('importInput').click()">📥 IMPORT</button>
+                    <input type="file" id="importInput" class="file-input" accept=".enc" onchange="importNote(event)">
+                    <button class="btn cyan" onclick="showPasswordGenerator()">🔑 GEN KEY</button>
+                    <button class="btn danger" onclick="toggleSelfDestruct()" id="selfDestructBtn">💀 SELF-DESTRUCT</button>
+                    
+                    <div class="toggle-group">
+                        <label class="toggle-label">
+                            <input type="checkbox" id="lineNumToggle" checked onchange="toggleLineNumbers()">
+                            LINE #
+                        </label>
+                        <label class="toggle-label">
+                            <input type="checkbox" id="wordWrapToggle" checked onchange="toggleWordWrap()">
+                            WRAP
+                        </label>
+                        <div class="inactivity-timer">
+                            <span style="color: #555;">AUTO-LOCK:</span>
+                            <input type="number" class="timer-input" id="inactivityTimer" value="5" min="1" max="60" onchange="updateInactivityTimer()">
+                            <span style="color: #555;">MIN</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="editor-wrapper">
+                    <div class="line-numbers" id="lineNumbers">1</div>
+                    <textarea class="editor" id="editor" placeholder=">> Enter your encrypted note here..." oninput="updateLineNumbers(); resetInactivityTimer();" onscroll="syncScroll()"></textarea>
+                </div>
+
+                <div class="status-bar">
+                    <div class="status-item">
+                        <span id="encryptionStatus" class="locked">🔒 ENCRYPTED</span>
+                    </div>
+                    <div class="status-item">
+                        <span id="noteStatus">No note selected</span>
+                    </div>
+                    <div class="status-item">
+                        <span id="charCount">0 chars</span>
+                    </div>
+                </div>
+
+                <div class="terminal-log" id="terminalLog"></div>
+            </main>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="passwordModal">
+        <div class="modal glitch-border">
+            <h2 class="modal-title" id="modalTitle">🔐 INITIALIZE ENCRYPTION</h2>
+            <p style="color: #888; margin-bottom: 15px; font-size: 0.85rem;" id="modalDesc">Set your master password to encrypt all notes.</p>
+            <input type="password" class="modal-input" id="passwordInput" placeholder="Enter master password..." onkeydown="handlePasswordKey(event)">
+            <input type="password" class="modal-input hidden" id="confirmPasswordInput" placeholder="Confirm password...">
+            <div class="modal-buttons">
+                <button class="btn" id="modalSubmitBtn" onclick="handlePasswordSubmit()">INITIALIZE</button>
+                <button class="btn cyan hidden" id="changePasswordBtn" onclick="showChangePassword()">CHANGE PASSWORD</button>
+            </div>
+            <div class="security-notice">
+                <strong>⚠ SECURITY NOTICE:</strong><br>
+                • All encryption is performed locally<br>
+                • Data never leaves your device<br>
+                • Password cannot be recovered<br>
+                • Losing password = losing notes forever
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay hidden" id="panicModal">
+        <div class="modal glitch-border" style="border-color: #ff3939;">
+            <h2 class="modal-title" style="color: #ff3939;">⚠ PANIC WIPE CONFIRMATION</h2>
+            <p style="color: #ff3939; margin-bottom: 20px; text-align: center;">
+                This will PERMANENTLY DELETE all notes and reset the application.<br>
+                Type "CONFIRM" to proceed.
+            </p>
+            <input type="text" class="modal-input" id="panicConfirmInput" placeholder="Type CONFIRM..." style="border-color: #ff3939; color: #ff3939;">
+            <div class="modal-buttons">
+                <button class="btn danger" onclick="executePanicWipe()">🗑 WIPE EVERYTHING</button>
+                <button class="btn" onclick="hidePanicConfirm()">CANCEL</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay hidden" id="passwordGenModal">
+        <div class="modal glitch-border">
+            <h2 class="modal-title">🔑 SECURE PASSWORD GENERATOR</h2>
+            <div style="margin-bottom: 15px;">
+                <label style="color: #888; font-size: 0.8rem;">Password Length:</label>
+                <input type="range" id="passLengthSlider" min="8" max="64" value="24" oninput="generateSecurePassword()" style="width: 100%; accent-color: #39ff14;">
+                <span id="passLengthDisplay" style="color: #39ff14;">24</span>
+            </div>
+            <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
+                <label class="toggle-label"><input type="checkbox" id="passUppercase" checked onchange="generateSecurePassword()"> A-Z</label>
+                <label class="toggle-label"><input type="checkbox" id="passLowercase" checked onchange="generateSecurePassword()"> a-z</label>
+                <label class="toggle-label"><input type="checkbox" id="passNumbers" checked onchange="generateSecurePassword()"> 0-9</label>
+                <label class="toggle-label"><input type="checkbox" id="passSymbols" checked onchange="generateSecurePassword()"> !@#</label>
+            </div>
+            <input type="text" class="modal-input" id="generatedPassword" readonly style="font-size: 1.1rem; letter-spacing: 2px;">
+            <div class="modal-buttons">
+                <button class="btn" onclick="generateSecurePassword()">🔄 REGENERATE</button>
+                <button class="btn cyan" onclick="copyGeneratedPassword()">📋 COPY</button>
+                <button class="btn" onclick="hidePasswordGenerator()">CLOSE</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const STORAGE_KEY = 'maqsadbek_cyber_notes';
+        const PASSWORD_HASH_KEY = 'maqsadbek_pwd_hash';
+        
+        let masterPassword = '';
+        let notes = [];
+        let currentNoteId = null;
+        let previousNoteId = null;
+        let isDecryptedView = false;
+        let inactivityTimeout = null;
+        let inactivityMinutes = 5;
+        let isInitialized = false;
+
+        function init() {
+            generateWatermark();
+            checkExistingSession();
+            setupKeyboardShortcuts();
+            updateLineNumbers();
+            setupActivityListeners();
+            
+            document.getElementById('editor').addEventListener('input', () => {
+                updateCharCount();
+                resetInactivityTimer();
+            });
+        }
+
+        function setupActivityListeners() {
+            const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+            events.forEach(event => {
+                document.addEventListener(event, () => {
+                    if (masterPassword) {
+                        resetInactivityTimer();
+                    }
+                }, { passive: true });
+            });
+        }
+
+        function generateWatermark() {
+            const watermark = document.getElementById('watermark');
+            let text = '';
+            for (let i = 0; i < 200; i++) {
+                text += 'MAQSADBEK ';
+            }
+            watermark.textContent = text;
+        }
+
+        async function sha256(message) {
+            const msgBuffer = new TextEncoder().encode(message);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+
+        function xorEncrypt(text, key) {
+            let result = '';
+            for (let i = 0; i < text.length; i++) {
+                const charCode = text.charCodeAt(i) ^ key.charCodeAt(i % key.length);
+                result += String.fromCharCode(charCode);
+            }
+            return btoa(unescape(encodeURIComponent(result)));
+        }
+
+        function xorDecrypt(encoded, key) {
+            try {
+                const decoded = decodeURIComponent(escape(atob(encoded)));
+                let result = '';
+                for (let i = 0; i < decoded.length; i++) {
+                    const charCode = decoded.charCodeAt(i) ^ key.charCodeAt(i % key.length);
+                    result += String.fromCharCode(charCode);
+                }
+                return result;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        async function deriveKey(password, salt = 'maqsadbek_salt_2024') {
+            const combined = password + salt;
+            let key = await sha256(combined);
+            for (let i = 0; i < 1000; i++) {
+                key = await sha256(key + combined);
+            }
+            return key;
+        }
+
+        async function encryptData(data, password) {
+            const key = await deriveKey(password);
+            const jsonStr = JSON.stringify(data);
+            return xorEncrypt(jsonStr, key);
+        }
+
+        async function decryptData(encrypted, password) {
+            const key = await deriveKey(password);
+            const decrypted = xorDecrypt(encrypted, key);
+            if (!decrypted) return null;
+            try {
+                return JSON.parse(decrypted);
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function checkExistingSession() {
+            const storedHash = localStorage.getItem(PASSWORD_HASH_KEY);
+            const modal = document.getElementById('passwordModal');
+            const confirmInput = document.getElementById('confirmPasswordInput');
+            const modalTitle = document.getElementById('modalTitle');
+            const modalDesc = document.getElementById('modalDesc');
+            const submitBtn = document.getElementById('modalSubmitBtn');
+            const changeBtn = document.getElementById('changePasswordBtn');
+
+            if (storedHash) {
+                modalTitle.textContent = '🔐 UNLOCK WORKSPACE';
+                modalDesc.textContent = 'Enter your master password to decrypt notes.';
+                confirmInput.classList.add('hidden');
+                submitBtn.textContent = 'UNLOCK';
+                changeBtn.classList.remove('hidden');
+                isInitialized = true;
+            } else {
+                modalTitle.textContent = '🔐 INITIALIZE ENCRYPTION';
+                modalDesc.textContent = 'Set your master password to encrypt all notes.';
+                confirmInput.classList.remove('hidden');
+                submitBtn.textContent = 'INITIALIZE';
+                changeBtn.classList.add('hidden');
+                isInitialized = false;
+            }
+            modal.classList.remove('hidden');
+        }
+
+        async function handlePasswordSubmit() {
+            const password = document.getElementById('passwordInput').value;
+            const confirmPassword = document.getElementById('confirmPasswordInput').value;
+
+            if (!password) {
+                logMessage('Password cannot be empty', 'error');
+                return;
+            }
+
+            if (!isInitialized) {
+                if (password !== confirmPassword) {
+                    logMessage('Passwords do not match', 'error');
+                    return;
+                }
+                if (password.length < 6) {
+                    logMessage('Password must be at least 6 characters', 'error');
+                    return;
+                }
+                
+                const hash = await sha256(password);
+                localStorage.setItem(PASSWORD_HASH_KEY, hash);
+                masterPassword = password;
+                notes = [];
+                await saveNotesToStorage();
+                
+                document.getElementById('passwordModal').classList.add('hidden');
+                logMessage('Workspace initialized successfully', 'info');
+                logMessage('Encryption system online', 'info');
+                resetInactivityTimer();
+            } else {
+                const storedHash = localStorage.getItem(PASSWORD_HASH_KEY);
+                const inputHash = await sha256(password);
+                
+                if (inputHash !== storedHash) {
+                    logMessage('Access denied: wrong key', 'error');
+                    document.getElementById('passwordInput').value = '';
+                    return;
+                }
+                
+                masterPassword = password;
+                await loadNotesFromStorage();
+                
+                document.getElementById('passwordModal').classList.add('hidden');
+                logMessage('Decryption successful', 'info');
+                logMessage('Workspace unlocked', 'info');
+                renderNotesList();
+                resetInactivityTimer();
+            }
+
+            document.getElementById('passwordInput').value = '';
+            document.getElementById('confirmPasswordInput').value = '';
+        }
+
+        function handlePasswordKey(event) {
+            if (event.key === 'Enter') {
+                handlePasswordSubmit();
+            }
+        }
+
+        function showChangePassword() {
+            const modal = document.getElementById('passwordModal');
+            const confirmInput = document.getElementById('confirmPasswordInput');
+            const modalTitle = document.getElementById('modalTitle');
+            const modalDesc = document.getElementById('modalDesc');
+            const submitBtn = document.getElementById('modalSubmitBtn');
+
+            modalTitle.textContent = '🔑 CHANGE PASSWORD';
+            modalDesc.textContent = 'First enter your current password, then the new one.';
+            confirmInput.classList.remove('hidden');
+            confirmInput.placeholder = 'New password...';
+            document.getElementById('passwordInput').placeholder = 'Current password...';
+            submitBtn.textContent = 'CHANGE';
+            submitBtn.onclick = handleChangePassword;
+        }
+
+        async function handleChangePassword() {
+            const currentPass = document.getElementById('passwordInput').value;
+            const newPass = document.getElementById('confirmPasswordInput').value;
+
+            const storedHash = localStorage.getItem(PASSWORD_HASH_KEY);
+            const currentHash = await sha256(currentPass);
+
+            if (currentHash !== storedHash) {
+                logMessage('Current password incorrect', 'error');
+                return;
+            }
+
+            if (newPass.length < 6) {
+                logMessage('New password must be at least 6 characters', 'error');
+                return;
+            }
+
+            masterPassword = newPass;
+            const newHash = await sha256(newPass);
+            localStorage.setItem(PASSWORD_HASH_KEY, newHash);
+            await saveNotesToStorage();
+
+            document.getElementById('passwordModal').classList.add('hidden');
+            logMessage('Password changed successfully', 'info');
+            
+            document.getElementById('passwordInput').value = '';
+            document.getElementById('confirmPasswordInput').value = '';
+            document.getElementById('passwordInput').placeholder = 'Enter master password...';
+            document.getElementById('confirmPasswordInput').placeholder = 'Confirm password...';
+            document.getElementById('modalSubmitBtn').onclick = handlePasswordSubmit;
+        }
+
+        async function saveNotesToStorage() {
+            try {
+                const encrypted = await encryptData(notes, masterPassword);
+                localStorage.setItem(STORAGE_KEY, encrypted);
+            } catch (e) {
+                logMessage('Error saving notes', 'error');
+            }
+        }
+
+        async function loadNotesFromStorage() {
+            try {
+                const encrypted = localStorage.getItem(STORAGE_KEY);
+                if (!encrypted) {
+                    notes = [];
+                    return;
+                }
+                const decrypted = await decryptData(encrypted, masterPassword);
+                if (decrypted) {
+                    notes = decrypted;
+                } else {
+                    logMessage('Failed to decrypt notes - data may be corrupted', 'error');
+                    notes = [];
+                }
+            } catch (e) {
+                logMessage('Error loading notes - starting fresh', 'warning');
+                notes = [];
+            }
+        }
+
+        function renderNotesList() {
+            const list = document.getElementById('notesList');
+            list.innerHTML = '';
+
+            if (notes.length === 0) {
+                list.innerHTML = '<div style="color: #555; padding: 20px; text-align: center;">No notes yet</div>';
+                return;
+            }
+
+            notes.forEach(note => {
+                const div = document.createElement('div');
+                div.className = 'note-item' + (note.id === currentNoteId ? ' active' : '') + (note.selfDestruct ? ' self-destruct' : '');
+                div.onclick = () => selectNote(note.id);
+                
+                const title = note.title || 'Untitled Note';
+                const icon = note.selfDestruct ? '💀' : '🔒';
+                
+                div.innerHTML = `
+                    <span class="note-title">${escapeHtml(title)}</span>
+                    <span class="lock-icon">${icon}</span>
+                `;
+                list.appendChild(div);
+            });
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        async function createNewNote() {
+            if (!masterPassword) {
+                logMessage('Workspace is locked', 'error');
+                return;
+            }
+
+            await handleSelfDestructCleanup();
+            previousNoteId = currentNoteId;
+
+            const note = {
+                id: Date.now().toString(),
+                title: 'New Note',
+                content: '',
+                created: new Date().toISOString(),
+                modified: new Date().toISOString(),
+                selfDestruct: false
+            };
+
+            notes.unshift(note);
+            currentNoteId = note.id;
+            isDecryptedView = true;
+            
+            document.getElementById('editor').value = '';
+            updateEditorState();
+            renderNotesList();
+            await saveNotesToStorage();
+            
+            logMessage('New encrypted note created', 'info');
+            resetInactivityTimer();
+        }
+
+        async function handleSelfDestructCleanup() {
+            if (previousNoteId && previousNoteId !== currentNoteId) {
+                const prevNote = notes.find(n => n.id === previousNoteId);
+                if (prevNote && prevNote.selfDestruct && prevNote.viewed) {
+                    const idx = notes.findIndex(n => n.id === previousNoteId);
+                    if (idx > -1) {
+                        notes.splice(idx, 1);
+                        await saveNotesToStorage();
+                        renderNotesList();
+                        logMessage('Self-destruct note permanently erased', 'error');
+                    }
+                }
+            }
+        }
+
+        async function selectNote(id) {
+            if (!masterPassword) {
+                logMessage('Workspace is locked', 'error');
+                return;
+            }
+
+            const note = notes.find(n => n.id === id);
+            if (!note) return;
+
+            await handleSelfDestructCleanup();
+
+            previousNoteId = currentNoteId;
+            currentNoteId = id;
+
+            isDecryptedView = true;
+            document.getElementById('editor').value = note.content;
+            
+            if (note.selfDestruct && !note.viewed) {
+                note.viewed = true;
+                await saveNotesToStorage();
+                logMessage('⚠ SELF-DESTRUCT ACTIVE: Note will be erased when you leave', 'error');
+            }
+
+            updateEditorState();
+            renderNotesList();
+            updateLineNumbers();
+            
+            document.getElementById('noteStatus').textContent = note.title;
+            resetInactivityTimer();
+
+            if (note.selfDestruct) {
+                previousNoteId = currentNoteId;
+            }
+        }
+
+        async function saveNote() {
+            if (!masterPassword) {
+                logMessage('Workspace is locked', 'error');
+                return;
+            }
+
+            if (!currentNoteId) {
+                createNewNote();
+                return;
+            }
+
+            const note = notes.find(n => n.id === currentNoteId);
+            if (!note) return;
+
+            const content = document.getElementById('editor').value;
+            note.content = content;
+            note.modified = new Date().toISOString();
+            
+            const firstLine = content.split('\n')[0].trim();
+            note.title = firstLine.substring(0, 50) || 'Untitled Note';
+
+            await saveNotesToStorage();
+            renderNotesList();
+            
+            logMessage('Note encrypted and saved', 'info');
+            resetInactivityTimer();
+        }
+
+        async function deleteCurrentNote() {
+            if (!currentNoteId) return;
+
+            const idx = notes.findIndex(n => n.id === currentNoteId);
+            if (idx > -1) {
+                notes.splice(idx, 1);
+                await saveNotesToStorage();
+                
+                currentNoteId = null;
+                document.getElementById('editor').value = '';
+                isDecryptedView = false;
+                
+                renderNotesList();
+                updateEditorState();
+                logMessage('Note permanently deleted', 'warning');
+            }
+            resetInactivityTimer();
+        }
+
+        function toggleEncryptView() {
+            if (!masterPassword) {
+                logMessage('Workspace is locked', 'error');
+                return;
+            }
+
+            isDecryptedView = !isDecryptedView;
+            
+            const editor = document.getElementById('editor');
+            const note = notes.find(n => n.id === currentNoteId);
+            
+            if (!isDecryptedView && note) {
+                const fakeEncrypted = btoa(unescape(encodeURIComponent(note.content)));
+                editor.value = '[ ENCRYPTED DATA ]\n\n' + fakeEncrypted.match(/.{1,64}/g).join('\n');
+                editor.readOnly = true;
+                logMessage('View switched to encrypted mode', 'info');
+            } else if (note) {
+                editor.value = note.content;
+                editor.readOnly = false;
+                logMessage('Content decrypted for viewing', 'info');
+            }
+
+            updateEditorState();
+            resetInactivityTimer();
+        }
+
+        function updateEditorState() {
+            const btn = document.getElementById('encryptBtn');
+            const status = document.getElementById('encryptionStatus');
+            const charCount = document.getElementById('charCount');
+
+            if (isDecryptedView) {
+                btn.textContent = '🔓 ENCRYPT VIEW';
+                status.textContent = '🔓 DECRYPTED VIEW';
+                status.className = 'unlocked';
+            } else {
+                btn.textContent = '🔐 DECRYPT VIEW';
+                status.textContent = '🔒 ENCRYPTED';
+                status.className = 'locked';
+            }
+
+            updateCharCount();
+        }
+
+        function updateCharCount() {
+            const content = document.getElementById('editor').value;
+            document.getElementById('charCount').textContent = content.length + ' chars';
+        }
+
+        async function lockWorkspace() {
+            await handleSelfDestructCleanup();
+            
+            masterPassword = '';
+            currentNoteId = null;
+            previousNoteId = null;
+            isDecryptedView = false;
+            notes = [];
+            
+            document.getElementById('editor').value = '';
+            document.getElementById('notesList').innerHTML = '';
+            document.getElementById('editor').readOnly = false;
+            
+            clearTimeout(inactivityTimeout);
+            
+            logMessage('Workspace locked', 'warning');
+            checkExistingSession();
+        }
+
+        function resetInactivityTimer() {
+            clearTimeout(inactivityTimeout);
+            if (masterPassword) {
+                inactivityTimeout = setTimeout(() => {
+                    logMessage('Auto-lock due to inactivity', 'warning');
+                    lockWorkspace();
+                }, inactivityMinutes * 60 * 1000);
+            }
+        }
+
+        function updateInactivityTimer() {
+            inactivityMinutes = parseInt(document.getElementById('inactivityTimer').value) || 5;
+            resetInactivityTimer();
+            logMessage('Auto-lock timer set to ' + inactivityMinutes + ' minutes', 'info');
+        }
+
+        function toggleLineNumbers() {
+            const lineNums = document.getElementById('lineNumbers');
+            const checked = document.getElementById('lineNumToggle').checked;
+            lineNums.style.display = checked ? 'block' : 'none';
+        }
+
+        function toggleWordWrap() {
+            const editor = document.getElementById('editor');
+            const checked = document.getElementById('wordWrapToggle').checked;
+            editor.classList.toggle('no-wrap', !checked);
+        }
+
+        function updateLineNumbers() {
+            const editor = document.getElementById('editor');
+            const lineNums = document.getElementById('lineNumbers');
+            const lines = editor.value.split('\n').length;
+            lineNums.innerHTML = Array.from({length: lines}, (_, i) => i + 1).join('<br>');
+        }
+
+        function syncScroll() {
+            const editor = document.getElementById('editor');
+            const lineNums = document.getElementById('lineNumbers');
+            lineNums.scrollTop = editor.scrollTop;
+        }
+
+        async function exportNote() {
+            if (!currentNoteId || !masterPassword) {
+                logMessage('No note to export', 'error');
+                return;
+            }
+
+            const note = notes.find(n => n.id === currentNoteId);
+            if (!note) return;
+
+            const exportData = {
+                title: note.title,
+                content: note.content,
+                created: note.created,
+                exported: new Date().toISOString()
+            };
+
+            const encrypted = await encryptData(exportData, masterPassword);
+            const blob = new Blob([encrypted], {type: 'application/octet-stream'});
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = (note.title.replace(/[^a-z0-9]/gi, '_') || 'note') + '.enc';
+            a.click();
+            
+            URL.revokeObjectURL(url);
+            logMessage('Note exported as encrypted file', 'info');
+        }
+
+        async function importNote(event) {
+            if (!masterPassword) {
+                logMessage('Workspace is locked', 'error');
+                return;
+            }
+
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const encrypted = e.target.result;
+                    const decrypted = await decryptData(encrypted, masterPassword);
+                    
+                    if (!decrypted || !decrypted.content) {
+                        logMessage('Failed to import - wrong password or corrupted file', 'error');
+                        return;
+                    }
+
+                    const note = {
+                        id: Date.now().toString(),
+                        title: decrypted.title || 'Imported Note',
+                        content: decrypted.content,
+                        created: decrypted.created || new Date().toISOString(),
+                        modified: new Date().toISOString(),
+                        selfDestruct: false
+                    };
+
+                    notes.unshift(note);
+                    await saveNotesToStorage();
+                    renderNotesList();
+                    
+                    logMessage('Note imported successfully', 'info');
+                } catch (err) {
+                    logMessage('Import failed - invalid file format', 'error');
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = '';
+        }
+
+        function toggleSelfDestruct() {
+            if (!currentNoteId) {
+                logMessage('No note selected', 'error');
+                return;
+            }
+
+            const note = notes.find(n => n.id === currentNoteId);
+            if (!note) return;
+
+            note.selfDestruct = !note.selfDestruct;
+            note.viewed = false;
+            
+            saveNotesToStorage();
+            renderNotesList();
+            
+            if (note.selfDestruct) {
+                logMessage('⚠ Self-destruct enabled - note will erase after next view', 'warning');
+            } else {
+                logMessage('Self-destruct disabled', 'info');
+            }
+        }
+
+        function showPanicConfirm() {
+            document.getElementById('panicModal').classList.remove('hidden');
+            document.getElementById('panicConfirmInput').value = '';
+            document.getElementById('panicConfirmInput').focus();
+        }
+
+        function hidePanicConfirm() {
+            document.getElementById('panicModal').classList.add('hidden');
+        }
+
+        function executePanicWipe() {
+            const input = document.getElementById('panicConfirmInput').value;
+            if (input !== 'CONFIRM') {
+                logMessage('Panic wipe cancelled - confirmation not matched', 'warning');
+                return;
+            }
+
+            localStorage.removeItem(STORAGE_KEY);
+            localStorage.removeItem(PASSWORD_HASH_KEY);
+            
+            masterPassword = '';
+            notes = [];
+            currentNoteId = null;
+            isDecryptedView = false;
+            
+            document.getElementById('editor').value = '';
+            document.getElementById('notesList').innerHTML = '';
+            
+            hidePanicConfirm();
+            
+            logMessage('🗑 ALL DATA WIPED - Memory purged', 'error');
+            logMessage('System reset complete', 'warning');
+            
+            setTimeout(() => {
+                checkExistingSession();
+            }, 1500);
+        }
+
+        function showPasswordGenerator() {
+            document.getElementById('passwordGenModal').classList.remove('hidden');
+            generateSecurePassword();
+        }
+
+        function hidePasswordGenerator() {
+            document.getElementById('passwordGenModal').classList.add('hidden');
+        }
+
+        function generateSecurePassword() {
+            const length = document.getElementById('passLengthSlider').value;
+            document.getElementById('passLengthDisplay').textContent = length;
+
+            let chars = '';
+            if (document.getElementById('passUppercase').checked) chars += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+            if (document.getElementById('passLowercase').checked) chars += 'abcdefghijklmnopqrstuvwxyz';
+            if (document.getElementById('passNumbers').checked) chars += '0123456789';
+            if (document.getElementById('passSymbols').checked) chars += '!@#$%^&*()_+-=[]{}|;:,.<>?';
+
+            if (!chars) chars = 'abcdefghijklmnopqrstuvwxyz';
+
+            let password = '';
+            const array = new Uint32Array(length);
+            crypto.getRandomValues(array);
+            for (let i = 0; i < length; i++) {
+                password += chars[array[i] % chars.length];
+            }
+
+            document.getElementById('generatedPassword').value = password;
+        }
+
+        function copyGeneratedPassword() {
+            const password = document.getElementById('generatedPassword').value;
+            navigator.clipboard.writeText(password).then(() => {
+                logMessage('Password copied to clipboard', 'info');
+            }).catch(() => {
+                logMessage('Failed to copy password', 'error');
+            });
+        }
+
+        function setupKeyboardShortcuts() {
+            document.addEventListener('keydown', (e) => {
+                const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+                const modifier = isMac ? e.metaKey : e.ctrlKey;
+
+                if (modifier && e.key === 's') {
+                    e.preventDefault();
+                    saveNote();
+                } else if (modifier && e.key === 'n') {
+                    e.preventDefault();
+                    createNewNote();
+                } else if (modifier && e.key === 'd') {
+                    e.preventDefault();
+                    if (confirm('Delete current note?')) {
+                        deleteCurrentNote();
+                    }
+                } else if (modifier && e.key === 'e') {
+                    e.preventDefault();
+                    toggleEncryptView();
+                }
+            });
+
+            document.getElementById('editor').addEventListener('keydown', (e) => {
+                if (e.key === 'Tab') {
+                    e.preventDefault();
+                    const start = e.target.selectionStart;
+                    const end = e.target.selectionEnd;
+                    e.target.value = e.target.value.substring(0, start) + '    ' + e.target.value.substring(end);
+                    e.target.selectionStart = e.target.selectionEnd = start + 4;
+                    updateLineNumbers();
+                }
+            });
+        }
+
+        function logMessage(message, type = 'info') {
+            const log = document.getElementById('terminalLog');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry ' + type;
+            
+            const time = new Date().toLocaleTimeString();
+            
+            entry.innerHTML = `<span class="timestamp">[${time}]</span> <span class="message"></span><span class="cursor-blink"></span>`;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+
+            typewriterEffect(entry.querySelector('.message'), message, entry.querySelector('.cursor-blink'));
+        }
+
+        function typewriterEffect(element, text, cursor) {
+            element.textContent = '> ';
+            let i = 0;
+            const speed = 25;
+            
+            function type() {
+                if (i < text.length) {
+                    element.textContent += text[i];
+                    i++;
+                    setTimeout(type, speed);
+                } else {
+                    if (cursor) {
+                        setTimeout(() => {
+                            cursor.style.display = 'none';
+                        }, 1000);
+                    }
+                }
+            }
+            type();
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>

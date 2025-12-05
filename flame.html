@@ -1,0 +1,1294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASCII Fire Simulation | MAQSADBEK</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #0b0b0b;
+            color: #00ff00;
+            font-family: 'Courier New', monospace;
+            min-height: 100vh;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        .watermark {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+            overflow: hidden;
+            opacity: 0.03;
+        }
+
+        .watermark-text {
+            font-size: 24px;
+            color: #00ff00;
+            white-space: nowrap;
+            line-height: 1.5;
+            font-weight: bold;
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .ascii-banner {
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: clamp(8px, 2vw, 14px);
+            color: #00ff00;
+            text-shadow: 0 0 10px #00ff00, 0 0 20px #00ff00, 0 0 30px #00ff00;
+            white-space: pre;
+            line-height: 1.2;
+            animation: glow 2s ease-in-out infinite alternate;
+        }
+
+        @keyframes glow {
+            from { text-shadow: 0 0 5px #00ff00, 0 0 10px #00ff00, 0 0 15px #00ff00; }
+            to { text-shadow: 0 0 10px #00ff00, 0 0 20px #00ff00, 0 0 40px #00ff00, 0 0 60px #00ff00; }
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #888;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .main-content {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .fire-container {
+            flex: 1;
+            min-width: 300px;
+            background: #111;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 10px;
+            position: relative;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.1);
+        }
+
+        #fireCanvas {
+            width: 100%;
+            height: 400px;
+            background: #0b0b0b;
+            border-radius: 4px;
+            cursor: crosshair;
+            display: block;
+            font-size: 10px;
+            line-height: 1;
+            overflow: hidden;
+        }
+
+        .controls-panel {
+            width: 320px;
+            background: linear-gradient(180deg, #1a1a1a 0%, #111 100%);
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.1);
+        }
+
+        .panel-title {
+            color: #00ff00;
+            font-size: 16px;
+            margin-bottom: 20px;
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 10px;
+        }
+
+        .control-group {
+            margin-bottom: 20px;
+        }
+
+        .control-label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #aaa;
+            font-size: 12px;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+
+        .control-value {
+            color: #00ff00;
+            font-weight: bold;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: #333;
+            outline: none;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #00ff00;
+            cursor: pointer;
+            box-shadow: 0 0 10px #00ff00;
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #00ff00;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 0 10px #00ff00;
+        }
+
+        .toggle-group {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            padding: 8px 12px;
+            background: #1a1a1a;
+            border-radius: 4px;
+            border: 1px solid #2a2a2a;
+        }
+
+        .toggle-label {
+            color: #aaa;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 50px;
+            height: 26px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #333;
+            transition: 0.3s;
+            border-radius: 26px;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 3px;
+            bottom: 3px;
+            background-color: #666;
+            transition: 0.3s;
+            border-radius: 50%;
+        }
+
+        input:checked + .toggle-slider {
+            background-color: #004400;
+            box-shadow: 0 0 10px #00ff00;
+        }
+
+        input:checked + .toggle-slider:before {
+            transform: translateX(24px);
+            background-color: #00ff00;
+        }
+
+        .button-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+
+        .mode-btn {
+            padding: 10px 8px;
+            background: #1a1a1a;
+            border: 1px solid #333;
+            color: #888;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            text-transform: uppercase;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.3s;
+        }
+
+        .mode-btn:hover {
+            background: #222;
+            border-color: #00ff00;
+            color: #00ff00;
+        }
+
+        .mode-btn.active {
+            background: #003300;
+            border-color: #00ff00;
+            color: #00ff00;
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
+        }
+
+        .palette-btn {
+            padding: 8px;
+            border: 1px solid #333;
+            background: #1a1a1a;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.3s;
+            font-size: 10px;
+            color: #888;
+            text-transform: uppercase;
+        }
+
+        .palette-btn:hover {
+            border-color: #555;
+        }
+
+        .palette-btn.active {
+            border-color: #00ff00;
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
+        }
+
+        .palette-btn.red { background: linear-gradient(45deg, #ff0000, #ff6600, #ffff00); }
+        .palette-btn.blue { background: linear-gradient(45deg, #0000ff, #00aaff, #00ffff); }
+        .palette-btn.green { background: linear-gradient(45deg, #003300, #00ff00, #88ff88); }
+        .palette-btn.rainbow { background: linear-gradient(45deg, #ff0000, #ff7700, #ffff00, #00ff00, #0077ff, #ff00ff); }
+
+        .export-btn {
+            width: 100%;
+            padding: 12px;
+            margin-top: 10px;
+            background: linear-gradient(180deg, #1a1a1a 0%, #0a0a0a 100%);
+            border: 1px solid #00ff00;
+            color: #00ff00;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            text-transform: uppercase;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.3s;
+            letter-spacing: 1px;
+        }
+
+        .export-btn:hover {
+            background: #003300;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.4);
+        }
+
+        .section-divider {
+            border: none;
+            border-top: 1px solid #333;
+            margin: 20px 0;
+        }
+
+        .section-title {
+            color: #666;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 12px;
+        }
+
+        .fire-style-group {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+
+        .fire-style-btn {
+            flex: 1;
+            padding: 8px;
+            background: #1a1a1a;
+            border: 1px solid #333;
+            color: #888;
+            font-family: 'Courier New', monospace;
+            font-size: 10px;
+            text-transform: uppercase;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.3s;
+        }
+
+        .fire-style-btn:hover {
+            border-color: #00ff00;
+            color: #00ff00;
+        }
+
+        .fire-style-btn.active {
+            background: #003300;
+            border-color: #00ff00;
+            color: #00ff00;
+        }
+
+        .stats-bar {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            background: #111;
+            border-radius: 4px;
+            margin-top: 10px;
+            font-size: 10px;
+            color: #666;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-value {
+            color: #00ff00;
+            font-weight: bold;
+        }
+
+        .instructions {
+            text-align: center;
+            padding: 10px;
+            color: #555;
+            font-size: 11px;
+            margin-top: 10px;
+        }
+
+        .glitch-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1000;
+            opacity: 0;
+            background: repeating-linear-gradient(
+                0deg,
+                rgba(0, 0, 0, 0.1),
+                rgba(0, 0, 0, 0.1) 1px,
+                transparent 1px,
+                transparent 2px
+            );
+        }
+
+        .glitch-overlay.active {
+            animation: glitchOverlay 0.1s infinite;
+        }
+
+        @keyframes glitchOverlay {
+            0% { opacity: 0.1; transform: translateX(0); }
+            25% { opacity: 0.15; transform: translateX(-2px); }
+            50% { opacity: 0.1; transform: translateX(2px); }
+            75% { opacity: 0.2; transform: translateX(-1px); }
+            100% { opacity: 0.1; transform: translateX(0); }
+        }
+
+        .recording-indicator {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            padding: 8px 16px;
+            background: rgba(255, 0, 0, 0.8);
+            color: white;
+            font-size: 12px;
+            border-radius: 4px;
+            display: none;
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                flex-direction: column;
+            }
+
+            .controls-panel {
+                width: 100%;
+            }
+
+            .ascii-banner {
+                font-size: 6px;
+            }
+
+            #fireCanvas {
+                height: 300px;
+            }
+        }
+
+        .hidden-canvas {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="watermark" id="watermark"></div>
+    <div class="glitch-overlay" id="glitchOverlay"></div>
+
+    <div class="container">
+        <pre class="ascii-banner">
+███╗   ███╗ █████╗  ██████╗ ███████╗ █████╗ ██████╗ ██████╗ ███████╗██╗  ██╗
+████╗ ████║██╔══██╗██╔═══██╗██╔════╝██╔══██╗██╔══██╗██╔══██╗██╔════╝██║ ██╔╝
+██╔████╔██║███████║██║   ██║███████╗███████║██║  ██║██████╔╝█████╗  █████╔╝ 
+██║╚██╔╝██║██╔══██║██║▄▄ ██║╚════██║██╔══██║██║  ██║██╔══██╗██╔══╝  ██╔═██╗ 
+██║ ╚═╝ ██║██║  ██║╚██████╔╝███████║██║  ██║██████╔╝██████╔╝███████╗██║  ██╗
+╚═╝     ╚═╝╚═╝  ╚═╝ ╚══▀▀═╝ ╚══════╝╚═╝  ╚═╝╚═════╝ ╚═════╝ ╚══════╝╚═╝  ╚═╝
+        </pre>
+        <div class="subtitle">[ ASCII FIRE SIMULATION // TERMINAL v2.0 ]</div>
+
+        <div class="main-content">
+            <div class="fire-container">
+                <canvas id="fireCanvas"></canvas>
+                <div class="recording-indicator" id="recordingIndicator">● REC</div>
+                <div class="stats-bar">
+                    <div class="stat-item">FPS: <span class="stat-value" id="fpsDisplay">60</span></div>
+                    <div class="stat-item">PARTICLES: <span class="stat-value" id="particleCount">0</span></div>
+                    <div class="stat-item">TEMP: <span class="stat-value" id="tempDisplay">0°</span></div>
+                </div>
+                <div class="instructions">
+                    Click & drag to draw fire | Double-click for burst
+                </div>
+            </div>
+
+            <div class="controls-panel">
+                <div class="panel-title">🔥 Fire Controls</div>
+
+                <div class="section-title">Color Palette</div>
+                <div class="button-group">
+                    <button class="palette-btn red active" data-palette="red">Classic</button>
+                    <button class="palette-btn blue" data-palette="blue">Ice Fire</button>
+                    <button class="palette-btn green" data-palette="green">Cyber</button>
+                    <button class="palette-btn rainbow" data-palette="rainbow">Rainbow</button>
+                </div>
+
+                <div class="section-title">Fire Mode</div>
+                <div class="button-group">
+                    <button class="mode-btn active" data-mode="normal">Normal</button>
+                    <button class="mode-btn" data-mode="inferno">Inferno</button>
+                    <button class="mode-btn" data-mode="cyber">Cyber</button>
+                    <button class="mode-btn" data-mode="pixel">Pixel</button>
+                </div>
+
+                <div class="section-title">Fire Style</div>
+                <div class="fire-style-group">
+                    <button class="fire-style-btn active" data-style="smooth">Smooth</button>
+                    <button class="fire-style-btn" data-style="sharp">Sharp</button>
+                </div>
+
+                <hr class="section-divider">
+
+                <div class="control-group">
+                    <div class="control-label">
+                        <span>Flame Intensity</span>
+                        <span class="control-value" id="intensityValue">70%</span>
+                    </div>
+                    <input type="range" id="intensitySlider" min="0" max="100" value="70">
+                </div>
+
+                <div class="control-group">
+                    <div class="control-label">
+                        <span>Heat Distortion</span>
+                        <span class="control-value" id="distortionValue">30%</span>
+                    </div>
+                    <input type="range" id="distortionSlider" min="0" max="100" value="30">
+                </div>
+
+                <div class="control-group">
+                    <div class="control-label">
+                        <span>Wind Direction</span>
+                        <span class="control-value" id="windValue">0</span>
+                    </div>
+                    <input type="range" id="windSlider" min="-50" max="50" value="0">
+                </div>
+
+                <hr class="section-divider">
+
+                <div class="toggle-group">
+                    <span class="toggle-label">Sparks</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="sparksToggle" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
+                <div class="toggle-group">
+                    <span class="toggle-label">Ember Particles</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="embersToggle" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
+                <div class="toggle-group">
+                    <span class="toggle-label">Glitch Effect</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="glitchToggle">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
+                <hr class="section-divider">
+
+                <div class="section-title">Export</div>
+                <button class="export-btn" id="exportPng">📷 Export as PNG</button>
+                <button class="export-btn" id="exportGif">🎬 Record GIF (3s)</button>
+            </div>
+        </div>
+    </div>
+
+    <canvas id="hiddenCanvas" class="hidden-canvas"></canvas>
+
+    <script>
+        (function() {
+            const watermarkEl = document.getElementById('watermark');
+            let watermarkHTML = '';
+            for (let i = 0; i < 50; i++) {
+                watermarkHTML += '<div class="watermark-text">';
+                for (let j = 0; j < 20; j++) {
+                    watermarkHTML += 'MAQSADBEK ';
+                }
+                watermarkHTML += '</div>';
+            }
+            watermarkEl.innerHTML = watermarkHTML;
+
+            const canvas = document.getElementById('fireCanvas');
+            const ctx = canvas.getContext('2d');
+            const hiddenCanvas = document.getElementById('hiddenCanvas');
+            const hiddenCtx = hiddenCanvas.getContext('2d');
+
+            const FIRE_WIDTH = 80;
+            const FIRE_HEIGHT = 50;
+            let firePixels = new Array(FIRE_WIDTH * FIRE_HEIGHT).fill(0);
+
+            const ASCII_CHARS_SMOOTH = ' .:-=+*#%@';
+            const ASCII_CHARS_SHARP = ' ·•○●▪▫■□▓█';
+            const ASCII_CHARS_PIXEL = ' ░▒▓█████████';
+            let currentChars = ASCII_CHARS_SMOOTH;
+
+            const PALETTES = {
+                red: [
+                    '#0b0b0b', '#1a0000', '#330000', '#4d0000', '#660000',
+                    '#800000', '#990000', '#b30000', '#cc0000', '#e60000',
+                    '#ff0000', '#ff1a1a', '#ff3300', '#ff4d00', '#ff6600',
+                    '#ff8000', '#ff9900', '#ffb300', '#ffcc00', '#ffe600',
+                    '#ffff00', '#ffff33', '#ffff66', '#ffff99', '#ffffcc',
+                    '#ffffff'
+                ],
+                blue: [
+                    '#0b0b0b', '#000011', '#000022', '#000033', '#000044',
+                    '#000066', '#000088', '#0000aa', '#0000cc', '#0000ff',
+                    '#0033ff', '#0066ff', '#0099ff', '#00bbff', '#00ddff',
+                    '#00ffff', '#33ffff', '#66ffff', '#99ffff', '#bbffff',
+                    '#ccffff', '#ddffff', '#eeffff', '#f5ffff', '#ffffff',
+                    '#ffffff'
+                ],
+                green: [
+                    '#0b0b0b', '#001100', '#002200', '#003300', '#004400',
+                    '#005500', '#006600', '#007700', '#008800', '#009900',
+                    '#00aa00', '#00bb00', '#00cc00', '#00dd00', '#00ee00',
+                    '#00ff00', '#22ff22', '#44ff44', '#66ff66', '#88ff88',
+                    '#aaffaa', '#bbffbb', '#ccffcc', '#ddffdd', '#eeffee',
+                    '#ffffff'
+                ],
+                rainbow: [
+                    '#0b0b0b', '#1a001a', '#330033', '#4d004d', '#660066',
+                    '#800080', '#9900cc', '#6600ff', '#3300ff', '#0000ff',
+                    '#0033ff', '#0066ff', '#0099ff', '#00ccff', '#00ffff',
+                    '#00ff99', '#00ff00', '#66ff00', '#99ff00', '#ccff00',
+                    '#ffff00', '#ffcc00', '#ff9900', '#ff6600', '#ff3300',
+                    '#ff0000'
+                ]
+            };
+
+            let currentPalette = 'red';
+            let intensity = 70;
+            let distortion = 30;
+            let wind = 0;
+            let sparksEnabled = true;
+            let embersEnabled = true;
+            let glitchEnabled = false;
+            let fireMode = 'normal';
+            let fireStyle = 'smooth';
+
+            let sparks = [];
+            let embers = [];
+            let mouseX = -1;
+            let mouseY = -1;
+            let isMouseDown = false;
+            let lastFrameTime = 0;
+            let fps = 60;
+            let frameCount = 0;
+            let fpsUpdateTime = 0;
+
+            let isRecording = false;
+            let recordedFrames = [];
+            let recordStartTime = 0;
+
+            function initFire() {
+                for (let x = 0; x < FIRE_WIDTH; x++) {
+                    firePixels[(FIRE_HEIGHT - 1) * FIRE_WIDTH + x] = Math.floor(Math.random() * 8) + 18;
+                }
+            }
+
+            function updateFire() {
+                const baseIntensity = intensity / 100;
+                const windFactor = wind / 25;
+                const distortFactor = distortion / 100;
+
+                for (let x = 0; x < FIRE_WIDTH; x++) {
+                    const heatBoost = fireMode === 'inferno' ? 24 : (fireMode === 'cyber' ? 20 : 18);
+                    firePixels[(FIRE_HEIGHT - 1) * FIRE_WIDTH + x] = Math.floor(Math.random() * 8) + heatBoost;
+                }
+
+                if (mouseX >= 0 && mouseY >= 0 && isMouseDown) {
+                    const gridX = Math.floor((mouseX / canvas.width) * FIRE_WIDTH);
+                    const gridY = Math.floor((mouseY / canvas.height) * FIRE_HEIGHT);
+                    
+                    for (let dx = -3; dx <= 3; dx++) {
+                        for (let dy = -3; dy <= 3; dy++) {
+                            const nx = gridX + dx;
+                            const ny = gridY + dy;
+                            if (nx >= 0 && nx < FIRE_WIDTH && ny >= 0 && ny < FIRE_HEIGHT) {
+                                const dist = Math.sqrt(dx * dx + dy * dy);
+                                if (dist < 4) {
+                                    firePixels[ny * FIRE_WIDTH + nx] = Math.min(25, firePixels[ny * FIRE_WIDTH + nx] + Math.floor((4 - dist) * 6));
+                                }
+                            }
+                        }
+                    }
+                }
+
+                for (let y = 0; y < FIRE_HEIGHT - 1; y++) {
+                    for (let x = 0; x < FIRE_WIDTH; x++) {
+                        const src = (y + 1) * FIRE_WIDTH + x;
+                        
+                        let windOffset = 0;
+                        if (Math.random() < Math.abs(windFactor)) {
+                            windOffset = windFactor > 0 ? 1 : -1;
+                        }
+
+                        let distortOffset = 0;
+                        if (Math.random() < distortFactor * 0.3) {
+                            distortOffset = Math.floor(Math.random() * 3) - 1;
+                        }
+
+                        const randomOffset = Math.floor(Math.random() * 3) - 1;
+                        let srcX = x + randomOffset + windOffset + distortOffset;
+                        srcX = Math.max(0, Math.min(FIRE_WIDTH - 1, srcX));
+                        
+                        const srcIndex = (y + 1) * FIRE_WIDTH + srcX;
+                        const decay = Math.random() * (1.5 - baseIntensity * 0.5) + 0.3;
+                        
+                        let newVal = firePixels[srcIndex] - decay;
+                        if (fireMode === 'inferno') {
+                            newVal = firePixels[srcIndex] - decay * 0.6;
+                        }
+                        
+                        firePixels[y * FIRE_WIDTH + x] = Math.max(0, newVal);
+                    }
+                }
+            }
+
+            function updateSparks() {
+                if (!sparksEnabled) {
+                    sparks = [];
+                    return;
+                }
+
+                if (Math.random() < 0.3 * (intensity / 100)) {
+                    sparks.push({
+                        x: Math.random() * FIRE_WIDTH,
+                        y: FIRE_HEIGHT - 1,
+                        vx: (Math.random() - 0.5) * 2 + (wind / 50),
+                        vy: -Math.random() * 3 - 2,
+                        life: 1,
+                        decay: Math.random() * 0.03 + 0.02
+                    });
+                }
+
+                sparks = sparks.filter(spark => {
+                    spark.x += spark.vx;
+                    spark.y += spark.vy;
+                    spark.vy += 0.05;
+                    spark.life -= spark.decay;
+                    return spark.life > 0 && spark.y > 0;
+                });
+            }
+
+            function updateEmbers() {
+                if (!embersEnabled) {
+                    embers = [];
+                    return;
+                }
+
+                if (Math.random() < 0.15 * (intensity / 100)) {
+                    embers.push({
+                        x: Math.random() * FIRE_WIDTH,
+                        y: FIRE_HEIGHT * 0.7,
+                        vx: (Math.random() - 0.5) + (wind / 100),
+                        vy: -Math.random() * 0.8 - 0.3,
+                        life: 1,
+                        decay: Math.random() * 0.01 + 0.005,
+                        size: Math.random() * 2 + 1
+                    });
+                }
+
+                embers = embers.filter(ember => {
+                    ember.x += ember.vx + Math.sin(Date.now() * 0.01 + ember.y) * 0.1;
+                    ember.y += ember.vy;
+                    ember.life -= ember.decay;
+                    return ember.life > 0 && ember.y > -5;
+                });
+            }
+
+            function render() {
+                const palette = PALETTES[currentPalette];
+                const charWidth = canvas.width / FIRE_WIDTH;
+                const charHeight = canvas.height / FIRE_HEIGHT;
+
+                ctx.fillStyle = '#0b0b0b';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                ctx.font = `${Math.floor(charHeight * 1.2)}px "Courier New", monospace`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+
+                for (let y = 0; y < FIRE_HEIGHT; y++) {
+                    for (let x = 0; x < FIRE_WIDTH; x++) {
+                        const value = firePixels[y * FIRE_WIDTH + x];
+                        if (value > 0.5) {
+                            const colorIndex = Math.min(Math.floor(value), palette.length - 1);
+                            const charIndex = Math.min(Math.floor(value / 26 * currentChars.length), currentChars.length - 1);
+                            
+                            ctx.fillStyle = palette[colorIndex];
+                            
+                            if (glitchEnabled && Math.random() < 0.02) {
+                                ctx.fillStyle = '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0');
+                            }
+                            
+                            const px = x * charWidth + charWidth / 2;
+                            const py = y * charHeight + charHeight / 2;
+                            
+                            if (glitchEnabled && Math.random() < 0.01) {
+                                ctx.fillText(currentChars[charIndex], px + (Math.random() - 0.5) * 10, py);
+                            } else {
+                                ctx.fillText(currentChars[charIndex], px, py);
+                            }
+                        }
+                    }
+                }
+
+                sparks.forEach(spark => {
+                    const alpha = spark.life;
+                    const colorIndex = Math.floor(spark.life * (palette.length - 1) * 0.8) + 5;
+                    ctx.fillStyle = palette[Math.min(colorIndex, palette.length - 1)];
+                    ctx.globalAlpha = alpha;
+                    const px = spark.x * charWidth;
+                    const py = spark.y * charHeight;
+                    ctx.fillText('*', px, py);
+                });
+                ctx.globalAlpha = 1;
+
+                embers.forEach(ember => {
+                    const alpha = ember.life * 0.8;
+                    const colorIndex = Math.floor(ember.life * 10) + 10;
+                    ctx.fillStyle = palette[Math.min(colorIndex, palette.length - 1)];
+                    ctx.globalAlpha = alpha;
+                    const px = ember.x * charWidth;
+                    const py = ember.y * charHeight;
+                    ctx.beginPath();
+                    ctx.arc(px, py, ember.size, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+                ctx.globalAlpha = 1;
+            }
+
+            function animate(currentTime) {
+                frameCount++;
+                if (currentTime - fpsUpdateTime >= 1000) {
+                    fps = frameCount;
+                    frameCount = 0;
+                    fpsUpdateTime = currentTime;
+                    document.getElementById('fpsDisplay').textContent = fps;
+                }
+
+                document.getElementById('particleCount').textContent = sparks.length + embers.length;
+                
+                const avgTemp = firePixels.reduce((a, b) => a + b, 0) / firePixels.length;
+                document.getElementById('tempDisplay').textContent = Math.floor(avgTemp * 40) + '°';
+
+                updateFire();
+                updateSparks();
+                updateEmbers();
+                render();
+
+                if (glitchEnabled) {
+                    document.getElementById('glitchOverlay').classList.add('active');
+                } else {
+                    document.getElementById('glitchOverlay').classList.remove('active');
+                }
+
+                if (isRecording && currentTime - recordStartTime < 3000) {
+                    recordedFrames.push(canvas.toDataURL('image/png'));
+                } else if (isRecording && currentTime - recordStartTime >= 3000) {
+                    finishRecording();
+                }
+
+                requestAnimationFrame(animate);
+            }
+
+            function resizeCanvas() {
+                const container = canvas.parentElement;
+                const rect = container.getBoundingClientRect();
+                canvas.width = rect.width - 20;
+                canvas.height = 400;
+                hiddenCanvas.width = canvas.width;
+                hiddenCanvas.height = canvas.height;
+            }
+
+            function getMousePos(e) {
+                const rect = canvas.getBoundingClientRect();
+                const scaleX = canvas.width / rect.width;
+                const scaleY = canvas.height / rect.height;
+                
+                if (e.touches) {
+                    return {
+                        x: (e.touches[0].clientX - rect.left) * scaleX,
+                        y: (e.touches[0].clientY - rect.top) * scaleY
+                    };
+                }
+                return {
+                    x: (e.clientX - rect.left) * scaleX,
+                    y: (e.clientY - rect.top) * scaleY
+                };
+            }
+
+            function createBurst(x, y) {
+                const gridX = Math.floor((x / canvas.width) * FIRE_WIDTH);
+                const gridY = Math.floor((y / canvas.height) * FIRE_HEIGHT);
+                
+                for (let dx = -5; dx <= 5; dx++) {
+                    for (let dy = -5; dy <= 5; dy++) {
+                        const nx = gridX + dx;
+                        const ny = gridY + dy;
+                        if (nx >= 0 && nx < FIRE_WIDTH && ny >= 0 && ny < FIRE_HEIGHT) {
+                            const dist = Math.sqrt(dx * dx + dy * dy);
+                            if (dist < 6) {
+                                firePixels[ny * FIRE_WIDTH + nx] = 25;
+                            }
+                        }
+                    }
+                }
+
+                for (let i = 0; i < 15; i++) {
+                    sparks.push({
+                        x: gridX,
+                        y: gridY,
+                        vx: (Math.random() - 0.5) * 4,
+                        vy: -Math.random() * 5 - 2,
+                        life: 1,
+                        decay: Math.random() * 0.02 + 0.01
+                    });
+                }
+            }
+
+            canvas.addEventListener('mousedown', (e) => {
+                isMouseDown = true;
+                const pos = getMousePos(e);
+                mouseX = pos.x;
+                mouseY = pos.y;
+            });
+
+            canvas.addEventListener('mousemove', (e) => {
+                const pos = getMousePos(e);
+                mouseX = pos.x;
+                mouseY = pos.y;
+            });
+
+            canvas.addEventListener('mouseup', () => {
+                isMouseDown = false;
+            });
+
+            canvas.addEventListener('mouseleave', () => {
+                isMouseDown = false;
+                mouseX = -1;
+                mouseY = -1;
+            });
+
+            canvas.addEventListener('dblclick', (e) => {
+                const pos = getMousePos(e);
+                createBurst(pos.x, pos.y);
+            });
+
+            canvas.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                isMouseDown = true;
+                const pos = getMousePos(e);
+                mouseX = pos.x;
+                mouseY = pos.y;
+            });
+
+            canvas.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                const pos = getMousePos(e);
+                mouseX = pos.x;
+                mouseY = pos.y;
+            });
+
+            canvas.addEventListener('touchend', () => {
+                isMouseDown = false;
+                mouseX = -1;
+                mouseY = -1;
+            });
+
+            document.querySelectorAll('.palette-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.palette-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    currentPalette = btn.dataset.palette;
+                });
+            });
+
+            document.querySelectorAll('.mode-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    fireMode = btn.dataset.mode;
+                    
+                    if (fireMode === 'cyber') {
+                        currentPalette = 'green';
+                        document.querySelectorAll('.palette-btn').forEach(b => b.classList.remove('active'));
+                        document.querySelector('.palette-btn.green').classList.add('active');
+                    } else if (fireMode === 'pixel') {
+                        currentChars = ASCII_CHARS_PIXEL;
+                    } else if (fireStyle === 'smooth') {
+                        currentChars = ASCII_CHARS_SMOOTH;
+                    } else {
+                        currentChars = ASCII_CHARS_SHARP;
+                    }
+                });
+            });
+
+            document.querySelectorAll('.fire-style-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.fire-style-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    fireStyle = btn.dataset.style;
+                    
+                    if (fireMode !== 'pixel') {
+                        currentChars = fireStyle === 'smooth' ? ASCII_CHARS_SMOOTH : ASCII_CHARS_SHARP;
+                    }
+                });
+            });
+
+            document.getElementById('intensitySlider').addEventListener('input', (e) => {
+                intensity = parseInt(e.target.value);
+                document.getElementById('intensityValue').textContent = intensity + '%';
+            });
+
+            document.getElementById('distortionSlider').addEventListener('input', (e) => {
+                distortion = parseInt(e.target.value);
+                document.getElementById('distortionValue').textContent = distortion + '%';
+            });
+
+            document.getElementById('windSlider').addEventListener('input', (e) => {
+                wind = parseInt(e.target.value);
+                document.getElementById('windValue').textContent = wind;
+            });
+
+            document.getElementById('sparksToggle').addEventListener('change', (e) => {
+                sparksEnabled = e.target.checked;
+            });
+
+            document.getElementById('embersToggle').addEventListener('change', (e) => {
+                embersEnabled = e.target.checked;
+            });
+
+            document.getElementById('glitchToggle').addEventListener('change', (e) => {
+                glitchEnabled = e.target.checked;
+            });
+
+            document.getElementById('exportPng').addEventListener('click', () => {
+                const link = document.createElement('a');
+                link.download = 'ascii-fire-' + Date.now() + '.png';
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            });
+
+            document.getElementById('exportGif').addEventListener('click', () => {
+                if (isRecording) return;
+                
+                isRecording = true;
+                recordedFrames = [];
+                recordStartTime = performance.now();
+                document.getElementById('recordingIndicator').style.display = 'block';
+                document.getElementById('exportGif').textContent = '● RECORDING...';
+                document.getElementById('exportGif').style.background = '#330000';
+            });
+
+            function finishRecording() {
+                isRecording = false;
+                document.getElementById('recordingIndicator').style.display = 'none';
+                document.getElementById('exportGif').textContent = '🎬 Record GIF (3s)';
+                document.getElementById('exportGif').style.background = '';
+                
+                if (recordedFrames.length > 0) {
+                    const targetFrames = 30;
+                    const step = Math.max(1, Math.floor(recordedFrames.length / targetFrames));
+                    
+                    const selectedFrames = [];
+                    for (let i = 0; i < recordedFrames.length && selectedFrames.length < targetFrames; i += step) {
+                        selectedFrames.push(recordedFrames[i]);
+                    }
+                    
+                    const gifData = [];
+                    let loadedCount = 0;
+                    
+                    selectedFrames.forEach((frameData, index) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            gifData[index] = img;
+                            loadedCount++;
+                            
+                            if (loadedCount === selectedFrames.length) {
+                                createSpriteSheet(gifData);
+                            }
+                        };
+                        img.src = frameData;
+                    });
+                }
+            }
+
+            function createSpriteSheet(frames) {
+                const cols = 6;
+                const rows = Math.ceil(frames.length / cols);
+                const frameWidth = canvas.width;
+                const frameHeight = canvas.height;
+                const padding = 2;
+                const labelHeight = 20;
+                
+                const spriteCanvas = document.createElement('canvas');
+                spriteCanvas.width = (frameWidth + padding) * cols + padding;
+                spriteCanvas.height = (frameHeight + padding + labelHeight) * rows + padding + 40;
+                const spriteCtx = spriteCanvas.getContext('2d');
+                
+                spriteCtx.fillStyle = '#0b0b0b';
+                spriteCtx.fillRect(0, 0, spriteCanvas.width, spriteCanvas.height);
+                
+                spriteCtx.fillStyle = '#00ff00';
+                spriteCtx.font = 'bold 16px Courier New';
+                spriteCtx.textAlign = 'center';
+                spriteCtx.fillText('ASCII FIRE ANIMATION SPRITE SHEET - MAQSADBEK', spriteCanvas.width / 2, 25);
+                
+                spriteCtx.font = '10px Courier New';
+                spriteCtx.fillStyle = '#666';
+                spriteCtx.fillText(`${frames.length} frames | ${cols}x${rows} grid | ${frameWidth}x${frameHeight}px per frame`, spriteCanvas.width / 2, 38);
+                
+                frames.forEach((frame, index) => {
+                    const col = index % cols;
+                    const row = Math.floor(index / cols);
+                    const x = padding + col * (frameWidth + padding);
+                    const y = 45 + padding + row * (frameHeight + padding + labelHeight);
+                    
+                    spriteCtx.strokeStyle = '#333';
+                    spriteCtx.lineWidth = 1;
+                    spriteCtx.strokeRect(x - 1, y - 1, frameWidth + 2, frameHeight + 2);
+                    
+                    spriteCtx.drawImage(frame, x, y, frameWidth, frameHeight);
+                    
+                    spriteCtx.fillStyle = '#00ff00';
+                    spriteCtx.font = '10px Courier New';
+                    spriteCtx.textAlign = 'center';
+                    spriteCtx.fillText(`Frame ${index + 1}`, x + frameWidth / 2, y + frameHeight + 14);
+                });
+                
+                const link = document.createElement('a');
+                link.download = 'ascii-fire-spritesheet-' + Date.now() + '.png';
+                link.href = spriteCanvas.toDataURL('image/png');
+                link.click();
+                
+                createAnimatedGifReal(frames);
+            }
+            
+            function createAnimatedGifReal(frames) {
+                const width = Math.min(canvas.width, 400);
+                const height = Math.min(canvas.height, 250);
+                const scale = width / canvas.width;
+                
+                const encoder = new GIFEncoder(width, height);
+                encoder.setRepeat(0);
+                encoder.setDelay(100);
+                encoder.setQuality(10);
+                encoder.start();
+                
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = width;
+                tempCanvas.height = height;
+                const tempCtx = tempCanvas.getContext('2d');
+                
+                frames.forEach(frame => {
+                    tempCtx.fillStyle = '#0b0b0b';
+                    tempCtx.fillRect(0, 0, width, height);
+                    tempCtx.drawImage(frame, 0, 0, width, height);
+                    encoder.addFrame(tempCtx);
+                });
+                
+                encoder.finish();
+                
+                const binary = encoder.stream().getData();
+                const blob = new Blob([new Uint8Array(binary.split('').map(c => c.charCodeAt(0)))], {type: 'image/gif'});
+                const url = URL.createObjectURL(blob);
+                
+                const link = document.createElement('a');
+                link.download = 'ascii-fire-animated-' + Date.now() + '.gif';
+                link.href = url;
+                link.click();
+                
+                setTimeout(() => URL.revokeObjectURL(url), 1000);
+            }
+            
+            function GIFEncoder(width, height) {
+                let out = { data: [], writeByte: function(b) { this.data.push(b); }, writeBytes: function(arr) { this.data = this.data.concat(arr); }, getData: function() { return String.fromCharCode.apply(null, this.data); } };
+                let width_ = width, height_ = height, delay = 0, repeat = -1, quality = 10;
+                let started = false, closeStream = false;
+                let firstFrame = true, palSize = 7, dispose = -1, usedEntry = [];
+                let colorDepth, colorTab, pixels, indexedPixels;
+                
+                this.setDelay = function(ms) { delay = Math.round(ms / 10); };
+                this.setRepeat = function(iter) { repeat = iter; };
+                this.setQuality = function(q) { quality = q < 1 ? 1 : q; };
+                this.setDispose = function(d) { dispose = d; };
+                this.start = function() { out.data = []; writeString('GIF89a'); started = true; };
+                this.finish = function() { out.writeByte(0x3b); closeStream = true; };
+                this.stream = function() { return out; };
+                
+                this.addFrame = function(ctx) {
+                    if (!started) this.start();
+                    const imgData = ctx.getImageData(0, 0, width_, height_);
+                    pixels = imgData.data;
+                    getColorTable();
+                    if (firstFrame) { writeLSD(); writePalette(); if (repeat >= 0) writeNetscapeExt(); }
+                    writeGraphicCtrlExt();
+                    writeImageDesc();
+                    if (!firstFrame) writePalette();
+                    writePixels();
+                    firstFrame = false;
+                };
+                
+                function writeString(s) { for (let i = 0; i < s.length; i++) out.writeByte(s.charCodeAt(i)); }
+                function writeShort(v) { out.writeByte(v & 0xff); out.writeByte((v >> 8) & 0xff); }
+                function writeLSD() { writeShort(width_); writeShort(height_); out.writeByte(0xf0 | palSize); out.writeByte(0); out.writeByte(0); }
+                function writeNetscapeExt() { out.writeByte(0x21); out.writeByte(0xff); out.writeByte(11); writeString('NETSCAPE2.0'); out.writeByte(3); out.writeByte(1); writeShort(repeat); out.writeByte(0); }
+                function writeGraphicCtrlExt() { out.writeByte(0x21); out.writeByte(0xf9); out.writeByte(4); out.writeByte(0); writeShort(delay); out.writeByte(0); out.writeByte(0); }
+                function writeImageDesc() { out.writeByte(0x2c); writeShort(0); writeShort(0); writeShort(width_); writeShort(height_); out.writeByte(firstFrame ? 0 : 0x80 | palSize); }
+                function writePalette() { for (let i = 0; i < colorTab.length; i++) out.writeByte(colorTab[i]); const n = 3 * 256 - colorTab.length; for (let i = 0; i < n; i++) out.writeByte(0); }
+                
+                function getColorTable() {
+                    colorTab = []; indexedPixels = [];
+                    const colorMap = new Map();
+                    let colorCount = 0;
+                    for (let i = 0; i < pixels.length; i += 4) {
+                        const r = Math.floor(pixels[i] / quality) * quality;
+                        const g = Math.floor(pixels[i+1] / quality) * quality;
+                        const b = Math.floor(pixels[i+2] / quality) * quality;
+                        const key = (r << 16) | (g << 8) | b;
+                        if (!colorMap.has(key) && colorCount < 256) { colorMap.set(key, colorCount++); colorTab.push(r, g, b); }
+                        indexedPixels.push(colorMap.get(key) || 0);
+                    }
+                    while (colorTab.length < 768) colorTab.push(0);
+                    palSize = 7;
+                }
+                
+                function writePixels() {
+                    const minCodeSize = 8;
+                    out.writeByte(minCodeSize);
+                    const lzw = lzwEncode(minCodeSize, indexedPixels);
+                    let offset = 0;
+                    while (offset < lzw.length) {
+                        const chunk = Math.min(255, lzw.length - offset);
+                        out.writeByte(chunk);
+                        for (let i = 0; i < chunk; i++) out.writeByte(lzw[offset++]);
+                    }
+                    out.writeByte(0);
+                }
+                
+                function lzwEncode(minCodeSize, data) {
+                    const clearCode = 1 << minCodeSize;
+                    const endCode = clearCode + 1;
+                    let codeSize = minCodeSize + 1;
+                    let nextCode = endCode + 1;
+                    const dictionary = new Map();
+                    for (let i = 0; i < clearCode; i++) dictionary.set(String(i), i);
+                    
+                    const output = [];
+                    let bitBuffer = 0, bitCount = 0;
+                    function writeBits(code, size) {
+                        bitBuffer |= code << bitCount;
+                        bitCount += size;
+                        while (bitCount >= 8) { output.push(bitBuffer & 0xff); bitBuffer >>= 8; bitCount -= 8; }
+                    }
+                    
+                    writeBits(clearCode, codeSize);
+                    let current = String(data[0]);
+                    
+                    for (let i = 1; i < data.length; i++) {
+                        const next = String(data[i]);
+                        const combined = current + ',' + next;
+                        if (dictionary.has(combined)) { current = combined; }
+                        else {
+                            writeBits(dictionary.get(current), codeSize);
+                            if (nextCode < 4096) { dictionary.set(combined, nextCode++); if (nextCode > (1 << codeSize) && codeSize < 12) codeSize++; }
+                            current = next;
+                        }
+                    }
+                    writeBits(dictionary.get(current), codeSize);
+                    writeBits(endCode, codeSize);
+                    if (bitCount > 0) output.push(bitBuffer & 0xff);
+                    return output;
+                }
+            }
+
+            window.addEventListener('resize', resizeCanvas);
+            resizeCanvas();
+            initFire();
+            requestAnimationFrame(animate);
+        })();
+    </script>
+</body>
+</html>
