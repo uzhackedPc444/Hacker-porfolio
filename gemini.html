@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>NEON VOYAGER</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #050011;
+            font-family: 'Press Start 2P', cursive;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        #score-board {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: #0ff;
+            font-size: 20px;
+            text-shadow: 0 0 10px #0ff;
+        }
+
+        #game-over {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 40px;
+            border: 2px solid #f0f;
+            box-shadow: 0 0 20px #f0f;
+            pointer-events: auto;
+        }
+
+        h1 {
+            color: #f0f;
+            text-shadow: 0 0 10px #f0f, 4px 4px 0px #0ff;
+            margin-bottom: 20px;
+            font-size: 40px;
+            line-height: 1.5;
+        }
+
+        button {
+            background: transparent;
+            color: #0ff;
+            border: 2px solid #0ff;
+            padding: 15px 30px;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 16px;
+            cursor: pointer;
+            text-shadow: 0 0 5px #0ff;
+            box-shadow: 0 0 10px #0ff;
+            transition: all 0.2s;
+        }
+
+        button:hover {
+            background: #0ff;
+            color: #000;
+        }
+
+        /* Mobile Controls */
+        #mobile-controls {
+            display: none;
+            /* Shown via JS detection */
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 50%;
+            pointer-events: auto;
+            z-index: 20;
+        }
+
+        #joystick-area {
+            position: absolute;
+            bottom: 30px;
+            left: 30px;
+            width: 150px;
+            height: 150px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 50%;
+            border: 2px dashed rgba(0, 255, 255, 0.3);
+        }
+
+        #joystick-knob {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 50px;
+            height: 50px;
+            background: rgba(0, 255, 255, 0.5);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 15px #0ff;
+            pointer-events: none;
+        }
+
+        #fire-area {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 50%;
+            height: 100%;
+        }
+
+        #fire-hint {
+            position: absolute;
+            bottom: 60px;
+            right: 60px;
+            color: rgba(255, 0, 255, 0.5);
+            font-size: 14px;
+            pointer-events: none;
+        }
+
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            z-index: 100;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="canvas-container"></div>
+
+    <div id="ui-layer">
+        <div id="score-board">SCORE: 0</div>
+
+        <div id="game-over">
+            <h1>SYSTEM FAILURE</h1>
+            <p id="final-score" style="color: white; margin-bottom: 30px;">SCORE: 0</p>
+            <button id="restart-btn">REBOOT SYSTEM</button>
+        </div>
+
+        <div id="mobile-controls">
+            <div id="joystick-area">
+                <div id="joystick-knob"></div>
+            </div>
+            <div id="fire-area"></div>
+            <div id="fire-hint">TAP TO FIRE</div>
+        </div>
+    </div>
+
+    <div id="loading" class="loading">INITIALIZING...</div>
+
+    <!-- Import Map for Three.js -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+
+        // --- CONSTANTS & CONFIG ---
+        const COLORS = {
+            background: 0x050011,
+            grid: 0xff00ff,
+            grid2: 0x00ffff,
+            sunTop: new THREE.Color(0xffaa00),
+            sunBottom: new THREE.Color(0xff00aa),
+            ship: 0x00ffff,
+            enemy: 0xff0055,
+            laser: 0xaaffff
+        };
+
+        const SETTINGS = {
+            speed: 0.8,
+            friction: 0.1,
+            boundaryX: 25,
+            boundaryY: 12,
+            spawnRate: 60, // frames
+            particleCount: 20
+        };
+
+        // --- GAME STATE ---
+        const state = {
+            score: 0,
+            isPlaying: true,
+            frame: 0,
+            input: { x: 0, y: 0, firing: false },
+            isMobile: false
+        };
+
+        // --- SCENE SETUP ---
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(COLORS.background, 0.015);
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 3, 15);
+        camera.lookAt(0, 0, -20);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.toneMapping = THREE.ReinhardToneMapping;
+        document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+        // --- POST PROCESSING ---
+        const renderScene = new RenderPass(scene, camera);
+
+        // Resolution, Strength, Radius, Threshold
+        const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0);
+        bloomPass.strength = 1.8;
+        bloomPass.radius = 0.5;
+        bloomPass.threshold = 0.05;
+
+        const composer = new EffectComposer(renderer);
+        composer.addPass(renderScene);
+        composer.addPass(bloomPass);
+
+        // --- ASSETS & OBJECT POOLING ---
+
+        // 1. ENVIRONMENT (Retro Sun & Grid)
+        function createEnvironment() {
+            // Moving Grid
+            const gridHelper = new THREE.GridHelper(200, 40, COLORS.grid, COLORS.grid);
+            gridHelper.position.y = -5;
+            gridHelper.position.z = -50;
+            gridHelper.scale.z = 2;
+            scene.add(gridHelper);
+
+            // Floor Plane for reflection illusion
+            const planeGeo = new THREE.PlaneGeometry(200, 200);
+            const planeMat = new THREE.MeshBasicMaterial({
+                color: COLORS.background,
+                transparent: true,
+                opacity: 0.9
+            });
+            const plane = new THREE.Mesh(planeGeo, planeMat);
+            plane.rotation.x = -Math.PI / 2;
+            plane.position.y = -5.1;
+            scene.add(plane);
+
+            // The Sun (Shader Material)
+            const sunGeo = new THREE.CircleGeometry(40, 64);
+            const sunMat = new THREE.ShaderMaterial({
+                uniforms: {
+                    color1: { value: COLORS.sunTop },
+                    color2: { value: COLORS.sunBottom }
+                },
+                vertexShader: `
+                    varying vec2 vUv;
+                    void main() {
+                        vUv = uv;
+                        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                    }
+                `,
+                fragmentShader: `
+                    uniform vec3 color1;
+                    uniform vec3 color2;
+                    varying vec2 vUv;
+                    void main() {
+                        float y = vUv.y;
+                        // Stripes
+                        float stripes = step(0.1, sin(y * 40.0));
+                        vec3 finalColor = mix(color2, color1, y);
+                        // Cutout stripes
+                        if (y < 0.5 && stripes < 0.5) discard;
+                        gl_FragColor = vec4(finalColor, 1.0);
+                    }
+                `,
+                transparent: true
+            });
+            const sun = new THREE.Mesh(sunGeo, sunMat);
+            sun.position.set(0, 10, -100);
+            scene.add(sun);
+
+            // Stars
+            const starsGeo = new THREE.BufferGeometry();
+            const starsCount = 1000;
+            const posArray = new Float32Array(starsCount * 3);
+            for (let i = 0; i < starsCount * 3; i++) {
+                posArray[i] = (Math.random() - 0.5) * 300;
+            }
+            starsGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+            const starsMat = new THREE.PointsMaterial({
+                size: 0.5,
+                color: 0xffffff
+            });
+            const starField = new THREE.Points(starsGeo, starsMat);
+            scene.add(starField);
+
+            return { grid: gridHelper, stars: starField };
+        }
+        const env = createEnvironment();
+
+        // 2. PLAYER SHIP
+        function createShip() {
+            const group = new THREE.Group();
+
+            // Body
+            const geo = new THREE.ConeGeometry(1, 4, 4);
+            geo.rotateX(Math.PI / 2);
+            geo.rotateY(Math.PI / 4);
+            const mat = new THREE.MeshStandardMaterial({
+                color: 0x222222,
+                roughness: 0.4,
+                metalness: 0.8,
+                emissive: COLORS.ship,
+                emissiveIntensity: 0.5
+            });
+            const body = new THREE.Mesh(geo, mat);
+            group.add(body);
+
+            // Wings
+            const wingGeo = new THREE.BoxGeometry(4, 0.1, 1.5);
+            const wingMat = new THREE.MeshBasicMaterial({ color: COLORS.ship, wireframe: true });
+            const wings = new THREE.Mesh(wingGeo, wingMat);
+            wings.position.z = 1;
+            group.add(wings);
+
+            // Engine Glow
+            const engineLight = new THREE.PointLight(COLORS.ship, 2, 10);
+            engineLight.position.z = 2;
+            group.add(engineLight);
+
+            scene.add(group);
+            return group;
+        }
+        const ship = createShip();
+        const shipVelocity = { x: 0, y: 0 };
+
+        // 3. OBJECT POOLS (Lasers, Enemies, Particles)
+
+        class Pool {
+            constructor(createFn, initialSize) {
+                this.createFn = createFn;
+                this.pool = [];
+                this.active = [];
+                for (let i = 0; i < initialSize; i++) {
+                    const obj = this.createFn();
+                    obj.visible = false;
+                    scene.add(obj);
+                    this.pool.push(obj);
+                }
+            }
+
+            get() {
+                let obj = this.pool.length > 0 ? this.pool.pop() : this.createFn();
+                if (!obj.parent) scene.add(obj);
+                obj.visible = true;
+                this.active.push(obj);
+                return obj;
+            }
+
+            release(obj) {
+                obj.visible = false;
+                const idx = this.active.indexOf(obj);
+                if (idx > -1) this.active.splice(idx, 1);
+                this.pool.push(obj);
+            }
+        }
+
+        // Lasers
+        const laserPool = new Pool(() => {
+            const geo = new THREE.BoxGeometry(0.2, 0.2, 2);
+            const mat = new THREE.MeshBasicMaterial({ color: COLORS.laser });
+            return new THREE.Mesh(geo, mat);
+        }, 20);
+
+        // Enemies
+        const enemyPool = new Pool(() => {
+            const geo = new THREE.IcosahedronGeometry(1.5, 0);
+            const mat = new THREE.MeshStandardMaterial({
+                color: COLORS.enemy,
+                roughness: 0.1,
+                metalness: 0.5,
+                emissive: COLORS.enemy,
+                emissiveIntensity: 1
+            });
+            const mesh = new THREE.Mesh(geo, mat);
+            // Wireframe overlay for retro look
+            const wireGeo = new THREE.WireframeGeometry(geo);
+            const wireMat = new THREE.LineBasicMaterial({ color: 0xffffff });
+            const wire = new THREE.LineSegments(wireGeo, wireMat);
+            mesh.add(wire);
+            return mesh;
+        }, 15);
+
+        // Particles (Explosions)
+        // Using a custom system for complex debris
+        class ParticleSystem {
+            constructor() {
+                this.particles = [];
+                const geo = new THREE.BoxGeometry(0.3, 0.3, 0.3);
+                const mat = new THREE.MeshBasicMaterial({ color: COLORS.enemy });
+
+                // Pre-create 200 particles
+                for (let i = 0; i < 200; i++) {
+                    const mesh = new THREE.Mesh(geo, mat);
+                    mesh.visible = false;
+                    scene.add(mesh);
+                    this.particles.push({
+                        mesh: mesh,
+                        active: false,
+                        velocity: new THREE.Vector3(),
+                        life: 0
+                    });
+                }
+            }
+
+            explode(position) {
+                let count = 0;
+                for (let p of this.particles) {
+                    if (!p.active && count < SETTINGS.particleCount) {
+                        p.active = true;
+                        p.mesh.visible = true;
+                        p.mesh.position.copy(position);
+                        p.mesh.material.color.setHex(Math.random() > 0.5 ? COLORS.enemy : 0xffffff);
+
+                        // Random explosion velocity
+                        p.velocity.set(
+                            (Math.random() - 0.5) * 1.5,
+                            (Math.random() - 0.5) * 1.5,
+                            (Math.random() - 0.5) * 1.5
+                        );
+                        p.life = 1.0;
+                        count++;
+                    }
+                }
+            }
+
+            update(dt) {
+                for (let p of this.particles) {
+                    if (p.active) {
+                        p.mesh.position.add(p.velocity);
+                        p.mesh.rotation.x += p.velocity.z;
+                        p.life -= dt * 2; // Decay
+                        p.mesh.scale.setScalar(p.life);
+
+                        if (p.life <= 0) {
+                            p.active = false;
+                            p.mesh.visible = false;
+                        }
+                    }
+                }
+            }
+        }
+        const particles = new ParticleSystem();
+
+
+        // --- INPUT HANDLING ---
+
+        // Detection
+        state.isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        if (state.isMobile) {
+            document.getElementById('mobile-controls').style.display = 'block';
+        }
+
+        // Keyboard
+        const keys = { w: false, a: false, s: false, d: false, ArrowUp: false, ArrowLeft: false, ArrowDown: false, ArrowRight: false, " ": false };
+        window.addEventListener('keydown', (e) => {
+            if (keys.hasOwnProperty(e.key)) keys[e.key] = true;
+            if (e.key === ' ' && state.isPlaying) fireLaser();
+        });
+        window.addEventListener('keyup', (e) => {
+            if (keys.hasOwnProperty(e.key)) keys[e.key] = false;
+        });
+
+        // Touch / Joystick logic
+        const joyZone = document.getElementById('joystick-area');
+        const joyKnob = document.getElementById('joystick-knob');
+        const fireZone = document.getElementById('fire-area');
+        let joyCenter = { x: 0, y: 0 };
+        let joyTouchId = null;
+
+        joyZone.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const touch = e.changedTouches[0];
+            joyTouchId = touch.identifier;
+            const rect = joyZone.getBoundingClientRect();
+            joyCenter = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+            updateJoystick(touch.clientX, touch.clientY);
+        }, { passive: false });
+
+        joyZone.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                if (e.changedTouches[i].identifier === joyTouchId) {
+                    updateJoystick(e.changedTouches[i].clientX, e.changedTouches[i].clientY);
+                    break;
+                }
+            }
+        }, { passive: false });
+
+        joyZone.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                if (e.changedTouches[i].identifier === joyTouchId) {
+                    resetJoystick();
+                    break;
+                }
+            }
+        });
+
+        fireZone.addEventListener('touchstart', (e) => {
+            e.preventDefault(); // prevent zoom
+            if (state.isPlaying) fireLaser();
+        }, { passive: false });
+
+        function updateJoystick(x, y) {
+            const maxDist = 75; // radius of zone
+            let dx = x - joyCenter.x;
+            let dy = y - joyCenter.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            // Clamp
+            if (dist > maxDist) {
+                const angle = Math.atan2(dy, dx);
+                dx = Math.cos(angle) * maxDist;
+                dy = Math.sin(angle) * maxDist;
+            }
+
+            // Visual
+            joyKnob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+
+            // Normalize input -1 to 1
+            state.input.x = dx / maxDist;
+            state.input.y = -(dy / maxDist); // Invert Y for screen coords
+        }
+
+        function resetJoystick() {
+            joyKnob.style.transform = `translate(-50%, -50%)`;
+            state.input.x = 0;
+            state.input.y = 0;
+            joyTouchId = null;
+        }
+
+        function fireLaser() {
+            const l = laserPool.get();
+            l.position.copy(ship.position);
+            // Offset slightly to sides? No, center is fine for arcade feel
+            l.position.z -= 1.5;
+        }
+
+        // --- GAME LOGIC ---
+
+        function updateInput() {
+            if (!state.isMobile) {
+                // Reset then check keys
+                state.input.x = 0;
+                state.input.y = 0;
+                if (keys.w || keys.ArrowUp) state.input.y += 1;
+                if (keys.s || keys.ArrowDown) state.input.y -= 1;
+                if (keys.a || keys.ArrowLeft) state.input.x -= 1;
+                if (keys.d || keys.ArrowRight) state.input.x += 1;
+            }
+        }
+
+        function updateShip(dt) {
+            // Apply force
+            shipVelocity.x += state.input.x * SETTINGS.speed;
+            shipVelocity.y += state.input.y * SETTINGS.speed;
+
+            // Friction
+            shipVelocity.x += (0 - shipVelocity.x) * SETTINGS.friction;
+            shipVelocity.y += (0 - shipVelocity.y) * SETTINGS.friction;
+
+            // Move
+            ship.position.x += shipVelocity.x * dt;
+            ship.position.y += shipVelocity.y * dt;
+
+            // Banking Visuals
+            ship.rotation.z = -shipVelocity.x * 0.1; // Roll
+            ship.rotation.x = shipVelocity.y * 0.05; // Pitch
+
+            // Boundaries
+            if (ship.position.x > SETTINGS.boundaryX) { ship.position.x = SETTINGS.boundaryX; shipVelocity.x = 0; }
+            if (ship.position.x < -SETTINGS.boundaryX) { ship.position.x = -SETTINGS.boundaryX; shipVelocity.x = 0; }
+            if (ship.position.y > SETTINGS.boundaryY) { ship.position.y = SETTINGS.boundaryY; shipVelocity.y = 0; }
+            if (ship.position.y < -SETTINGS.boundaryY + 1) { ship.position.y = -SETTINGS.boundaryY + 1; shipVelocity.y = 0; } // +1 for ground clearance
+        }
+
+        function updateLasers(dt) {
+            for (let i = laserPool.active.length - 1; i >= 0; i--) {
+                const laser = laserPool.active[i];
+                laser.position.z -= 80 * dt;
+                if (laser.position.z < -100) {
+                    laserPool.release(laser);
+                }
+            }
+        }
+
+        function updateEnemies(dt) {
+            // Spawning
+            if (state.frame % SETTINGS.spawnRate === 0) {
+                const e = enemyPool.get();
+                e.position.z = -120;
+                e.position.x = (Math.random() - 0.5) * SETTINGS.boundaryX * 2;
+                e.position.y = (Math.random() - 0.5) * SETTINGS.boundaryY * 2;
+                // Keep above grid
+                if (e.position.y < -4) e.position.y = -4;
+            }
+
+            for (let i = enemyPool.active.length - 1; i >= 0; i--) {
+                const enemy = enemyPool.active[i];
+                enemy.position.z += 30 * dt; // Speed towards camera
+                enemy.rotation.x += dt;
+                enemy.rotation.y += dt;
+
+                // Check collision with Ship
+                const distToShip = enemy.position.distanceTo(ship.position);
+                if (distToShip < 2.0) {
+                    gameOver();
+                }
+
+                // Check passed camera
+                if (enemy.position.z > 10) {
+                    enemyPool.release(enemy);
+                }
+            }
+        }
+
+        function checkCollisions() {
+            // Brute force is fine for < 100 objects
+            for (let lIdx = laserPool.active.length - 1; lIdx >= 0; lIdx--) {
+                const laser = laserPool.active[lIdx];
+                let laserHit = false;
+
+                for (let eIdx = enemyPool.active.length - 1; eIdx >= 0; eIdx--) {
+                    const enemy = enemyPool.active[eIdx];
+
+                    // Simple Box/Distance check
+                    // Laser is fast, so simple distance might miss if frame rate drops, 
+                    // but for this arcade style, distance check is usually cheap and effective enough
+                    // if hitboxes are generous.
+                    if (Math.abs(laser.position.z - enemy.position.z) < 2.0) {
+                        const dist = Math.sqrt(
+                            Math.pow(laser.position.x - enemy.position.x, 2) +
+                            Math.pow(laser.position.y - enemy.position.y, 2)
+                        );
+
+                        if (dist < 2.0) {
+                            // Hit!
+                            particles.explode(enemy.position);
+                            enemyPool.release(enemy);
+                            laserPool.release(laser);
+                            laserHit = true;
+
+                            state.score += 100;
+                            updateScore();
+                            break; // Laser can only hit one thing
+                        }
+                    }
+                }
+                if (laserHit) continue;
+            }
+        }
+
+        function updateEnvironment(dt) {
+            // Scroll Grid
+            env.grid.position.z += 20 * dt;
+            if (env.grid.position.z > 0) env.grid.position.z = -50;
+
+            // Rotate Stars
+            env.stars.rotation.z += 0.05 * dt;
+        }
+
+        function updateScore() {
+            document.getElementById('score-board').innerText = `SCORE: ${state.score}`;
+
+            // Ramp up difficulty
+            if (state.score > 1000) SETTINGS.spawnRate = 45;
+            if (state.score > 3000) SETTINGS.spawnRate = 30;
+            if (state.score > 6000) SETTINGS.spawnRate = 15;
+        }
+
+        function gameOver() {
+            state.isPlaying = false;
+            document.getElementById('game-over').style.display = 'block';
+            document.getElementById('final-score').innerText = `FINAL SCORE: ${state.score}`;
+            document.getElementById('ui-layer').style.pointerEvents = 'auto'; // allow clicking button
+            if (state.isMobile) document.getElementById('mobile-controls').style.display = 'none';
+        }
+
+        function restartGame() {
+            state.score = 0;
+            state.isPlaying = true;
+            SETTINGS.spawnRate = 60;
+            updateScore();
+
+            // Clear screen
+            [...enemyPool.active].forEach(e => enemyPool.release(e));
+            [...laserPool.active].forEach(l => laserPool.release(l));
+
+            ship.position.set(0, 0, 0);
+            shipVelocity.x = 0;
+            shipVelocity.y = 0;
+
+            document.getElementById('game-over').style.display = 'none';
+            document.getElementById('ui-layer').style.pointerEvents = 'none';
+            if (state.isMobile) document.getElementById('mobile-controls').style.display = 'block';
+        }
+
+        document.getElementById('restart-btn').addEventListener('click', restartGame);
+
+        // --- MAIN LOOP ---
+        const clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const dt = Math.min(clock.getDelta(), 0.1); // Cap dt to prevent huge jumps on lag
+
+            if (state.isPlaying) {
+                updateInput();
+                updateShip(dt);
+                updateEnvironment(dt);
+                updateLasers(dt);
+                updateEnemies(dt);
+                checkCollisions();
+                state.frame++;
+            }
+
+            particles.update(dt);
+
+            composer.render();
+        }
+
+        // Handle Window Resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Hide loading
+        document.getElementById('loading').style.display = 'none';
+
+        // Start
+        animate();
+
+    </script>
+</body>
+
+</html>
