@@ -2,7 +2,7 @@
 
 Minimal static sayt: yashil/ qora tema, matritsa yomg'iri, typing effekt.
 
-## Ishga tushirish .
+## Ishga tushirish_
 
 ```bash
 # oddiy http serverdan foydalaning
